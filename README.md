@@ -128,7 +128,6 @@ Recommended Vercel settings:
 Set these Environment Variables in Vercel Project Settings:
 
 ```env
-SOOS_GSC_SITE_URL=https://www.example.com/
 SOOS_GSC_OAUTH_CLIENT_ID=your-google-oauth-client-id
 SOOS_GSC_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
 SOOS_GSC_REFRESH_TOKEN=your-google-refresh-token
@@ -138,6 +137,7 @@ SOOS_PUBLIC_BASE_URL=https://your-vercel-domain.vercel.app
 Notes:
 
 - Vercel Serverless Functions do not persist `.soos-gsc.json`; UI-saved API config is local-only.
+- Search Console Property URL is entered in the UI. It is not required as a Vercel environment variable.
 - Generate `SOOS_GSC_REFRESH_TOKEN` locally with `npm run dev`, then copy the refresh token value from `.soos-gsc.json` into Vercel Environment Variables.
 - Add the deployed callback URL to Google OAuth authorized redirect URIs:
 

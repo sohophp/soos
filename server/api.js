@@ -1400,7 +1400,6 @@ async function readDotEnvConfig() {
   try {
     const env = parseEnvText(await fs.readFile(ENV_PATH, "utf8"));
     return {
-      siteUrl: env.SOOS_GSC_SITE_URL || env.GSC_SITE_URL || "",
       accessToken: env.SOOS_GSC_ACCESS_TOKEN || env.GSC_ACCESS_TOKEN || "",
       refreshToken: env.SOOS_GSC_REFRESH_TOKEN || env.GSC_REFRESH_TOKEN || "",
       oauthClientId: env.SOOS_GSC_OAUTH_CLIENT_ID || env.GSC_OAUTH_CLIENT_ID || "",
@@ -1415,7 +1414,6 @@ async function readDotEnvConfig() {
 
 function readProcessEnvConfig() {
   return {
-    siteUrl: process.env.SOOS_GSC_SITE_URL || process.env.GSC_SITE_URL || "",
     accessToken: process.env.SOOS_GSC_ACCESS_TOKEN || process.env.GSC_ACCESS_TOKEN || "",
     refreshToken: process.env.SOOS_GSC_REFRESH_TOKEN || process.env.GSC_REFRESH_TOKEN || "",
     oauthClientId: process.env.SOOS_GSC_OAUTH_CLIENT_ID || process.env.GSC_OAUTH_CLIENT_ID || "",
@@ -1428,16 +1426,15 @@ async function readGscConfigWithEnv() {
   const [config, dotEnvConfig] = await Promise.all([readGscConfig(), readDotEnvConfig()]);
   const processEnvConfig = readProcessEnvConfig();
   const envConfig = {
-    siteUrl: processEnvConfig.siteUrl || dotEnvConfig.siteUrl || "",
     accessToken: processEnvConfig.accessToken || dotEnvConfig.accessToken || "",
     refreshToken: processEnvConfig.refreshToken || dotEnvConfig.refreshToken || "",
     oauthClientId: processEnvConfig.oauthClientId || dotEnvConfig.oauthClientId || "",
     oauthClientSecret: processEnvConfig.oauthClientSecret || dotEnvConfig.oauthClientSecret || "",
-    source: processEnvConfig.oauthClientId || processEnvConfig.oauthClientSecret || processEnvConfig.refreshToken || processEnvConfig.siteUrl ? "process-env" : dotEnvConfig.source || "",
+    source: processEnvConfig.oauthClientId || processEnvConfig.oauthClientSecret || processEnvConfig.refreshToken || processEnvConfig.accessToken ? "process-env" : dotEnvConfig.source || "",
   };
   return {
     ...config,
-    siteUrl: config.siteUrl || envConfig.siteUrl || "",
+    siteUrl: config.siteUrl || "",
     accessToken: config.accessToken || envConfig.accessToken || "",
     refreshToken: config.refreshToken || envConfig.refreshToken || "",
     oauthClientId: config.oauthClientId || envConfig.oauthClientId || "",
@@ -1470,8 +1467,9 @@ function gscStatusFromConfig(config) {
     : Number.isFinite(tokenAgeMs)
       ? tokenAgeMs > 55 * 60 * 1000
       : false;
-  const note = config.serverless && !config.refreshToken && !config.accessToken
-    ? "Vercel deployments use environment variables for Search Console API credentials."
+  const hasApiCredential = Boolean(config.accessToken || config.refreshToken);
+  const note = config.serverless && !hasApiCredential
+    ? "Vercel deployments use environment variables for Search Console API credentials. Enter Property URL in the UI for each request."
     : isOauth
       ? "OAuth refresh token configured. soos will refresh Search Console access automatically."
       : config.accessToken
@@ -1480,7 +1478,7 @@ function gscStatusFromConfig(config) {
           : "Manual token configured. Use Test API connection to confirm property access."
         : "Configure a Search Console property and access token, or use CSV import.";
   return {
-    configured: Boolean(config.siteUrl && (config.accessToken || config.refreshToken)),
+    configured: config.serverless ? hasApiCredential : Boolean(config.siteUrl && hasApiCredential),
     mode: isOauth ? "oauth-refresh" : config.accessToken ? "manual-token" : "not-configured",
     siteUrl: config.siteUrl || "",
     token: config.accessToken ? maskSecret(config.accessToken) : "",
@@ -1561,8 +1559,11 @@ async function refreshGscAccessToken(config) {
   return next;
 }
 
-async function getGscConfigWithAccessToken() {
+async function getGscConfigWithAccessToken(overrides = {}) {
   const config = await readGscConfigWithEnv();
+  if (typeof overrides.siteUrl === "string" && overrides.siteUrl.trim()) {
+    config.siteUrl = overrides.siteUrl.trim();
+  }
   if (!config.siteUrl) throw new Error("Search Console property URL is required.");
   if (config.refreshToken) {
     const expiresAt = config.tokenExpiresAt ? new Date(config.tokenExpiresAt).getTime() : 0;
@@ -1588,8 +1589,8 @@ function buildGscOAuthUrl(config) {
   return { authUrl: authUrl.toString(), state, redirectUri: oauthRedirectUri() };
 }
 
-async function testGscConnection() {
-  const config = await getGscConfigWithAccessToken();
+async function testGscConnection(options = {}) {
+  const config = await getGscConfigWithAccessToken(options);
   if (!config.siteUrl || !config.accessToken) {
     throw new Error("Search Console API is not configured.");
   }
@@ -1658,8 +1659,8 @@ async function inspectGscUrl(config, inspectionUrl) {
   };
 }
 
-async function inspectGscUrls(urls) {
-  const config = await getGscConfigWithAccessToken();
+async function inspectGscUrls(urls, options = {}) {
+  const config = await getGscConfigWithAccessToken(options);
   if (!config.siteUrl || !config.accessToken) {
     throw new Error("Search Console API is not configured.");
   }
@@ -1681,8 +1682,8 @@ function formatDateOnly(value) {
   return null;
 }
 
-async function queryGscSearchAnalytics({ startDate, endDate, rowLimit = 25000 }) {
-  const config = await getGscConfigWithAccessToken();
+async function queryGscSearchAnalytics({ startDate, endDate, rowLimit = 25000, siteUrl = "" }) {
+  const config = await getGscConfigWithAccessToken({ siteUrl });
   if (!config.siteUrl || !config.accessToken) {
     throw new Error("Search Console API is not configured.");
   }
@@ -1831,7 +1832,8 @@ export function handleRequest(req, res) {
     return;
   }
   if (req.method === "POST" && requestPath === "/api/gsc/test") {
-    testGscConnection()
+    readJsonBody(req, 50000)
+      .then((body) => testGscConnection({ siteUrl: body.siteUrl }))
       .then((result) => sendJson(res, 200, result))
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
@@ -1845,7 +1847,7 @@ export function handleRequest(req, res) {
   }
   if (req.method === "POST" && requestPath === "/api/gsc/inspect") {
     readJsonBody(req, 200000)
-      .then((body) => inspectGscUrls(body.urls || []))
+      .then((body) => inspectGscUrls(body.urls || [], { siteUrl: body.siteUrl }))
       .then((result) => sendJson(res, 200, result))
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;

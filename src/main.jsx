@@ -1567,8 +1567,7 @@ function summarizeGscRows(report, rows) {
   };
 }
 
-function SearchConsoleApiConfig({ status, onStatus }) {
-  const [siteUrl, setSiteUrl] = useState(status?.siteUrl || "");
+function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange }) {
   const [accessToken, setAccessToken] = useState("");
   const [oauthClientId, setOauthClientId] = useState("");
   const [oauthClientSecret, setOauthClientSecret] = useState("");
@@ -1579,8 +1578,8 @@ function SearchConsoleApiConfig({ status, onStatus }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setSiteUrl(status?.siteUrl || "");
-  }, [status?.siteUrl]);
+    if (status?.siteUrl) onSiteUrlChange(status.siteUrl);
+  }, [onSiteUrlChange, status?.siteUrl]);
 
   const tokenState = status?.refreshToken
     ? "OAuth connected"
@@ -1644,14 +1643,22 @@ function SearchConsoleApiConfig({ status, onStatus }) {
 
   async function testConfig() {
     if (!status?.configured) {
-      setError(status?.serverless ? "Set SOOS_GSC_SITE_URL and SOOS_GSC_REFRESH_TOKEN or SOOS_GSC_ACCESS_TOKEN in Vercel Environment Variables, then redeploy." : "Save a Property URL and access token, or complete OAuth, before testing the API connection.");
+      setError(status?.serverless ? "Set SOOS_GSC_REFRESH_TOKEN or SOOS_GSC_ACCESS_TOKEN in Vercel Environment Variables, then enter a Property URL here before testing." : "Save a Property URL and access token, or complete OAuth, before testing the API connection.");
+      return;
+    }
+    if (!siteUrl.trim()) {
+      setError("Enter the Search Console Property URL before testing the API connection.");
       return;
     }
     setTesting(true);
     setMessage("");
     setError("");
     try {
-      const response = await fetch("/api/gsc/test", { method: "POST" });
+      const response = await fetch("/api/gsc/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteUrl }),
+      });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Search Console API test failed");
       if (body.status) onStatus(body.status);
@@ -1712,7 +1719,7 @@ function SearchConsoleApiConfig({ status, onStatus }) {
         <div className="gsc-api-fields">
           <label>
             <strong>Property URL</strong>
-            <input type="text" placeholder="https://example.com/ or sc-domain:example.com" value={siteUrl} onChange={(event) => setSiteUrl(event.target.value)} />
+            <input type="text" placeholder="https://example.com/ or sc-domain:example.com" value={siteUrl} onChange={(event) => onSiteUrlChange(event.target.value)} />
             <small>URL-prefix: use the exact Search Console property, like https://www.example.com/. Domain property: use sc-domain:example.com.</small>
           </label>
           <label>
@@ -1759,7 +1766,7 @@ function SearchConsoleApiConfig({ status, onStatus }) {
           {status?.tokenExpiresAt ? <small>Access token expires at {new Date(status.tokenExpiresAt).toLocaleString()}.</small> : null}
           {status?.refreshToken ? <small>Refresh token saved locally. Access tokens refresh automatically.</small> : null}
           {status?.oauthClientSource ? <small>OAuth client credentials source: {status.oauthClientSource === "process-env" ? "environment variables" : status.oauthClientSource === "env" ? ".env preset" : "saved config"}.</small> : null}
-          {status?.serverless ? <small>Vercel mode: set SOOS_GSC_* values in Project Settings &gt; Environment Variables. UI-saved config is local-only.</small> : null}
+          {status?.serverless ? <small>Vercel mode: set OAuth/token values in Project Settings &gt; Environment Variables. Enter Property URL in this panel for each API request.</small> : null}
         </div>
         {message ? <small className="gsc-api-message">{message}</small> : null}
         {error ? <small className="gsc-api-error">{error}</small> : null}
@@ -1778,7 +1785,7 @@ function defaultGscDateRange() {
   };
 }
 
-function SearchAnalyticsPanel({ status, onRows }) {
+function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
   const defaults = useMemo(() => defaultGscDateRange(), []);
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [endDate, setEndDate] = useState(defaults.endDate);
@@ -1789,7 +1796,11 @@ function SearchAnalyticsPanel({ status, onRows }) {
   async function loadAnalytics(event) {
     event.preventDefault();
     if (!status?.configured) {
-      setError(status?.serverless ? "Search Console API is not configured. Set SOOS_GSC_SITE_URL and SOOS_GSC_REFRESH_TOKEN or SOOS_GSC_ACCESS_TOKEN in Vercel Environment Variables, then redeploy." : "Configure Search Console API first, then load Search Analytics.");
+      setError(status?.serverless ? "Search Console API token is not configured. Set SOOS_GSC_REFRESH_TOKEN or SOOS_GSC_ACCESS_TOKEN in Vercel Environment Variables, then redeploy." : "Configure Search Console API first, then load Search Analytics.");
+      return;
+    }
+    if (!siteUrl.trim()) {
+      setError("Enter the Search Console Property URL in the Search Console API panel before loading Search Analytics.");
       return;
     }
     setLoading(true);
@@ -1798,7 +1809,7 @@ function SearchAnalyticsPanel({ status, onRows }) {
       const response = await fetch("/api/gsc/search-analytics", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ startDate, endDate }),
+        body: JSON.stringify({ startDate, endDate, siteUrl }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Search Analytics failed");
@@ -2095,7 +2106,7 @@ function SearchVisibility({ report, t, gscRows }) {
     </section>
   );
 }
-function UrlInspectionPanel({ report, gscStatus }) {
+function UrlInspectionPanel({ report, gscStatus, siteUrl }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
@@ -2119,13 +2130,17 @@ function UrlInspectionPanel({ report, gscStatus }) {
   );
 
   async function runInspection() {
+    if (!siteUrl.trim()) {
+      setError("Enter the Search Console Property URL in the Search Console API panel before running URL Inspection.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
       const response = await fetch("/api/gsc/inspect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls }),
+        body: JSON.stringify({ urls, siteUrl }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "URL Inspection failed");
@@ -2273,7 +2288,7 @@ function diagnoseInspectionResult(item) {
   }
   return diagnoses;
 }
-function Report({ report, t, gscRows, gscStatus }) {
+function Report({ report, t, gscRows, gscStatus, gscSiteUrl }) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [issueFilter, setIssueFilter] = useState(null);
@@ -2319,7 +2334,7 @@ function Report({ report, t, gscRows, gscStatus }) {
       <ScoreCard score={report.summary.healthScore} t={t} />
       <SearchVisibility report={report} t={t} gscRows={gscRows} />
       <GscOpportunities report={report} rows={gscRows} />
-      <UrlInspectionPanel report={report} gscStatus={gscStatus} />
+      <UrlInspectionPanel report={report} gscStatus={gscStatus} siteUrl={gscSiteUrl} />
       <section className="summary">
         <Stat label={t.urls} value={report.summary.urlCount} />
         <Stat label={t.affected} value={report.summary.affectedUrlCount} tone="warn" />
@@ -2441,6 +2456,7 @@ function App() {
   const [backgroundMode, setBackgroundMode] = useState(false);
   const [gscRows, setGscRows] = useState([]);
   const [gscStatus, setGscStatus] = useState(null);
+  const [gscSiteUrl, setGscSiteUrl] = useState("");
   const [report, setReport] = useState(null);
   const [history, setHistory] = useState(() => loadHistory());
   const [historyLimit, setHistoryLimit] = useState(() => loadHistoryLimit());
@@ -2458,7 +2474,10 @@ function App() {
     useEffect(() => {
     fetch("/api/gsc/status")
       .then((response) => response.json())
-      .then(setGscStatus)
+      .then((status) => {
+        setGscStatus(status);
+        if (status?.siteUrl) setGscSiteUrl(status.siteUrl);
+      })
       .catch(() => setGscStatus({ configured: false, note: "Search Console API status is unavailable." }));
   }, []);
 useEffect(() => {
@@ -2657,8 +2676,8 @@ useEffect(() => {
           <small>{t.directoryRobotsHelp}</small>
         </span>
       </label>
-      <SearchConsoleApiConfig status={gscStatus} onStatus={setGscStatus} />
-      <SearchAnalyticsPanel status={gscStatus} onRows={setGscRows} />
+      <SearchConsoleApiConfig status={gscStatus} onStatus={setGscStatus} siteUrl={gscSiteUrl} onSiteUrlChange={setGscSiteUrl} />
+      <SearchAnalyticsPanel status={gscStatus} siteUrl={gscSiteUrl} onRows={setGscRows} />
       <SearchConsoleImport rows={gscRows} onImport={setGscRows} onClear={() => setGscRows([])} />
 
 
@@ -2700,7 +2719,7 @@ useEffect(() => {
       <ComparisonPanel comparisonEntry={comparisonEntry} report={report} t={t} />
 
       {error ? <div className="error">{error}</div> : null}
-      <Report report={report} t={t} gscRows={gscRows} gscStatus={gscStatus} />
+      <Report report={report} t={t} gscRows={gscRows} gscStatus={gscStatus} gscSiteUrl={gscSiteUrl} />
     </main>
   );
 }
