@@ -1,5 +1,5 @@
 ﻿import http from "node:http";
-import { URL } from "node:url";
+import { URL, pathToFileURL } from "node:url";
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -1353,6 +1353,8 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null) {
 }
 
 async function readJsonBody(req, maxLength = 100000) {
+  if (req.body && typeof req.body === "object") return req.body;
+  if (typeof req.body === "string") return JSON.parse(req.body || "{}");
   let raw = "";
   for await (const chunk of req) {
     raw += chunk;
@@ -1368,7 +1370,13 @@ function maskSecret(value) {
 }
 
 function oauthRedirectUri() {
+  const publicBaseUrl = process.env.SOOS_PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+  if (publicBaseUrl) return `${publicBaseUrl.replace(/\/$/, "")}/api/gsc/oauth/callback`;
   return `http://127.0.0.1:${PORT}/api/gsc/oauth/callback`;
+}
+
+function isServerlessRuntime() {
+  return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 }
 
 function parseEnvText(text) {
@@ -1392,6 +1400,9 @@ async function readDotEnvConfig() {
   try {
     const env = parseEnvText(await fs.readFile(ENV_PATH, "utf8"));
     return {
+      siteUrl: env.SOOS_GSC_SITE_URL || env.GSC_SITE_URL || "",
+      accessToken: env.SOOS_GSC_ACCESS_TOKEN || env.GSC_ACCESS_TOKEN || "",
+      refreshToken: env.SOOS_GSC_REFRESH_TOKEN || env.GSC_REFRESH_TOKEN || "",
       oauthClientId: env.SOOS_GSC_OAUTH_CLIENT_ID || env.GSC_OAUTH_CLIENT_ID || "",
       oauthClientSecret: env.SOOS_GSC_OAUTH_CLIENT_SECRET || env.GSC_OAUTH_CLIENT_SECRET || "",
       source: "env",
@@ -1402,13 +1413,37 @@ async function readDotEnvConfig() {
   }
 }
 
+function readProcessEnvConfig() {
+  return {
+    siteUrl: process.env.SOOS_GSC_SITE_URL || process.env.GSC_SITE_URL || "",
+    accessToken: process.env.SOOS_GSC_ACCESS_TOKEN || process.env.GSC_ACCESS_TOKEN || "",
+    refreshToken: process.env.SOOS_GSC_REFRESH_TOKEN || process.env.GSC_REFRESH_TOKEN || "",
+    oauthClientId: process.env.SOOS_GSC_OAUTH_CLIENT_ID || process.env.GSC_OAUTH_CLIENT_ID || "",
+    oauthClientSecret: process.env.SOOS_GSC_OAUTH_CLIENT_SECRET || process.env.GSC_OAUTH_CLIENT_SECRET || "",
+    source: "process-env",
+  };
+}
+
 async function readGscConfigWithEnv() {
-  const [config, envConfig] = await Promise.all([readGscConfig(), readDotEnvConfig()]);
+  const [config, dotEnvConfig] = await Promise.all([readGscConfig(), readDotEnvConfig()]);
+  const processEnvConfig = readProcessEnvConfig();
+  const envConfig = {
+    siteUrl: processEnvConfig.siteUrl || dotEnvConfig.siteUrl || "",
+    accessToken: processEnvConfig.accessToken || dotEnvConfig.accessToken || "",
+    refreshToken: processEnvConfig.refreshToken || dotEnvConfig.refreshToken || "",
+    oauthClientId: processEnvConfig.oauthClientId || dotEnvConfig.oauthClientId || "",
+    oauthClientSecret: processEnvConfig.oauthClientSecret || dotEnvConfig.oauthClientSecret || "",
+    source: processEnvConfig.oauthClientId || processEnvConfig.oauthClientSecret || processEnvConfig.refreshToken || processEnvConfig.siteUrl ? "process-env" : dotEnvConfig.source || "",
+  };
   return {
     ...config,
+    siteUrl: config.siteUrl || envConfig.siteUrl || "",
+    accessToken: config.accessToken || envConfig.accessToken || "",
+    refreshToken: config.refreshToken || envConfig.refreshToken || "",
     oauthClientId: config.oauthClientId || envConfig.oauthClientId || "",
     oauthClientSecret: config.oauthClientSecret || envConfig.oauthClientSecret || "",
-    oauthClientSource: config.oauthClientId && config.oauthClientSecret ? "config" : envConfig.oauthClientId && envConfig.oauthClientSecret ? "env" : "",
+    oauthClientSource: config.oauthClientId && config.oauthClientSecret ? "config" : envConfig.oauthClientId && envConfig.oauthClientSecret ? envConfig.source : "",
+    serverless: isServerlessRuntime(),
   };
 }
 
@@ -1435,6 +1470,15 @@ function gscStatusFromConfig(config) {
     : Number.isFinite(tokenAgeMs)
       ? tokenAgeMs > 55 * 60 * 1000
       : false;
+  const note = config.serverless && !config.refreshToken && !config.accessToken
+    ? "Vercel deployments use environment variables for Search Console API credentials."
+    : isOauth
+      ? "OAuth refresh token configured. soos will refresh Search Console access automatically."
+      : config.accessToken
+        ? tokenLikelyExpired
+          ? "Manual access tokens usually expire after about 1 hour. Paste a fresh token, then test again."
+          : "Manual token configured. Use Test API connection to confirm property access."
+        : "Configure a Search Console property and access token, or use CSV import.";
   return {
     configured: Boolean(config.siteUrl && (config.accessToken || config.refreshToken)),
     mode: isOauth ? "oauth-refresh" : config.accessToken ? "manual-token" : "not-configured",
@@ -1445,16 +1489,12 @@ function gscStatusFromConfig(config) {
     oauthClientSource: config.oauthClientSource || "",
     oauthRedirectUri: oauthRedirectUri(),
     refreshToken: config.refreshToken ? "configured" : "",
+    serverless: Boolean(config.serverless),
+    persistentConfig: !config.serverless,
     tokenExpiresAt: expiresAt,
     tokenUpdatedAt,
     tokenLikelyExpired,
-    note: isOauth
-      ? "OAuth refresh token configured. soos will refresh Search Console access automatically."
-      : config.accessToken
-        ? tokenLikelyExpired
-          ? "Manual access tokens usually expire after about 1 hour. Paste a fresh token, then test again."
-          : "Manual token configured. Use Test API connection to confirm property access."
-        : "Configure a Search Console property and access token, or use CSV import.",
+    note,
   };
 }
 
@@ -1516,6 +1556,7 @@ async function refreshGscAccessToken(config) {
     delete next.oauthClientSecret;
   }
   delete next.oauthClientSource;
+  if (config.serverless) return next;
   await writeGscConfig(next);
   return next;
 }
@@ -1688,7 +1729,7 @@ async function queryGscSearchAnalytics({ startDate, endDate, rowLimit = 25000 })
     rows,
   };
 }
-const server = http.createServer((req, res) => {
+export function handleRequest(req, res) {
   cleanupJobs();
   if (req.method === "OPTIONS") return sendJson(res, 200, {});
   if (req.method === "GET" && req.url === "/api/gsc/status") {
@@ -1698,6 +1739,9 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (req.method === "POST" && req.url === "/api/gsc/config") {
+    if (isServerlessRuntime()) {
+      return sendJson(res, 400, { error: "Vercel deployments cannot persist UI-saved API config. Set SOOS_GSC_* environment variables instead." });
+    }
     readJsonBody(req, 50000)
       .then(async (body) => {
         const siteUrl = typeof body.siteUrl === "string" ? body.siteUrl.trim() : "";
@@ -1722,6 +1766,9 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (req.method === "POST" && req.url === "/api/gsc/clear") {
+    if (isServerlessRuntime()) {
+      return sendJson(res, 400, { error: "Vercel deployments use environment variables. Clear or change SOOS_GSC_* values in Vercel project settings." });
+    }
     fs.rm(GSC_CONFIG_PATH, { force: true })
       .then(() => sendJson(res, 200, gscStatusFromConfig({})))
       .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
@@ -1730,6 +1777,7 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/gsc/oauth/start") {
     readGscConfigWithEnv()
       .then(async (config) => {
+        if (config.serverless) throw new Error("Start OAuth locally to get a refresh token, then set SOOS_GSC_REFRESH_TOKEN in Vercel environment variables.");
         const oauth = buildGscOAuthUrl(config);
         const storedConfig = await readGscConfig();
         await writeGscConfig({
@@ -1812,14 +1860,9 @@ const server = http.createServer((req, res) => {
     const id = parts[3];
     const job = jobs.get(id);
     if (!job) return sendJson(res, 404, { error: "Job not found" });
-    let rawControl = "";
-    req.on("data", (chunk) => {
-      rawControl += chunk;
-      if (rawControl.length > 20000) req.destroy();
-    });
-    req.on("end", () => {
+    readJsonBody(req, 20000)
+      .then((body) => {
       try {
-        const body = JSON.parse(rawControl || "{}");
         if (body.action === "pause" && job.status === "running") {
           updateJob(job, { status: "paused", progress: { label: "Paused" } });
         } else if (body.action === "resume" && job.status === "paused") {
@@ -1831,18 +1874,14 @@ const server = http.createServer((req, res) => {
       } catch (error) {
         return sendJson(res, 400, { error: String(error.message || error) });
       }
-    });
+    })
+      .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
   if (req.method === "POST" && req.url === "/api/audit-jobs") {
-    let rawJob = "";
-    req.on("data", (chunk) => {
-      rawJob += chunk;
-      if (rawJob.length > 100000) req.destroy();
-    });
-    req.on("end", () => {
+    readJsonBody(req, 100000)
+      .then((body) => {
       try {
-        const body = JSON.parse(rawJob || "{}");
         const job = createJob();
         updateJob(job, {
           status: "running",
@@ -1890,25 +1929,24 @@ const server = http.createServer((req, res) => {
       } catch (error) {
         return sendJson(res, 400, { error: String(error.message || error) });
       }
-    });
+    })
+      .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
   if (req.method !== "POST" || req.url !== "/api/audit") return sendJson(res, 404, { error: "Not found" });
-  let raw = "";
-  req.on("data", (chunk) => {
-    raw += chunk;
-    if (raw.length > 100000) req.destroy();
-  });
-  req.on("end", async () => {
+  readJsonBody(req, 100000)
+    .then(async (body) => {
     try {
-      const body = JSON.parse(raw || "{}");
       sendJson(res, 200, await audit(body.sitemapUrl, body.options));
     } catch (error) {
       sendJson(res, 400, { error: String(error.message || error) });
     }
-  });
-});
+  })
+    .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
+}
 
-server.listen(PORT, "127.0.0.1", () => {
-  console.log(`soos API listening on http://127.0.0.1:${PORT}`);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  http.createServer(handleRequest).listen(PORT, "127.0.0.1", () => {
+    console.log(`soos API listening on http://127.0.0.1:${PORT}`);
+  });
+}

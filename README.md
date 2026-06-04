@@ -110,9 +110,42 @@ Recommended deployment options:
 
 - Static frontend on GitHub Pages plus a separate Node API host.
 - Full app on a platform that supports Node services, such as Render.
-- Adapt the API into serverless functions for Vercel or Netlify.
+- Vercel, using the included Serverless Function adapter in `api/[...path].js`.
+- Netlify, after adapting the API into Netlify Functions.
 
 For production OAuth, update the Google OAuth redirect URI to the deployed API callback URL.
+
+### Vercel
+
+This project includes `vercel.json` and a Vercel API adapter at `api/[...path].js`.
+
+Recommended Vercel settings:
+
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Install Command: `npm install`
+
+Set these Environment Variables in Vercel Project Settings:
+
+```env
+SOOS_GSC_SITE_URL=https://www.example.com/
+SOOS_GSC_OAUTH_CLIENT_ID=your-google-oauth-client-id
+SOOS_GSC_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
+SOOS_GSC_REFRESH_TOKEN=your-google-refresh-token
+SOOS_PUBLIC_BASE_URL=https://your-vercel-domain.vercel.app
+```
+
+Notes:
+
+- Vercel Serverless Functions do not persist `.soos-gsc.json`; UI-saved API config is local-only.
+- Generate `SOOS_GSC_REFRESH_TOKEN` locally with `npm run dev`, then copy the refresh token value from `.soos-gsc.json` into Vercel Environment Variables.
+- Add the deployed callback URL to Google OAuth authorized redirect URIs:
+
+```text
+https://your-vercel-domain.vercel.app/api/gsc/oauth/callback
+```
+
+- Background audit jobs use in-memory state and are best-effort on serverless platforms. Direct scans through `/api/audit` are more reliable for Vercel.
 
 ## Release Checklist
 
@@ -129,4 +162,3 @@ npm run build
 
 4. Commit changes.
 5. Tag releases with semantic versions such as `v0.1.0`.
-

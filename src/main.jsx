@@ -1592,6 +1592,10 @@ function SearchConsoleApiConfig({ status, onStatus }) {
 
   async function saveConfig(event) {
     event.preventDefault();
+    if (status?.serverless) {
+      setError("Vercel deployments use environment variables for API config. Set SOOS_GSC_* values in Vercel project settings.");
+      return;
+    }
     setSaving(true);
     setMessage("");
     setError("");
@@ -1615,6 +1619,10 @@ function SearchConsoleApiConfig({ status, onStatus }) {
   }
 
   async function clearConfig() {
+    if (status?.serverless) {
+      setError("Vercel deployments use environment variables. Clear or change SOOS_GSC_* values in Vercel project settings.");
+      return;
+    }
     setSaving(true);
     setMessage("");
     setError("");
@@ -1666,6 +1674,10 @@ function SearchConsoleApiConfig({ status, onStatus }) {
   }
 
   async function startOAuth() {
+    if (status?.serverless) {
+      setError("Start OAuth locally to get a refresh token, then set SOOS_GSC_REFRESH_TOKEN in Vercel environment variables.");
+      return;
+    }
     setOauthLoading(true);
     setMessage("");
     setError("");
@@ -1704,21 +1716,21 @@ function SearchConsoleApiConfig({ status, onStatus }) {
             <strong>OAuth Client ID</strong>
             <input type="text" placeholder={status?.oauthClientId || "Google OAuth client ID"} value={oauthClientId} onChange={(event) => setOauthClientId(event.target.value)} />
             <small>
-              {status?.oauthClientSource === "env" ? "Loaded from .env. " : status?.oauthClientSource === "config" ? "Loaded from saved config. " : ""}
+              {status?.oauthClientSource === "process-env" ? "Loaded from environment variables. " : status?.oauthClientSource === "env" ? "Loaded from .env. " : status?.oauthClientSource === "config" ? "Loaded from saved config. " : ""}
               Create a Google OAuth client and allow redirect URI {status?.oauthRedirectUri || "http://127.0.0.1:4177/api/gsc/oauth/callback"}.
             </small>
           </label>
           <label>
             <strong>OAuth Client Secret</strong>
             <input type="password" placeholder="Google OAuth client secret" value={oauthClientSecret} onChange={(event) => setOauthClientSecret(event.target.value)} />
-            <small>{status?.oauthClientSource === "env" ? "Using .env secret unless you save a new one here. " : ""}Saved locally in .soos-gsc.json. Leave blank to keep the saved secret or .env default.</small>
+            <small>{status?.oauthClientSource === "process-env" ? "Using environment variable secret. " : status?.oauthClientSource === "env" ? "Using .env secret unless you save a new one here. " : ""}Saved locally in .soos-gsc.json. Leave blank to keep the saved secret or environment default.</small>
           </label>
         </div>
         <div className="gsc-api-actions">
-          <button className="export-button" type="submit" disabled={saving}>
+          <button className="export-button" type="submit" disabled={saving || status?.serverless}>
             {saving ? "Saving..." : "Save API config"}
           </button>
-          <button className="export-button" type="button" onClick={startOAuth} disabled={!status?.oauthConfigured || oauthLoading || saving}>
+          <button className="export-button" type="button" onClick={startOAuth} disabled={!status?.oauthConfigured || oauthLoading || saving || status?.serverless}>
             {oauthLoading ? "Opening..." : "Start OAuth"}
           </button>
           <button className="export-button" type="button" onClick={refreshStatus} disabled={saving || testing || oauthLoading}>
@@ -1738,7 +1750,8 @@ function SearchConsoleApiConfig({ status, onStatus }) {
           {status?.tokenUpdatedAt ? <small>Token saved at {new Date(status.tokenUpdatedAt).toLocaleString()}.</small> : null}
           {status?.tokenExpiresAt ? <small>Access token expires at {new Date(status.tokenExpiresAt).toLocaleString()}.</small> : null}
           {status?.refreshToken ? <small>Refresh token saved locally. Access tokens refresh automatically.</small> : null}
-          {status?.oauthClientSource ? <small>OAuth client credentials source: {status.oauthClientSource === "env" ? ".env preset" : "saved config"}.</small> : null}
+          {status?.oauthClientSource ? <small>OAuth client credentials source: {status.oauthClientSource === "process-env" ? "environment variables" : status.oauthClientSource === "env" ? ".env preset" : "saved config"}.</small> : null}
+          {status?.serverless ? <small>Vercel mode: set SOOS_GSC_* values in Project Settings &gt; Environment Variables. UI-saved config is local-only.</small> : null}
         </div>
         {message ? <small className="gsc-api-message">{message}</small> : null}
         {error ? <small className="gsc-api-error">{error}</small> : null}

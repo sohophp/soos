@@ -2,6 +2,18 @@
 
 All notable changes to soos will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Vercel deployment support with `api/[...path].js` and `vercel.json`.
+- Environment-variable based GSC configuration for serverless deployments.
+
+### Changed
+
+- API handler can now be reused by both local Node server and Vercel Serverless Functions.
+- UI disables saved API config actions in serverless mode and points users to `SOOS_GSC_*` environment variables.
+
 ## [0.1.0] - 2026-06-04
 
 ### Added
@@ -31,4 +43,3 @@ All notable changes to soos will be documented in this file.
 
 - `.soos-gsc.json`, `.env`, `node_modules/`, and `dist/` are ignored by Git.
 - OAuth Client Secret from `.env` is not copied into `.soos-gsc.json` during OAuth start or refresh.
-
