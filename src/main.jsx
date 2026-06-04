@@ -1643,6 +1643,10 @@ function SearchConsoleApiConfig({ status, onStatus }) {
   }
 
   async function testConfig() {
+    if (!status?.configured) {
+      setError(status?.serverless ? "Set SOOS_GSC_SITE_URL and SOOS_GSC_REFRESH_TOKEN or SOOS_GSC_ACCESS_TOKEN in Vercel Environment Variables, then redeploy." : "Save a Property URL and access token, or complete OAuth, before testing the API connection.");
+      return;
+    }
     setTesting(true);
     setMessage("");
     setError("");
@@ -1676,6 +1680,10 @@ function SearchConsoleApiConfig({ status, onStatus }) {
   async function startOAuth() {
     if (status?.serverless) {
       setError("Start OAuth locally to get a refresh token, then set SOOS_GSC_REFRESH_TOKEN in Vercel environment variables.");
+      return;
+    }
+    if (!status?.oauthConfigured) {
+      setError("Save OAuth Client ID and OAuth Client Secret before starting OAuth.");
       return;
     }
     setOauthLoading(true);
@@ -1727,16 +1735,16 @@ function SearchConsoleApiConfig({ status, onStatus }) {
           </label>
         </div>
         <div className="gsc-api-actions">
-          <button className="export-button" type="submit" disabled={saving || status?.serverless}>
+          <button className="export-button" type="submit" disabled={saving}>
             {saving ? "Saving..." : "Save API config"}
           </button>
-          <button className="export-button" type="button" onClick={startOAuth} disabled={!status?.oauthConfigured || oauthLoading || saving || status?.serverless}>
+          <button className="export-button" type="button" onClick={startOAuth} disabled={oauthLoading || saving}>
             {oauthLoading ? "Opening..." : "Start OAuth"}
           </button>
           <button className="export-button" type="button" onClick={refreshStatus} disabled={saving || testing || oauthLoading}>
             Refresh status
           </button>
-          <button className="export-button" type="button" onClick={testConfig} disabled={!status?.configured || saving || testing}>
+          <button className="export-button" type="button" onClick={testConfig} disabled={saving || testing}>
             {testing ? "Testing..." : "Test API connection"}
           </button>
           {status?.configured ? (
@@ -1780,6 +1788,10 @@ function SearchAnalyticsPanel({ status, onRows }) {
 
   async function loadAnalytics(event) {
     event.preventDefault();
+    if (!status?.configured) {
+      setError(status?.serverless ? "Search Console API is not configured. Set SOOS_GSC_SITE_URL and SOOS_GSC_REFRESH_TOKEN or SOOS_GSC_ACCESS_TOKEN in Vercel Environment Variables, then redeploy." : "Configure Search Console API first, then load Search Analytics.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -1821,7 +1833,7 @@ function SearchAnalyticsPanel({ status, onRows }) {
           </label>
         </div>
         <div className="gsc-api-actions">
-          <button className="export-button" type="submit" disabled={!status?.configured || loading}>
+          <button className="export-button" type="submit" disabled={loading}>
             {loading ? "Loading..." : "Load Search Analytics"}
           </button>
         </div>
