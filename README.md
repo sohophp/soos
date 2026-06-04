@@ -1,0 +1,132 @@
+# soos SEO Assistant
+
+soos is a local-first React + Node SEO audit tool for sitemap, robots.txt, indexability, international SEO, lightweight performance checks, and Google Search Console diagnostics.
+
+## Features
+
+- Accepts a website URL, sitemap URL, or robots.txt URL and detects the best audit target.
+- Reads `sitemap.xml` and `sitemapindex` files, including child sitemaps.
+- Audits canonical, hreflang/alternate, title, description, H1, lang, viewport, JSON-LD, robots rules, and sitemap consistency.
+- Optional page content checks and lightweight performance checks.
+- Pause, resume, stop, background worker scans, history, CSV export, and summary export.
+- Google Search Console CSV import with English and Chinese column support.
+- Google Search Console API integration for Search Analytics and URL Inspection.
+- OAuth refresh token support so access tokens can refresh automatically.
+
+## Requirements
+
+- Node.js 20 or newer is recommended.
+- npm.
+- For Google Search Console API features, a Google Cloud OAuth client and access to the target Search Console property.
+
+## Local Development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run the app:
+
+```bash
+npm run dev
+```
+
+Default local URLs:
+
+- Frontend: `http://127.0.0.1:5173/`
+- API: `http://127.0.0.1:4177`
+
+If port `4177` is busy:
+
+```powershell
+$env:SOOS_API_PORT='4178'; npm run dev:api
+$env:SOOS_API_PORT='4178'; npm run dev:web -- --port 5177
+```
+
+Build for production:
+
+```bash
+npm run build
+```
+
+Check API syntax:
+
+```bash
+node --check server/api.js
+```
+
+## Configuration
+
+Runtime Google Search Console config is stored locally in `.soos-gsc.json`. This file may contain tokens and is intentionally ignored by Git.
+
+OAuth client credentials can also be preset in `.env`:
+
+```env
+SOOS_GSC_OAUTH_CLIENT_ID=your-google-oauth-client-id
+SOOS_GSC_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
+```
+
+The UI still allows manual OAuth Client ID / Secret entry. Precedence:
+
+1. Saved values in `.soos-gsc.json`
+2. Values from `.env`
+
+Copy `.env.example` to `.env` when you want local defaults.
+
+## Google Search Console OAuth
+
+1. Create or select a Google Cloud project.
+2. Enable Google Search Console API.
+3. Configure OAuth consent screen and add your Google account as a test user if the app is in testing mode.
+4. Create an OAuth Client ID.
+5. Add this redirect URI:
+
+```text
+http://127.0.0.1:4177/api/gsc/oauth/callback
+```
+
+If using another API port, add the matching callback, for example:
+
+```text
+http://127.0.0.1:4178/api/gsc/oauth/callback
+```
+
+6. In soos, fill Property URL and OAuth credentials.
+7. Click `Save API config`, then `Start OAuth`.
+8. After Google authorization, return to soos and click `Refresh status`, then `Test API connection`.
+
+Property URL examples:
+
+- URL-prefix property: `https://www.example.com/`
+- Domain property: `sc-domain:example.com`
+
+## Deployment
+
+GitHub Pages can host only the static frontend build. It cannot run `server/api.js`, so full API features such as crawling, Search Console OAuth callback, Search Analytics, and URL Inspection will not work on GitHub Pages alone.
+
+Recommended deployment options:
+
+- Static frontend on GitHub Pages plus a separate Node API host.
+- Full app on a platform that supports Node services, such as Render.
+- Adapt the API into serverless functions for Vercel or Netlify.
+
+For production OAuth, update the Google OAuth redirect URI to the deployed API callback URL.
+
+## Release Checklist
+
+When functionality, setup, deployment, or user-facing behavior changes:
+
+1. Update `README.md` if usage or configuration changes.
+2. Update `CHANGELOG.md` with the release or unreleased changes.
+3. Run:
+
+```bash
+node --check server/api.js
+npm run build
+```
+
+4. Commit changes.
+5. Tag releases with semantic versions such as `v0.1.0`.
+
