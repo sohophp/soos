@@ -6,7 +6,7 @@ All notable changes to soos will be documented in this file.
 
 ### Added
 
-- Vercel deployment support with `api/[...path].js` and `vercel.json`.
+- Vercel deployment support with `api/index.js` and `vercel.json`.
 - Environment-variable based GSC configuration for serverless deployments.
 
 ### Changed

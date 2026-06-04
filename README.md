@@ -110,14 +110,14 @@ Recommended deployment options:
 
 - Static frontend on GitHub Pages plus a separate Node API host.
 - Full app on a platform that supports Node services, such as Render.
-- Vercel, using the included Serverless Function adapter in `api/[...path].js`.
+- Vercel, using the included Serverless Function adapter in `api/index.js`.
 - Netlify, after adapting the API into Netlify Functions.
 
 For production OAuth, update the Google OAuth redirect URI to the deployed API callback URL.
 
 ### Vercel
 
-This project includes `vercel.json` and a Vercel API adapter at `api/[...path].js`.
+This project includes `vercel.json` and a Vercel API adapter at `api/index.js`.
 
 Recommended Vercel settings:
 
@@ -146,6 +146,7 @@ https://your-vercel-domain.vercel.app/api/gsc/oauth/callback
 ```
 
 - Background audit jobs use in-memory state and are best-effort on serverless platforms. Direct scans through `/api/audit` are more reliable for Vercel.
+- If `/api/gsc/status` returns `Not Found`, confirm the deployed branch includes `api/index.js` and `vercel.json`, then redeploy. The Vercel rewrite maps `/api/:path*` to `api/index.js`.
 
 ## Release Checklist
 
