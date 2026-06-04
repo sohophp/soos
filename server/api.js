@@ -1731,14 +1731,15 @@ async function queryGscSearchAnalytics({ startDate, endDate, rowLimit = 25000 })
 }
 export function handleRequest(req, res) {
   cleanupJobs();
+  const requestPath = (req.url || "").split("?")[0];
   if (req.method === "OPTIONS") return sendJson(res, 200, {});
-  if (req.method === "GET" && req.url === "/api/gsc/status") {
+  if (req.method === "GET" && requestPath === "/api/gsc/status") {
     readGscConfigWithEnv()
       .then((config) => sendJson(res, 200, gscStatusFromConfig(config)))
       .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
     return;
   }
-  if (req.method === "POST" && req.url === "/api/gsc/config") {
+  if (req.method === "POST" && requestPath === "/api/gsc/config") {
     if (isServerlessRuntime()) {
       return sendJson(res, 400, { error: "Vercel deployments cannot persist UI-saved API config. Set SOOS_GSC_* environment variables instead." });
     }
@@ -1765,7 +1766,7 @@ export function handleRequest(req, res) {
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
-  if (req.method === "POST" && req.url === "/api/gsc/clear") {
+  if (req.method === "POST" && requestPath === "/api/gsc/clear") {
     if (isServerlessRuntime()) {
       return sendJson(res, 400, { error: "Vercel deployments use environment variables. Clear or change SOOS_GSC_* values in Vercel project settings." });
     }
@@ -1774,7 +1775,7 @@ export function handleRequest(req, res) {
       .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
     return;
   }
-  if (req.method === "POST" && req.url === "/api/gsc/oauth/start") {
+  if (req.method === "POST" && requestPath === "/api/gsc/oauth/start") {
     readGscConfigWithEnv()
       .then(async (config) => {
         if (config.serverless) throw new Error("Start OAuth locally to get a refresh token, then set SOOS_GSC_REFRESH_TOKEN in Vercel environment variables.");
@@ -1794,7 +1795,7 @@ export function handleRequest(req, res) {
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
-  if (req.method === "GET" && (req.url || "").startsWith("/api/gsc/oauth/callback")) {
+  if (req.method === "GET" && requestPath === "/api/gsc/oauth/callback") {
     const callbackUrl = new URL(req.url || "", `http://127.0.0.1:${PORT}`);
     const code = callbackUrl.searchParams.get("code") || "";
     const state = callbackUrl.searchParams.get("state") || "";
@@ -1829,34 +1830,34 @@ export function handleRequest(req, res) {
       .catch((error) => sendHtml(res, 400, `<!doctype html><meta charset="utf-8"><title>soos OAuth error</title><body style="font-family:system-ui;padding:24px"><h1>OAuth failed</h1><p>${escapeHtml(error.message || error)}</p></body>`));
     return;
   }
-  if (req.method === "POST" && req.url === "/api/gsc/test") {
+  if (req.method === "POST" && requestPath === "/api/gsc/test") {
     testGscConnection()
       .then((result) => sendJson(res, 200, result))
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
-  if (req.method === "POST" && req.url === "/api/gsc/search-analytics") {
+  if (req.method === "POST" && requestPath === "/api/gsc/search-analytics") {
     readJsonBody(req, 50000)
       .then((body) => queryGscSearchAnalytics(body))
       .then((result) => sendJson(res, 200, result))
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
-  if (req.method === "POST" && req.url === "/api/gsc/inspect") {
+  if (req.method === "POST" && requestPath === "/api/gsc/inspect") {
     readJsonBody(req, 200000)
       .then((body) => inspectGscUrls(body.urls || []))
       .then((result) => sendJson(res, 200, result))
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
-  if (req.method === "GET" && /^\/api\/audit-jobs\/[^/]+$/.test(req.url || "")) {
-    const id = req.url.split("/").pop();
+  if (req.method === "GET" && /^\/api\/audit-jobs\/[^/]+$/.test(requestPath)) {
+    const id = requestPath.split("/").pop();
     const job = jobs.get(id);
     if (!job) return sendJson(res, 404, { error: "Job not found" });
     return sendJson(res, 200, jobSnapshot(job));
   }
-  if (req.method === "POST" && /^\/api\/audit-jobs\/[^/]+\/control$/.test(req.url || "")) {
-    const parts = (req.url || "").split("/");
+  if (req.method === "POST" && /^\/api\/audit-jobs\/[^/]+\/control$/.test(requestPath)) {
+    const parts = requestPath.split("/");
     const id = parts[3];
     const job = jobs.get(id);
     if (!job) return sendJson(res, 404, { error: "Job not found" });
@@ -1878,7 +1879,7 @@ export function handleRequest(req, res) {
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
-  if (req.method === "POST" && req.url === "/api/audit-jobs") {
+  if (req.method === "POST" && requestPath === "/api/audit-jobs") {
     readJsonBody(req, 100000)
       .then((body) => {
       try {
@@ -1933,7 +1934,7 @@ export function handleRequest(req, res) {
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
-  if (req.method !== "POST" || req.url !== "/api/audit") return sendJson(res, 404, { error: "Not found" });
+  if (req.method !== "POST" || requestPath !== "/api/audit") return sendJson(res, 404, { error: "Not found" });
   readJsonBody(req, 100000)
     .then(async (body) => {
     try {
