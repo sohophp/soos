@@ -21,6 +21,7 @@ const GSC_SCOPE = "openid email profile https://www.googleapis.com/auth/webmaste
 const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
+const GOOGLE_OAUTH_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const SESSION_COOKIE = "soos_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 365;
 
@@ -1722,6 +1723,22 @@ async function fetchGoogleAccount(accessToken) {
   };
 }
 
+async function revokeGoogleToken(config) {
+  const token = config?.refreshToken || config?.accessToken || "";
+  if (!token) return { revoked: false };
+  const response = await fetch(GOOGLE_OAUTH_REVOKE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ token }),
+  }).catch((error) => ({ networkError: friendlyGscNetworkError(error) }));
+  if (response.networkError) return { revoked: false, error: response.networkError };
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    return { revoked: false, error: body || `Google revoke HTTP ${response.status}` };
+  }
+  return { revoked: true };
+}
+
 async function refreshGscAccessToken(config) {
   if (!config.oauthClientId || !config.oauthClientSecret || !config.refreshToken) {
     throw new Error("OAuth refresh token is not configured.");
@@ -1831,6 +1848,8 @@ async function inspectGscUrl(config, inspectionUrl) {
     };
   }
   const index = body?.inspectionResult?.indexStatusResult || {};
+  const mobile = body?.inspectionResult?.mobileUsabilityResult || {};
+  const rich = body?.inspectionResult?.richResultsResult || {};
   return {
     url: inspectionUrl,
     ok: true,
@@ -1839,9 +1858,16 @@ async function inspectGscUrl(config, inspectionUrl) {
     indexingState: index.indexingState || "",
     robotsTxtState: index.robotsTxtState || "",
     pageFetchState: index.pageFetchState || "",
+    crawledAs: index.crawledAs || "",
+    referringUrls: index.referringUrls || [],
+    sitemap: index.sitemap || [],
     lastCrawlTime: index.lastCrawlTime || "",
     googleCanonical: index.googleCanonical || "",
     userCanonical: index.userCanonical || "",
+    mobileVerdict: mobile.verdict || "",
+    mobileIssues: mobile.issues || [],
+    richResultsVerdict: rich.verdict || "",
+    richResultsDetectedItems: rich.detectedItems || [],
   };
 }
 
@@ -1982,9 +2008,11 @@ export function handleRequest(req, res) {
         if (isServerlessRuntime() && !await persistentGscConfigEnabled()) {
           throw new Error("Vercel deployments do not persist UI-saved OAuth config without DATABASE_URL.");
         }
+        const current = await readGscConfigWithEnv(sessionId);
+        const revoke = await revokeGoogleToken(current);
         await clearGscConfig(sessionId);
         const config = await readGscConfigWithEnv(sessionId);
-        return sendJson(res, 200, gscStatusFromConfig(config));
+        return sendJson(res, 200, { ...gscStatusFromConfig(config), revoke });
       })
       .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
     return;
@@ -2049,7 +2077,7 @@ export function handleRequest(req, res) {
         delete next.oauthClientSource;
         if (!next.refreshToken) throw new Error("Google did not return a refresh token. Start OAuth again and approve offline access.");
         await writeGscConfig(next, sessionId);
-        return sendHtml(res, 200, "<!doctype html><meta charset=\"utf-8\"><title>soos OAuth connected</title><body style=\"font-family:system-ui;padding:24px\"><h1>Search Console OAuth connected</h1><p>You can close this tab and return to soos.</p></body>");
+        return sendHtml(res, 200, `<!doctype html><meta charset="utf-8"><title>soos OAuth connected</title><body style="font-family:system-ui;padding:24px"><h1>Search Console OAuth connected</h1><p>You can close this tab and return to soos.</p><script>try{if(window.opener){window.opener.postMessage({type:"soos:gsc-oauth-connected"},"*");setTimeout(function(){window.close()},800)}}catch(error){}</script></body>`);
       })
       .catch((error) => sendHtml(res, 400, `<!doctype html><meta charset="utf-8"><title>soos OAuth error</title><body style="font-family:system-ui;padding:24px"><h1>OAuth failed</h1><p>${escapeHtml(error.message || error)}</p></body>`));
     return;

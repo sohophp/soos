@@ -1599,6 +1599,7 @@ const gscUiText = {
     missingPropertyError: "Enter the Search Console Property URL before testing the API connection.",
     openingMessage: "Opening Google OAuth.",
     disconnectedMessage: "Search Console connection removed for this browser.",
+    revokeNotConfirmed: "Google token revoke was not confirmed.",
     reconnectHint: "Reconnect once if the account email is not shown.",
   },
   "zh-CN": {
@@ -1628,6 +1629,7 @@ const gscUiText = {
     missingPropertyError: "测试 API 连接前，请先输入 Search Console Property URL。",
     openingMessage: "正在打开 Google OAuth。",
     disconnectedMessage: "已清除此浏览器的 Search Console 连接。",
+    revokeNotConfirmed: "Google token 撤销未确认。",
     reconnectHint: "如果未显示账号邮箱，请重新连接一次。",
   },
   "zh-TW": {
@@ -1657,6 +1659,7 @@ const gscUiText = {
     missingPropertyError: "測試 API 連線前，請先輸入 Search Console Property URL。",
     openingMessage: "正在開啟 Google OAuth。",
     disconnectedMessage: "已清除此瀏覽器的 Search Console 連線。",
+    revokeNotConfirmed: "Google token 撤銷未確認。",
     reconnectHint: "如果未顯示帳號信箱，請重新連接一次。",
   },
 };
@@ -1672,6 +1675,15 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
   useEffect(() => {
     if (status?.siteUrl) onSiteUrlChange(status.siteUrl);
   }, [onSiteUrlChange, status?.siteUrl]);
+
+  useEffect(() => {
+    function handleMessage(event) {
+      if (event.data?.type !== "soos:gsc-oauth-connected") return;
+      refreshStatus("oauth-connected");
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   const tokenState = status?.refreshToken
     ? "OAuth connected"
@@ -1699,7 +1711,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not clear Search Console config");
       onStatus(body);
-      setMessage(copy.disconnectedMessage);
+      setMessage(body.revoke?.revoked ? copy.disconnectedMessage : `${copy.disconnectedMessage} ${copy.revokeNotConfirmed}`);
     } catch (err) {
       setError(err.message || String(err));
     } finally {
@@ -1736,7 +1748,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
     }
   }
 
-  async function refreshStatus() {
+  async function refreshStatus(reason = "") {
     setMessage("");
     setError("");
     try {
@@ -1744,7 +1756,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not refresh Search Console API status");
       onStatus(body);
-      setMessage(body.refreshToken ? "OAuth status refreshed. Automatic token refresh is ready." : "Status refreshed.");
+      setMessage(reason === "oauth-connected" ? "OAuth connected. Search Console status refreshed." : body.refreshToken ? "OAuth status refreshed. Automatic token refresh is ready." : "Status refreshed.");
     } catch (err) {
       setError(err.message || String(err));
     }
@@ -1872,12 +1884,19 @@ function buildSearchAnalyticsInsights(rows, dimension) {
   if (dimension !== "page_query") return [];
   const pageQueryRows = (rows || []).filter((row) => row.page && row.query);
   const insights = [];
+  const seenInsightDetails = new Set();
+  function addInsight(insight) {
+    const key = `${insight.type}:${insight.detail}`;
+    if (seenInsightDetails.has(key)) return;
+    seenInsightDetails.add(key);
+    insights.push(insight);
+  }
   const lowCtr = pageQueryRows
     .filter((row) => (row.impressions || 0) >= 100 && typeof row.ctr === "number" && row.ctr < 0.01)
     .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
     .slice(0, 5);
   for (const row of lowCtr) {
-    insights.push({
+    addInsight({
       type: "low_ctr",
       severity: "warning",
       title: "High impressions, low CTR",
@@ -1886,17 +1905,45 @@ function buildSearchAnalyticsInsights(rows, dimension) {
       metrics: `${row.impressions} impressions, ${((row.ctr || 0) * 100).toFixed(2)}% CTR, position ${typeof row.position === "number" ? row.position.toFixed(1) : "-"}`,
     });
   }
+  const highRankLowClicks = pageQueryRows
+    .filter((row) => typeof row.position === "number" && row.position <= 3 && (row.impressions || 0) >= 100 && (row.clicks || 0) <= 1)
+    .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
+    .slice(0, 5);
+  for (const row of highRankLowClicks) {
+    addInsight({
+      type: "snippet_gap",
+      severity: "warning",
+      title: "Top ranking, almost no clicks",
+      detail: `${row.query} on ${row.page}`,
+      action: "Check whether the query intent matches the page and improve the title, meta description, and visible answer near the top.",
+      metrics: `${row.impressions} impressions, ${row.clicks || 0} clicks, position ${row.position.toFixed(1)}`,
+    });
+  }
   const strikingDistance = pageQueryRows
     .filter((row) => typeof row.position === "number" && row.position >= 4 && row.position <= 10 && (row.impressions || 0) >= 50)
     .sort((a, b) => (a.position || 99) - (b.position || 99))
     .slice(0, 5);
   for (const row of strikingDistance) {
-    insights.push({
+    addInsight({
       type: "striking_distance",
       severity: "notice",
       title: "Ranking within striking distance",
       detail: `${row.query} on ${row.page}`,
       action: "Strengthen the section that answers this query, add internal links, and improve snippet relevance.",
+      metrics: `${row.impressions} impressions, position ${row.position.toFixed(1)}`,
+    });
+  }
+  const pageTwo = pageQueryRows
+    .filter((row) => typeof row.position === "number" && row.position > 10 && row.position <= 20 && (row.impressions || 0) >= 100)
+    .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
+    .slice(0, 5);
+  for (const row of pageTwo) {
+    addInsight({
+      type: "page_two",
+      severity: "notice",
+      title: "Page two opportunity",
+      detail: `${row.query} on ${row.page}`,
+      action: "Expand the answer depth, add internal links from stronger related pages, and compare content gaps against page-one results.",
       metrics: `${row.impressions} impressions, position ${row.position.toFixed(1)}`,
     });
   }
@@ -1916,7 +1963,7 @@ function buildSearchAnalyticsInsights(rows, dimension) {
       .slice(0, 3)
       .map((row) => row.query)
       .join(", ");
-    insights.push({
+    addInsight({
       type: "intent_spread",
       severity: "notice",
       title: "Page ranks for many queries",
@@ -1937,6 +1984,7 @@ function classifySearchQueryOpportunity(row) {
 
 function keywordOpportunityAction(type) {
   if (type === "low_ctr") return "Rewrite title/meta description and align snippet copy with query intent.";
+  if (type === "snippet_gap") return "Improve title/meta description and verify the page answers the query intent clearly.";
   if (type === "striking_distance") return "Improve the answer section, add internal links, and strengthen topical relevance.";
   if (type === "page_two") return "Expand content depth and add internal links from stronger related pages.";
   return "Monitor performance and prioritize if impressions or position improve.";
@@ -2426,9 +2474,14 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl }) {
                   {item.indexingState ? <small>Indexing: {item.indexingState}</small> : null}
                   {item.robotsTxtState ? <small>Robots: {item.robotsTxtState}</small> : null}
                   {item.pageFetchState ? <small>Fetch: {item.pageFetchState}</small> : null}
+                  {item.crawledAs ? <small>Crawled as: {item.crawledAs}</small> : null}
                   {item.lastCrawlTime ? <small>Last crawl: {item.lastCrawlTime}</small> : null}
+                  {item.sitemap?.length ? <small>Seen in sitemap: {item.sitemap.slice(0, 2).join(", ")}</small> : null}
+                  {item.referringUrls?.length ? <small>Referrers: {item.referringUrls.length}</small> : null}
                   {item.googleCanonical ? <small>Google canonical: {item.googleCanonical}</small> : null}
                   {item.userCanonical ? <small>User canonical: {item.userCanonical}</small> : null}
+                  {item.mobileVerdict ? <small>Mobile: {item.mobileVerdict}</small> : null}
+                  {item.richResultsVerdict ? <small>Rich results: {item.richResultsVerdict}</small> : null}
                 </div>
                 {item.diagnoses.length ? (
                   <div className="inspection-diagnoses">
@@ -2465,6 +2518,8 @@ function diagnoseInspectionResult(item) {
   const robots = String(item.robotsTxtState || "").toLowerCase();
   const fetchState = String(item.pageFetchState || "").toLowerCase();
   const verdict = String(item.verdict || "").toUpperCase();
+  const mobileVerdict = String(item.mobileVerdict || "").toUpperCase();
+  const richVerdict = String(item.richResultsVerdict || "").toUpperCase();
   if (!item.ok) {
     diagnoses.push({
       type: "inspection_error",
@@ -2482,6 +2537,33 @@ function diagnoseInspectionResult(item) {
       title: "Not indexed by Google",
       detail: item.coverageState || "Google did not report this URL as indexed.",
       action: "Review crawlability, canonical tags, content quality, internal links, and sitemap inclusion.",
+    });
+  }
+  if (coverage.includes("discovered") && coverage.includes("not indexed")) {
+    diagnoses.push({
+      type: "discovered_not_crawled",
+      severity: "warning",
+      title: "Discovered, not crawled yet",
+      detail: item.coverageState,
+      action: "Strengthen internal links, verify crawl budget signals, keep the URL in sitemap, and make sure the server responds quickly.",
+    });
+  }
+  if (coverage.includes("duplicate") || coverage.includes("alternate page")) {
+    diagnoses.push({
+      type: "duplicate_or_alternate",
+      severity: "warning",
+      title: "Google treats this as duplicate or alternate",
+      detail: item.coverageState,
+      action: "Confirm the canonical target is intentional. If this URL should rank, make canonical, sitemap, internal links, and content unique.",
+    });
+  }
+  if (coverage.includes("soft 404")) {
+    diagnoses.push({
+      type: "soft_404",
+      severity: "critical",
+      title: "Soft 404 detected",
+      detail: item.coverageState,
+      action: "Add substantial useful content or return a real 404/410 if the page should not exist.",
     });
   }
   if (robots.includes("disallow") || robots.includes("blocked")) {
@@ -2509,6 +2591,42 @@ function diagnoseInspectionResult(item) {
       title: "Google selected a different canonical",
       detail: `Google: ${item.googleCanonical}`,
       action: "Align canonical tags, internal links, redirects, and sitemap URLs around the preferred canonical.",
+    });
+  }
+  if (!item.sitemap?.length && verdict !== "PASS") {
+    diagnoses.push({
+      type: "not_seen_in_sitemap",
+      severity: "notice",
+      title: "Google did not report sitemap discovery",
+      detail: "URL Inspection did not include a sitemap source for this URL.",
+      action: "Keep the canonical URL in the submitted sitemap and ensure the sitemap is discoverable from robots.txt.",
+    });
+  }
+  if (!item.referringUrls?.length && verdict !== "PASS") {
+    diagnoses.push({
+      type: "no_referrers",
+      severity: "notice",
+      title: "No referring URLs reported",
+      detail: "Google did not report internal or external referrers for this URL.",
+      action: "Add internal links from relevant indexed pages so Google can discover and prioritize the URL.",
+    });
+  }
+  if (mobileVerdict && mobileVerdict !== "PASS") {
+    diagnoses.push({
+      type: "mobile_usability",
+      severity: "warning",
+      title: "Mobile usability issue",
+      detail: item.mobileVerdict,
+      action: "Review mobile usability issues in Search Console and fix layout, tap target, and viewport problems.",
+    });
+  }
+  if (richVerdict && richVerdict !== "PASS" && richVerdict !== "VERDICT_UNSPECIFIED") {
+    diagnoses.push({
+      type: "rich_results",
+      severity: "notice",
+      title: "Rich results need review",
+      detail: item.richResultsVerdict,
+      action: "Validate structured data with Google's rich results tooling and fix invalid detected items.",
     });
   }
   if (indexing && indexing !== "indexing_allowed" && indexing !== "allowed") {

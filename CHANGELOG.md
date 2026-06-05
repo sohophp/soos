@@ -7,11 +7,14 @@ All notable changes to soos will be documented in this file.
 ### Added
 
 - Connected Google account display in the Search Console API panel.
+- OAuth callback auto-refresh for the opener window and token revoke on disconnect.
 - Vercel deployment support with `api/index.js` and `vercel.json`.
 - Three-language OAuth setup help in the Search Console API panel.
 - Session-scoped Neon/Postgres storage for each visitor's Search Console connection.
 - Search Analytics dimensions for Query, Page + Query, Country, and Device.
 - Page + Query Search Analytics opportunity cards for low CTR, striking-distance rankings, and broad query spread.
+- Additional Search Analytics opportunity cards for top-rank/no-click and page-two query opportunities.
+- Expanded URL Inspection diagnostics for sitemap/referrer discovery, mobile usability, rich results, duplicate/alternate states, soft 404, and discovered-not-crawled states.
 - Keyword opportunities CSV export from Page + Query Search Analytics rows.
 
 ### Changed

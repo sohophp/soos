@@ -95,6 +95,8 @@ Visitor flow:
 
 soos requests Search Console read-only access plus basic Google account identity (`openid email profile`) so the UI can show which Google account is connected. Existing connections created before this scope was added may need to reconnect once before the email appears.
 
+After OAuth succeeds, the callback page notifies the main soos window and tries to close itself. Disconnect removes the local/Neon connection and attempts to revoke the Google OAuth token.
+
 Property URL examples:
 
 - URL-prefix property: `https://www.example.com/`
@@ -146,8 +148,13 @@ Search Analytics notes:
 
 - Page dimension rows feed GSC opportunities, Search Visibility, and CSV export.
 - Query, Page + Query, Country, and Device dimensions are displayed in the Search Analytics panel for exploration.
-- Page + Query rows also generate lightweight opportunities for high impressions with low CTR, rankings in positions 4-10, and pages spread across many queries.
+- Page + Query rows also generate lightweight opportunities for high impressions with low CTR, top rankings with almost no clicks, rankings in positions 4-10, page-two rankings, and pages spread across many queries.
 - Page + Query rows can be exported as a keyword opportunities CSV.
+
+URL Inspection notes:
+
+- URL Inspection imports Google coverage, robots, fetch, canonical, sitemap/referrer, mobile usability, and rich results signals when available.
+- The diagnosis cards highlight not-indexed states, discovered-not-crawled URLs, duplicate/alternate pages, soft 404s, canonical mismatches, mobile issues, and missing discovery signals.
 
 ## Release Checklist
 
