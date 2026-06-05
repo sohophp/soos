@@ -1682,7 +1682,19 @@ function formatDateOnly(value) {
   return null;
 }
 
-async function queryGscSearchAnalytics({ startDate, endDate, rowLimit = 25000, siteUrl = "" }) {
+const GSC_SEARCH_ANALYTICS_DIMENSIONS = {
+  page: ["page"],
+  query: ["query"],
+  page_query: ["page", "query"],
+  country: ["country"],
+  device: ["device"],
+};
+
+function safeSearchAnalyticsDimension(value) {
+  return GSC_SEARCH_ANALYTICS_DIMENSIONS[value] ? value : "page";
+}
+
+async function queryGscSearchAnalytics({ startDate, endDate, rowLimit = 25000, siteUrl = "", dimension = "page" }) {
   const config = await getGscConfigWithAccessToken({ siteUrl });
   if (!config.siteUrl || !config.accessToken) {
     throw new Error("Search Console API is not configured.");
@@ -1691,6 +1703,8 @@ async function queryGscSearchAnalytics({ startDate, endDate, rowLimit = 25000, s
   const safeEndDate = formatDateOnly(endDate);
   if (!safeStartDate || !safeEndDate) throw new Error("startDate and endDate must be YYYY-MM-DD.");
   const safeRowLimit = Math.max(1, Math.min(Number(rowLimit) || 25000, 25000));
+  const safeDimension = safeSearchAnalyticsDimension(dimension);
+  const dimensions = GSC_SEARCH_ANALYTICS_DIMENSIONS[safeDimension];
   const endpoint = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(config.siteUrl)}/searchAnalytics/query`;
   const response = await fetch(endpoint, {
     method: "POST",
@@ -1701,7 +1715,7 @@ async function queryGscSearchAnalytics({ startDate, endDate, rowLimit = 25000, s
     body: JSON.stringify({
       startDate: safeStartDate,
       endDate: safeEndDate,
-      dimensions: ["page"],
+      dimensions,
       rowLimit: safeRowLimit,
     }),
   }).catch((error) => {
@@ -1712,20 +1726,31 @@ async function queryGscSearchAnalytics({ startDate, endDate, rowLimit = 25000, s
     throw new Error(friendlyGscApiError(response.status, body, `Search Analytics HTTP ${response.status}`));
   }
   const rows = (body.rows || []).map((row) => {
-    const page = row.keys?.[0] || "";
+    const keys = row.keys || [];
+    const pageIndex = dimensions.indexOf("page");
+    const page = pageIndex >= 0 ? keys[pageIndex] || "" : "";
     return {
+      dimension: safeDimension,
+      dimensions,
+      keys,
       page,
-      key: normalizeUrl(page) || page.replace(/\/$/, ""),
+      query: dimensions.includes("query") ? keys[dimensions.indexOf("query")] || "" : "",
+      country: dimensions.includes("country") ? keys[dimensions.indexOf("country")] || "" : "",
+      device: dimensions.includes("device") ? keys[dimensions.indexOf("device")] || "" : "",
+      label: keys.join(" | "),
+      key: page ? normalizeUrl(page) || page.replace(/\/$/, "") : keys.join("|"),
       clicks: row.clicks ?? 0,
       impressions: row.impressions ?? 0,
       ctr: row.ctr ?? null,
       position: row.position ?? null,
     };
-  }).filter((row) => row.page);
+  }).filter((row) => row.keys.length);
   return {
     siteUrl: config.siteUrl,
     startDate: safeStartDate,
     endDate: safeEndDate,
+    dimension: safeDimension,
+    dimensions,
     rowLimit: safeRowLimit,
     rows,
   };

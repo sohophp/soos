@@ -1789,8 +1789,10 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
   const defaults = useMemo(() => defaultGscDateRange(), []);
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [endDate, setEndDate] = useState(defaults.endDate);
+  const [dimension, setDimension] = useState("page");
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
+  const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
 
   async function loadAnalytics(event) {
@@ -1809,15 +1811,17 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
       const response = await fetch("/api/gsc/search-analytics", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ startDate, endDate, siteUrl }),
+        body: JSON.stringify({ startDate, endDate, siteUrl, dimension }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Search Analytics failed");
-      onRows(body.rows || []);
+      if (body.dimension === "page") onRows(body.rows || []);
+      setRows(body.rows || []);
       setSummary({
         rows: body.rows?.length || 0,
         clicks: (body.rows || []).reduce((sum, row) => sum + (row.clicks || 0), 0),
         impressions: (body.rows || []).reduce((sum, row) => sum + (row.impressions || 0), 0),
+        dimension: body.dimension || dimension,
       });
     } catch (err) {
       setError(err.message || String(err));
@@ -1842,6 +1846,16 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
             <strong>End date</strong>
             <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
           </label>
+          <label>
+            <strong>Dimension</strong>
+            <select value={dimension} onChange={(event) => setDimension(event.target.value)}>
+              <option value="page">Page</option>
+              <option value="query">Query</option>
+              <option value="page_query">Page + Query</option>
+              <option value="country">Country</option>
+              <option value="device">Device</option>
+            </select>
+          </label>
         </div>
         <div className="gsc-api-actions">
           <button className="export-button" type="submit" disabled={loading}>
@@ -1849,10 +1863,31 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
           </button>
         </div>
         {summary ? (
-          <small>{summary.rows} rows loaded, {summary.clicks} clicks, {summary.impressions} impressions</small>
+          <small>{summary.rows} {summary.dimension} rows loaded, {summary.clicks} clicks, {summary.impressions} impressions</small>
         ) : (
           <small>Loads page-level clicks, impressions, CTR, and average position into the same GSC opportunity analysis.</small>
         )}
+        {dimension !== "page" ? <small>Only Page rows update GSC opportunities. Other dimensions are shown below for exploration.</small> : null}
+        {rows.length ? (
+          <div className="search-analytics-results">
+            <div className="search-analytics-result head">
+              <span>Dimension</span>
+              <span>Clicks</span>
+              <span>Impressions</span>
+              <span>CTR</span>
+              <span>Position</span>
+            </div>
+            {rows.slice(0, 12).map((row, index) => (
+              <div className="search-analytics-result" key={`${row.label || row.page || index}-${index}`}>
+                <strong title={row.label || row.page}>{row.label || row.page || row.query || row.country || row.device}</strong>
+                <span>{row.clicks ?? 0}</span>
+                <span>{row.impressions ?? 0}</span>
+                <span>{typeof row.ctr === "number" ? `${(row.ctr * 100).toFixed(2)}%` : "-"}</span>
+                <span>{typeof row.position === "number" ? row.position.toFixed(1) : "-"}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {error ? <small className="gsc-api-error">{error}</small> : null}
       </form>
     </section>

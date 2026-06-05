@@ -10,7 +10,7 @@ soos is a local-first React + Node SEO audit tool for sitemap, robots.txt, index
 - Optional page content checks and lightweight performance checks.
 - Pause, resume, stop, background worker scans, history, CSV export, and summary export.
 - Google Search Console CSV import with English and Chinese column support.
-- Google Search Console API integration for Search Analytics and URL Inspection.
+- Google Search Console API integration for Search Analytics dimensions and URL Inspection.
 - OAuth refresh token support so access tokens can refresh automatically.
 
 ## Requirements
@@ -147,6 +147,11 @@ https://your-vercel-domain.vercel.app/api/gsc/oauth/callback
 
 - Background audit jobs use in-memory state and are best-effort on serverless platforms. Direct scans through `/api/audit` are more reliable for Vercel.
 - If `/api/gsc/status` returns `Not Found`, confirm the deployed branch includes `api/index.js` and `vercel.json`, then redeploy. The Vercel rewrite maps `/api/:path*` to `api/index.js`.
+
+Search Analytics notes:
+
+- Page dimension rows feed GSC opportunities, Search Visibility, and CSV export.
+- Query, Page + Query, Country, and Device dimensions are displayed in the Search Analytics panel for exploration.
 
 ## Release Checklist
 
