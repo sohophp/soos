@@ -1571,10 +1571,123 @@ function summarizeGscRows(report, rows) {
   };
 }
 
-function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange }) {
+const gscUiText = {
+  en: {
+    propertyUrl: "Property URL",
+    propertyHelp: "URL-prefix: use the exact Search Console property. Domain property: use sc-domain:example.com.",
+    accessToken: "Manual access token",
+    accessHelp: "Optional fallback. Manual tokens usually expire after about 1 hour.",
+    oauthClientId: "OAuth Client ID",
+    oauthClientSecret: "OAuth Client Secret",
+    oauthIdHelp: "Saved locally. Use the help button for setup steps.",
+    oauthSecretHelp: "Saved locally in .soos-gsc.json. Leave blank to keep the saved secret.",
+    oauthHelpTitle: "How to get OAuth credentials",
+    oauthHelpSteps: [
+      "Open Google Cloud Console and select a project.",
+      "Enable Google Search Console API.",
+      "Configure OAuth consent screen and add your Google account as a test user if needed.",
+      "Create an OAuth Client ID for a web application.",
+      "Add an authorized redirect URI that ends with /api/gsc/oauth/callback for the host you are using.",
+      "Copy the Client ID and Client Secret into soos, save, then start OAuth.",
+    ],
+    docsLabel: "Google OAuth credentials docs",
+    save: "Save API config",
+    saving: "Saving...",
+    startOAuth: "Start OAuth",
+    opening: "Opening...",
+    refresh: "Refresh status",
+    test: "Test API connection",
+    testing: "Testing...",
+    clear: "Clear API config",
+    serverlessHelp: "Vercel mode: saved OAuth config is local-only. Use a manual access token for serverless deployments, or run the full OAuth flow locally.",
+    saveServerlessError: "Vercel deployments cannot persist OAuth config. Run the full OAuth flow locally, or use a manual access token.",
+    startServerlessError: "OAuth start is local-only because serverless deployments cannot persist refresh tokens.",
+    missingOAuthError: "Save OAuth Client ID and OAuth Client Secret before starting OAuth.",
+    missingApiError: "Save a Property URL and access token, or complete OAuth, before testing the API connection.",
+    missingPropertyError: "Enter the Search Console Property URL before testing the API connection.",
+    openingMessage: "Opening Google OAuth.",
+    savedMessage: "Config saved. Run Test API connection to verify access.",
+  },
+  "zh-CN": {
+    propertyUrl: "Property URL",
+    propertyHelp: "URL-prefix 属性必须和 Search Console 完全一致；Domain 属性使用 sc-domain:example.com。",
+    accessToken: "手动 Access Token",
+    accessHelp: "可选备用方式。手动 token 通常约 1 小时过期。",
+    oauthClientId: "OAuth Client ID",
+    oauthClientSecret: "OAuth Client Secret",
+    oauthIdHelp: "保存在本地。点击问号查看获取步骤。",
+    oauthSecretHelp: "保存在本地 .soos-gsc.json。留空表示沿用已保存的密钥。",
+    oauthHelpTitle: "如何获取 OAuth 凭据",
+    oauthHelpSteps: [
+      "打开 Google Cloud Console，并选择一个项目。",
+      "启用 Google Search Console API。",
+      "配置 OAuth consent screen；如果应用处于测试状态，把你的 Google 账号加入测试用户。",
+      "创建 Web application 类型的 OAuth Client ID。",
+      "添加 Authorized redirect URI：使用你当前访问主机，并以 /api/gsc/oauth/callback 结尾。",
+      "把 Client ID 和 Client Secret 填入 soos，保存后点击 Start OAuth。",
+    ],
+    docsLabel: "Google OAuth 凭据文档",
+    save: "保存 API 配置",
+    saving: "保存中...",
+    startOAuth: "开始 OAuth",
+    opening: "打开中...",
+    refresh: "刷新状态",
+    test: "测试 API 连接",
+    testing: "测试中...",
+    clear: "清除 API 配置",
+    serverlessHelp: "Vercel 模式：OAuth 配置只能本地保存。线上可使用手动 Access Token，或在本地完成完整 OAuth 流程。",
+    saveServerlessError: "Vercel 部署无法持久保存 OAuth 配置。请在本地完成 OAuth 流程，或使用手动 Access Token。",
+    startServerlessError: "Start OAuth 仅适用于本地，因为 serverless 部署无法持久保存 refresh token。",
+    missingOAuthError: "请先保存 OAuth Client ID 和 OAuth Client Secret。",
+    missingApiError: "请先保存 Property URL 和 access token，或完成 OAuth 授权。",
+    missingPropertyError: "测试 API 连接前，请先输入 Search Console Property URL。",
+    openingMessage: "正在打开 Google OAuth。",
+    savedMessage: "配置已保存。请点击测试 API 连接确认权限。",
+  },
+  "zh-TW": {
+    propertyUrl: "Property URL",
+    propertyHelp: "URL-prefix 資源必須和 Search Console 完全一致；Domain 資源使用 sc-domain:example.com。",
+    accessToken: "手動 Access Token",
+    accessHelp: "可選備用方式。手動 token 通常約 1 小時過期。",
+    oauthClientId: "OAuth Client ID",
+    oauthClientSecret: "OAuth Client Secret",
+    oauthIdHelp: "儲存在本機。點問號查看取得步驟。",
+    oauthSecretHelp: "儲存在本機 .soos-gsc.json。留空表示沿用已儲存的密鑰。",
+    oauthHelpTitle: "如何取得 OAuth 憑證",
+    oauthHelpSteps: [
+      "開啟 Google Cloud Console，並選擇一個專案。",
+      "啟用 Google Search Console API。",
+      "設定 OAuth consent screen；如果應用程式處於測試狀態，將你的 Google 帳號加入測試使用者。",
+      "建立 Web application 類型的 OAuth Client ID。",
+      "新增 Authorized redirect URI：使用你目前存取的主機，並以 /api/gsc/oauth/callback 結尾。",
+      "將 Client ID 和 Client Secret 填入 soos，儲存後點 Start OAuth。",
+    ],
+    docsLabel: "Google OAuth 憑證文件",
+    save: "儲存 API 設定",
+    saving: "儲存中...",
+    startOAuth: "開始 OAuth",
+    opening: "開啟中...",
+    refresh: "重新整理狀態",
+    test: "測試 API 連線",
+    testing: "測試中...",
+    clear: "清除 API 設定",
+    serverlessHelp: "Vercel 模式：OAuth 設定只能本機儲存。線上可使用手動 Access Token，或在本機完成完整 OAuth 流程。",
+    saveServerlessError: "Vercel 部署無法持久儲存 OAuth 設定。請在本機完成 OAuth 流程，或使用手動 Access Token。",
+    startServerlessError: "Start OAuth 僅適用於本機，因為 serverless 部署無法持久儲存 refresh token。",
+    missingOAuthError: "請先儲存 OAuth Client ID 和 OAuth Client Secret。",
+    missingApiError: "請先儲存 Property URL 和 access token，或完成 OAuth 授權。",
+    missingPropertyError: "測試 API 連線前，請先輸入 Search Console Property URL。",
+    openingMessage: "正在開啟 Google OAuth。",
+    savedMessage: "設定已儲存。請點擊測試 API 連線確認權限。",
+  },
+};
+
+function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, language }) {
+  const copy = gscUiText[language] || gscUiText.en;
   const [accessToken, setAccessToken] = useState("");
   const [oauthClientId, setOauthClientId] = useState("");
   const [oauthClientSecret, setOauthClientSecret] = useState("");
+  const [showOauthHelp, setShowOauthHelp] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
@@ -1596,7 +1709,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange }) 
   async function saveConfig(event) {
     event.preventDefault();
     if (status?.serverless) {
-      setError("Vercel deployments use environment variables for API config. Set SOOS_GSC_* values in Vercel project settings.");
+      setError(copy.saveServerlessError);
       return;
     }
     setSaving(true);
@@ -1613,7 +1726,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange }) 
       setAccessToken("");
       setOauthClientSecret("");
       onStatus(body);
-      setMessage(body.tokenLikelyExpired ? "Config saved. Paste a fresh token before testing." : "Config saved. Run Test API connection to verify access.");
+      setMessage(body.tokenLikelyExpired ? "Manual access tokens usually expire after about 1 hour. Paste a fresh token, then test again." : copy.savedMessage);
     } catch (err) {
       setError(err.message || String(err));
     } finally {
@@ -1623,7 +1736,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange }) 
 
   async function clearConfig() {
     if (status?.serverless) {
-      setError("Vercel deployments use environment variables. Clear or change SOOS_GSC_* values in Vercel project settings.");
+      setError(copy.saveServerlessError);
       return;
     }
     setSaving(true);
@@ -1647,11 +1760,11 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange }) 
 
   async function testConfig() {
     if (!status?.configured) {
-      setError(status?.serverless ? "Set SOOS_GSC_REFRESH_TOKEN or SOOS_GSC_ACCESS_TOKEN in Vercel Environment Variables, then enter a Property URL here before testing." : "Save a Property URL and access token, or complete OAuth, before testing the API connection.");
+      setError(copy.missingApiError);
       return;
     }
     if (!siteUrl.trim()) {
-      setError("Enter the Search Console Property URL before testing the API connection.");
+      setError(copy.missingPropertyError);
       return;
     }
     setTesting(true);
@@ -1690,11 +1803,11 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange }) 
 
   async function startOAuth() {
     if (status?.serverless) {
-      setError("Start OAuth locally to get a refresh token, then set SOOS_GSC_REFRESH_TOKEN in Vercel environment variables.");
+      setError(copy.startServerlessError);
       return;
     }
     if (!status?.oauthConfigured) {
-      setError("Save OAuth Client ID and OAuth Client Secret before starting OAuth.");
+      setError(copy.missingOAuthError);
       return;
     }
     setOauthLoading(true);
@@ -1704,7 +1817,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange }) 
       const response = await fetch("/api/gsc/oauth/start", { method: "POST" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not start OAuth");
-      setMessage(`Opening Google OAuth. Redirect URI: ${body.redirectUri}`);
+      setMessage(copy.openingMessage);
       window.open(body.authUrl, "_blank", "noopener,noreferrer");
     } catch (err) {
       setError(err.message || String(err));
@@ -1722,45 +1835,60 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange }) 
       <form className="gsc-api-body" onSubmit={saveConfig}>
         <div className="gsc-api-fields">
           <label>
-            <strong>Property URL</strong>
+            <strong>{copy.propertyUrl}</strong>
             <input type="text" placeholder="https://example.com/ or sc-domain:example.com" value={siteUrl} onChange={(event) => onSiteUrlChange(event.target.value)} />
-            <small>URL-prefix: use the exact Search Console property, like https://www.example.com/. Domain property: use sc-domain:example.com.</small>
+            <small>{copy.propertyHelp}</small>
           </label>
           <label>
-            <strong>Access token</strong>
+            <strong>{copy.accessToken}</strong>
             <input type="password" placeholder={status?.token || "paste manual OAuth token"} value={accessToken} onChange={(event) => setAccessToken(event.target.value)} />
-            <small>Use OAuth scope https://www.googleapis.com/auth/webmasters.readonly. Manual tokens usually expire after about 1 hour.</small>
+            <small>{copy.accessHelp}</small>
           </label>
           <label>
-            <strong>OAuth Client ID</strong>
+            <strong className="gsc-label-row">
+              {copy.oauthClientId}
+              <button className="gsc-help-button" type="button" onClick={() => setShowOauthHelp((value) => !value)} aria-label={copy.oauthHelpTitle}>
+                ?
+              </button>
+            </strong>
             <input type="text" placeholder={status?.oauthClientId || "Google OAuth client ID"} value={oauthClientId} onChange={(event) => setOauthClientId(event.target.value)} />
-            <small>
-              {status?.oauthClientSource === "process-env" ? "Loaded from environment variables. " : status?.oauthClientSource === "env" ? "Loaded from .env. " : status?.oauthClientSource === "config" ? "Loaded from saved config. " : ""}
-              Create a Google OAuth client and allow redirect URI {status?.oauthRedirectUri || "http://127.0.0.1:4177/api/gsc/oauth/callback"}.
-            </small>
+            <small>{copy.oauthIdHelp}</small>
           </label>
           <label>
-            <strong>OAuth Client Secret</strong>
+            <strong>{copy.oauthClientSecret}</strong>
             <input type="password" placeholder="Google OAuth client secret" value={oauthClientSecret} onChange={(event) => setOauthClientSecret(event.target.value)} />
-            <small>{status?.oauthClientSource === "process-env" ? "Using environment variable secret. " : status?.oauthClientSource === "env" ? "Using .env secret unless you save a new one here. " : ""}Saved locally in .soos-gsc.json. Leave blank to keep the saved secret or environment default.</small>
+            <small>{copy.oauthSecretHelp}</small>
           </label>
         </div>
+        {showOauthHelp ? (
+          <div className="gsc-oauth-help">
+            <strong>{copy.oauthHelpTitle}</strong>
+            <ol>
+              {copy.oauthHelpSteps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+            <a href="https://developers.google.com/workspace/guides/create-credentials" target="_blank" rel="noreferrer">
+              {copy.docsLabel}
+            </a>
+          </div>
+        ) : null}
         <div className="gsc-api-actions">
           <button className="export-button" type="submit" disabled={saving}>
-            {saving ? "Saving..." : "Save API config"}
+            {saving ? copy.saving : copy.save}
           </button>
           <button className="export-button" type="button" onClick={startOAuth} disabled={oauthLoading || saving}>
-            {oauthLoading ? "Opening..." : "Start OAuth"}
+            {oauthLoading ? copy.opening : copy.startOAuth}
           </button>
           <button className="export-button" type="button" onClick={refreshStatus} disabled={saving || testing || oauthLoading}>
-            Refresh status
+            {copy.refresh}
           </button>
           <button className="export-button" type="button" onClick={testConfig} disabled={saving || testing}>
-            {testing ? "Testing..." : "Test API connection"}
+            {testing ? copy.testing : copy.test}
           </button>
           {status?.configured ? (
             <button className="export-button" type="button" onClick={clearConfig} disabled={saving || testing}>
-              Clear API config
+              {copy.clear}
             </button>
           ) : null}
         </div>
@@ -1769,8 +1897,8 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange }) 
           {status?.tokenUpdatedAt ? <small>Token saved at {new Date(status.tokenUpdatedAt).toLocaleString()}.</small> : null}
           {status?.tokenExpiresAt ? <small>Access token expires at {new Date(status.tokenExpiresAt).toLocaleString()}.</small> : null}
           {status?.refreshToken ? <small>Refresh token saved locally. Access tokens refresh automatically.</small> : null}
-          {status?.oauthClientSource ? <small>OAuth client credentials source: {status.oauthClientSource === "process-env" ? "environment variables" : status.oauthClientSource === "env" ? ".env preset" : "saved config"}.</small> : null}
-          {status?.serverless ? <small>Vercel mode: set OAuth/token values in Project Settings &gt; Environment Variables. Enter Property URL in this panel for each API request.</small> : null}
+          {status?.oauthClientSource ? <small>OAuth client credentials source: saved config.</small> : null}
+          {status?.serverless ? <small>{copy.serverlessHelp}</small> : null}
         </div>
         {message ? <small className="gsc-api-message">{message}</small> : null}
         {error ? <small className="gsc-api-error">{error}</small> : null}
@@ -1899,7 +2027,7 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
   async function loadAnalytics(event) {
     event.preventDefault();
     if (!status?.configured) {
-      setError(status?.serverless ? "Search Console API token is not configured. Set SOOS_GSC_REFRESH_TOKEN or SOOS_GSC_ACCESS_TOKEN in Vercel Environment Variables, then redeploy." : "Configure Search Console API first, then load Search Analytics.");
+      setError(status?.serverless ? "Search Console API token is not configured. Use a manual access token for serverless deployments, or run OAuth locally." : "Configure Search Console API first, then load Search Analytics.");
       return;
     }
     if (!siteUrl.trim()) {
@@ -2831,7 +2959,7 @@ useEffect(() => {
           <small>{t.directoryRobotsHelp}</small>
         </span>
       </label>
-      <SearchConsoleApiConfig status={gscStatus} onStatus={setGscStatus} siteUrl={gscSiteUrl} onSiteUrlChange={setGscSiteUrl} />
+      <SearchConsoleApiConfig status={gscStatus} onStatus={setGscStatus} siteUrl={gscSiteUrl} onSiteUrlChange={setGscSiteUrl} language={language} />
       <SearchAnalyticsPanel status={gscStatus} siteUrl={gscSiteUrl} onRows={setGscRows} />
       <SearchConsoleImport rows={gscRows} onImport={setGscRows} onClear={() => setGscRows([])} />
 

@@ -1401,9 +1401,6 @@ async function readDotEnvConfig() {
     const env = parseEnvText(await fs.readFile(ENV_PATH, "utf8"));
     return {
       accessToken: env.SOOS_GSC_ACCESS_TOKEN || env.GSC_ACCESS_TOKEN || "",
-      refreshToken: env.SOOS_GSC_REFRESH_TOKEN || env.GSC_REFRESH_TOKEN || "",
-      oauthClientId: env.SOOS_GSC_OAUTH_CLIENT_ID || env.GSC_OAUTH_CLIENT_ID || "",
-      oauthClientSecret: env.SOOS_GSC_OAUTH_CLIENT_SECRET || env.GSC_OAUTH_CLIENT_SECRET || "",
       source: "env",
     };
   } catch (error) {
@@ -1415,9 +1412,6 @@ async function readDotEnvConfig() {
 function readProcessEnvConfig() {
   return {
     accessToken: process.env.SOOS_GSC_ACCESS_TOKEN || process.env.GSC_ACCESS_TOKEN || "",
-    refreshToken: process.env.SOOS_GSC_REFRESH_TOKEN || process.env.GSC_REFRESH_TOKEN || "",
-    oauthClientId: process.env.SOOS_GSC_OAUTH_CLIENT_ID || process.env.GSC_OAUTH_CLIENT_ID || "",
-    oauthClientSecret: process.env.SOOS_GSC_OAUTH_CLIENT_SECRET || process.env.GSC_OAUTH_CLIENT_SECRET || "",
     source: "process-env",
   };
 }
@@ -1427,19 +1421,16 @@ async function readGscConfigWithEnv() {
   const processEnvConfig = readProcessEnvConfig();
   const envConfig = {
     accessToken: processEnvConfig.accessToken || dotEnvConfig.accessToken || "",
-    refreshToken: processEnvConfig.refreshToken || dotEnvConfig.refreshToken || "",
-    oauthClientId: processEnvConfig.oauthClientId || dotEnvConfig.oauthClientId || "",
-    oauthClientSecret: processEnvConfig.oauthClientSecret || dotEnvConfig.oauthClientSecret || "",
-    source: processEnvConfig.oauthClientId || processEnvConfig.oauthClientSecret || processEnvConfig.refreshToken || processEnvConfig.accessToken ? "process-env" : dotEnvConfig.source || "",
+    source: processEnvConfig.accessToken ? "process-env" : dotEnvConfig.source || "",
   };
   return {
     ...config,
     siteUrl: config.siteUrl || "",
     accessToken: config.accessToken || envConfig.accessToken || "",
-    refreshToken: config.refreshToken || envConfig.refreshToken || "",
-    oauthClientId: config.oauthClientId || envConfig.oauthClientId || "",
-    oauthClientSecret: config.oauthClientSecret || envConfig.oauthClientSecret || "",
-    oauthClientSource: config.oauthClientId && config.oauthClientSecret ? "config" : envConfig.oauthClientId && envConfig.oauthClientSecret ? envConfig.source : "",
+    refreshToken: config.refreshToken || "",
+    oauthClientId: config.oauthClientId || "",
+    oauthClientSecret: config.oauthClientSecret || "",
+    oauthClientSource: config.oauthClientId && config.oauthClientSecret ? "config" : "",
     serverless: isServerlessRuntime(),
   };
 }
@@ -1469,7 +1460,7 @@ function gscStatusFromConfig(config) {
       : false;
   const hasApiCredential = Boolean(config.accessToken || config.refreshToken);
   const note = config.serverless && !hasApiCredential
-    ? "Vercel deployments use environment variables for Search Console API credentials. Enter Property URL in the UI for each request."
+    ? "Vercel deployments cannot persist OAuth config. Use a manual access token, or run the full OAuth flow locally."
     : isOauth
       ? "OAuth refresh token configured. soos will refresh Search Console access automatically."
       : config.accessToken
@@ -1478,7 +1469,7 @@ function gscStatusFromConfig(config) {
           : "Manual token configured. Use Test API connection to confirm property access."
         : "Configure a Search Console property and access token, or use CSV import.";
   return {
-    configured: config.serverless ? hasApiCredential : Boolean(config.siteUrl && hasApiCredential),
+    configured: config.serverless ? Boolean(config.accessToken) : Boolean(config.siteUrl && hasApiCredential),
     mode: isOauth ? "oauth-refresh" : config.accessToken ? "manual-token" : "not-configured",
     siteUrl: config.siteUrl || "",
     token: config.accessToken ? maskSecret(config.accessToken) : "",
@@ -1767,7 +1758,7 @@ export function handleRequest(req, res) {
   }
   if (req.method === "POST" && requestPath === "/api/gsc/config") {
     if (isServerlessRuntime()) {
-      return sendJson(res, 400, { error: "Vercel deployments cannot persist UI-saved API config. Set SOOS_GSC_* environment variables instead." });
+      return sendJson(res, 400, { error: "Vercel deployments cannot persist UI-saved OAuth config. Use a manual access token or run OAuth in a persistent Node environment." });
     }
     readJsonBody(req, 50000)
       .then(async (body) => {
@@ -1794,7 +1785,7 @@ export function handleRequest(req, res) {
   }
   if (req.method === "POST" && requestPath === "/api/gsc/clear") {
     if (isServerlessRuntime()) {
-      return sendJson(res, 400, { error: "Vercel deployments use environment variables. Clear or change SOOS_GSC_* values in Vercel project settings." });
+      return sendJson(res, 400, { error: "Vercel deployments do not persist UI-saved OAuth config." });
     }
     fs.rm(GSC_CONFIG_PATH, { force: true })
       .then(() => sendJson(res, 200, gscStatusFromConfig({})))
@@ -1804,7 +1795,7 @@ export function handleRequest(req, res) {
   if (req.method === "POST" && requestPath === "/api/gsc/oauth/start") {
     readGscConfigWithEnv()
       .then(async (config) => {
-        if (config.serverless) throw new Error("Start OAuth locally to get a refresh token, then set SOOS_GSC_REFRESH_TOKEN in Vercel environment variables.");
+        if (config.serverless) throw new Error("Start OAuth locally or in a persistent Node environment. Serverless deployments cannot persist OAuth refresh tokens.");
         const oauth = buildGscOAuthUrl(config);
         const storedConfig = await readGscConfig();
         await writeGscConfig({

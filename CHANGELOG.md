@@ -7,7 +7,7 @@ All notable changes to soos will be documented in this file.
 ### Added
 
 - Vercel deployment support with `api/index.js` and `vercel.json`.
-- Environment-variable based GSC configuration for serverless deployments.
+- Three-language OAuth setup help in the Search Console API panel.
 - Search Analytics dimensions for Query, Page + Query, Country, and Device.
 - Page + Query Search Analytics opportunity cards for low CTR, striking-distance rankings, and broad query spread.
 - Keyword opportunities CSV export from Page + Query Search Analytics rows.
@@ -15,7 +15,8 @@ All notable changes to soos will be documented in this file.
 ### Changed
 
 - API handler can now be reused by both local Node server and Vercel Serverless Functions.
-- UI disables saved API config actions in serverless mode and points users to `SOOS_GSC_*` environment variables.
+- OAuth Client ID, OAuth Client Secret, and refresh token are managed through UI-saved local config instead of `.env`.
+- UI avoids showing local debug callback URLs in OAuth setup hints.
 
 ## [0.1.0] - 2026-06-04
 

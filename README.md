@@ -59,21 +59,16 @@ node --check server/api.js
 
 ## Configuration
 
-Runtime Google Search Console config is stored locally in `.soos-gsc.json`. This file may contain tokens and is intentionally ignored by Git.
+Runtime Google Search Console config is stored locally in `.soos-gsc.json`. This file may contain OAuth credentials and tokens, and is intentionally ignored by Git.
 
-OAuth client credentials can also be preset in `.env`:
+`.env` is only for non-OAuth deployment helpers such as a temporary manual access token or public base URL:
 
 ```env
-SOOS_GSC_OAUTH_CLIENT_ID=your-google-oauth-client-id
-SOOS_GSC_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
+SOOS_GSC_ACCESS_TOKEN=optional-manual-access-token
+SOOS_PUBLIC_BASE_URL=https://your-deployed-domain.example
 ```
 
-The UI still allows manual OAuth Client ID / Secret entry. Precedence:
-
-1. Saved values in `.soos-gsc.json`
-2. Values from `.env`
-
-Copy `.env.example` to `.env` when you want local defaults.
+OAuth Client ID, OAuth Client Secret, and refresh token are managed through the UI and `.soos-gsc.json`, not `.env`.
 
 ## Google Search Console OAuth
 
@@ -81,19 +76,8 @@ Copy `.env.example` to `.env` when you want local defaults.
 2. Enable Google Search Console API.
 3. Configure OAuth consent screen and add your Google account as a test user if the app is in testing mode.
 4. Create an OAuth Client ID.
-5. Add this redirect URI:
-
-```text
-http://127.0.0.1:4177/api/gsc/oauth/callback
-```
-
-If using another API port, add the matching callback, for example:
-
-```text
-http://127.0.0.1:4178/api/gsc/oauth/callback
-```
-
-6. In soos, fill Property URL and OAuth credentials.
+5. Add an authorized redirect URI for the host you are using. It must end with `/api/gsc/oauth/callback`.
+6. In soos, fill Property URL and OAuth credentials. Use the `?` help button beside OAuth Client ID for setup steps.
 7. Click `Save API config`, then `Start OAuth`.
 8. After Google authorization, return to soos and click `Refresh status`, then `Test API connection`.
 
@@ -113,7 +97,7 @@ Recommended deployment options:
 - Vercel, using the included Serverless Function adapter in `api/index.js`.
 - Netlify, after adapting the API into Netlify Functions.
 
-For production OAuth, update the Google OAuth redirect URI to the deployed API callback URL.
+For production OAuth, add the deployed API callback URL in Google Cloud.
 
 ### Vercel
 
@@ -128,9 +112,7 @@ Recommended Vercel settings:
 Set these Environment Variables in Vercel Project Settings:
 
 ```env
-SOOS_GSC_OAUTH_CLIENT_ID=your-google-oauth-client-id
-SOOS_GSC_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
-SOOS_GSC_REFRESH_TOKEN=your-google-refresh-token
+SOOS_GSC_ACCESS_TOKEN=optional-manual-access-token
 SOOS_PUBLIC_BASE_URL=https://your-vercel-domain.vercel.app
 ```
 
@@ -138,13 +120,8 @@ Notes:
 
 - Vercel Serverless Functions do not persist `.soos-gsc.json`; UI-saved API config is local-only.
 - Search Console Property URL is entered in the UI. It is not required as a Vercel environment variable.
-- Generate `SOOS_GSC_REFRESH_TOKEN` locally with `npm run dev`, then copy the refresh token value from `.soos-gsc.json` into Vercel Environment Variables.
-- Add the deployed callback URL to Google OAuth authorized redirect URIs:
-
-```text
-https://your-vercel-domain.vercel.app/api/gsc/oauth/callback
-```
-
+- OAuth Client ID, OAuth Client Secret, and refresh token are not read from Vercel environment variables.
+- For Vercel, use a manual access token or run the full OAuth flow in a persistent Node environment.
 - Background audit jobs use in-memory state and are best-effort on serverless platforms. Direct scans through `/api/audit` are more reliable for Vercel.
 - If `/api/gsc/status` returns `Not Found`, confirm the deployed branch includes `api/index.js` and `vercel.json`, then redeploy. The Vercel rewrite maps `/api/:path*` to `api/index.js`.
 
