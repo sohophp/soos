@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import { ProxyAgent } from "undici";
+import { neon } from "@neondatabase/serverless";
 
 const PORT = Number(process.env.SOOS_API_PORT || 4177);
 const USER_AGENT = "soos/0.1 SEO audit";
@@ -34,8 +35,8 @@ function sendJson(res, status, body) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Soos-Admin-Key",
   });
   res.end(JSON.stringify(body));
 }
@@ -1379,6 +1380,117 @@ function isServerlessRuntime() {
   return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 }
 
+let dotEnvCache = null;
+
+async function readDotEnvValues() {
+  if (dotEnvCache) return dotEnvCache;
+  try {
+    dotEnvCache = parseEnvText(await fs.readFile(ENV_PATH, "utf8"));
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    dotEnvCache = {};
+  }
+  return dotEnvCache;
+}
+
+async function envValue(name) {
+  if (process.env[name]) return process.env[name];
+  const env = await readDotEnvValues();
+  return env[name] || "";
+}
+
+async function databaseUrl() {
+  return envValue("DATABASE_URL");
+}
+
+async function adminKey() {
+  return envValue("SOOS_ADMIN_KEY");
+}
+
+let neonSql = null;
+let neonReady = false;
+
+async function getNeonSql() {
+  const url = await databaseUrl();
+  if (!url) return null;
+  if (!neonSql) neonSql = neon(url);
+  return neonSql;
+}
+
+async function ensureNeonConfigTable(sql) {
+  if (neonReady) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS soos_config (
+      key text PRIMARY KEY,
+      value jsonb NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  neonReady = true;
+}
+
+function sanitizeGscConfigForStorage(config) {
+  const {
+    adminConfigured,
+    adminKeyRequired,
+    databaseConfigured,
+    oauthClientSource,
+    persistentConfig,
+    serverless,
+    ...stored
+  } = config || {};
+  return stored;
+}
+
+async function readGscConfigFromDatabase() {
+  const sql = await getNeonSql();
+  if (!sql) return null;
+  await ensureNeonConfigTable(sql);
+  const rows = await sql`SELECT value FROM soos_config WHERE key = 'gsc_config' LIMIT 1`;
+  const value = rows[0]?.value;
+  if (typeof value === "string") return JSON.parse(value || "{}");
+  return value || {};
+}
+
+async function writeGscConfigToDatabase(config) {
+  const sql = await getNeonSql();
+  if (!sql) return false;
+  await ensureNeonConfigTable(sql);
+  const stored = sanitizeGscConfigForStorage(config);
+  await sql`
+    INSERT INTO soos_config (key, value, updated_at)
+    VALUES ('gsc_config', ${JSON.stringify(stored)}::jsonb, now())
+    ON CONFLICT (key)
+    DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+  `;
+  return true;
+}
+
+async function clearGscConfigFromDatabase() {
+  const sql = await getNeonSql();
+  if (!sql) return false;
+  await ensureNeonConfigTable(sql);
+  await sql`DELETE FROM soos_config WHERE key = 'gsc_config'`;
+  return true;
+}
+
+async function persistentGscConfigEnabled() {
+  return Boolean(await databaseUrl());
+}
+
+async function requireConfigAdmin(req, body = {}) {
+  const requiresAdmin = isServerlessRuntime() || await persistentGscConfigEnabled();
+  if (!requiresAdmin) return;
+  const expected = await adminKey();
+  if (!expected) {
+    throw new Error("Set SOOS_ADMIN_KEY before saving online Search Console config.");
+  }
+  const provided = String(req.headers["x-soos-admin-key"] || body.adminKey || "").trim();
+  if (!provided || provided !== expected) {
+    throw new Error("Admin key is missing or incorrect.");
+  }
+}
+
 function parseEnvText(text) {
   const env = {};
   for (const rawLine of String(text || "").split(/\r?\n/)) {
@@ -1397,16 +1509,11 @@ function parseEnvText(text) {
 }
 
 async function readDotEnvConfig() {
-  try {
-    const env = parseEnvText(await fs.readFile(ENV_PATH, "utf8"));
-    return {
-      accessToken: env.SOOS_GSC_ACCESS_TOKEN || env.GSC_ACCESS_TOKEN || "",
-      source: "env",
-    };
-  } catch (error) {
-    if (error?.code === "ENOENT") return {};
-    throw error;
-  }
+  const env = await readDotEnvValues();
+  return {
+    accessToken: env.SOOS_GSC_ACCESS_TOKEN || env.GSC_ACCESS_TOKEN || "",
+    source: "env",
+  };
 }
 
 function readProcessEnvConfig() {
@@ -1417,12 +1524,18 @@ function readProcessEnvConfig() {
 }
 
 async function readGscConfigWithEnv() {
-  const [config, dotEnvConfig] = await Promise.all([readGscConfig(), readDotEnvConfig()]);
+  const [config, dotEnvConfig, databaseConfigured, configuredAdminKey] = await Promise.all([
+    readGscConfig(),
+    readDotEnvConfig(),
+    persistentGscConfigEnabled(),
+    adminKey(),
+  ]);
   const processEnvConfig = readProcessEnvConfig();
   const envConfig = {
     accessToken: processEnvConfig.accessToken || dotEnvConfig.accessToken || "",
     source: processEnvConfig.accessToken ? "process-env" : dotEnvConfig.source || "",
   };
+  const serverless = isServerlessRuntime();
   return {
     ...config,
     siteUrl: config.siteUrl || "",
@@ -1431,11 +1544,16 @@ async function readGscConfigWithEnv() {
     oauthClientId: config.oauthClientId || "",
     oauthClientSecret: config.oauthClientSecret || "",
     oauthClientSource: config.oauthClientId && config.oauthClientSecret ? "config" : "",
-    serverless: isServerlessRuntime(),
+    serverless,
+    databaseConfigured,
+    adminKeyRequired: Boolean(serverless || databaseConfigured),
+    adminConfigured: Boolean(configuredAdminKey),
   };
 }
 
 async function readGscConfig() {
+  const databaseConfig = await readGscConfigFromDatabase();
+  if (databaseConfig) return databaseConfig;
   try {
     return JSON.parse(await fs.readFile(GSC_CONFIG_PATH, "utf8"));
   } catch (error) {
@@ -1445,7 +1563,14 @@ async function readGscConfig() {
 }
 
 async function writeGscConfig(config) {
-  await fs.writeFile(GSC_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
+  const stored = sanitizeGscConfigForStorage(config);
+  if (await writeGscConfigToDatabase(stored)) return;
+  await fs.writeFile(GSC_CONFIG_PATH, JSON.stringify(stored, null, 2), "utf8");
+}
+
+async function clearGscConfig() {
+  if (await clearGscConfigFromDatabase()) return;
+  await fs.rm(GSC_CONFIG_PATH, { force: true });
 }
 
 function gscStatusFromConfig(config) {
@@ -1459,8 +1584,10 @@ function gscStatusFromConfig(config) {
       ? tokenAgeMs > 55 * 60 * 1000
       : false;
   const hasApiCredential = Boolean(config.accessToken || config.refreshToken);
-  const note = config.serverless && !hasApiCredential
-    ? "Vercel deployments cannot persist OAuth config. Use a manual access token, or run the full OAuth flow locally."
+  const note = config.serverless && !config.databaseConfigured && !hasApiCredential
+    ? "Vercel deployments need DATABASE_URL for UI-saved OAuth config, or a manual access token."
+    : config.databaseConfigured
+      ? "Database-backed config is enabled. OAuth credentials and refresh token can be saved for this deployment."
     : isOauth
       ? "OAuth refresh token configured. soos will refresh Search Console access automatically."
       : config.accessToken
@@ -1469,7 +1596,7 @@ function gscStatusFromConfig(config) {
           : "Manual token configured. Use Test API connection to confirm property access."
         : "Configure a Search Console property and access token, or use CSV import.";
   return {
-    configured: config.serverless ? Boolean(config.accessToken) : Boolean(config.siteUrl && hasApiCredential),
+    configured: Boolean(config.siteUrl && hasApiCredential),
     mode: isOauth ? "oauth-refresh" : config.accessToken ? "manual-token" : "not-configured",
     siteUrl: config.siteUrl || "",
     token: config.accessToken ? maskSecret(config.accessToken) : "",
@@ -1479,7 +1606,10 @@ function gscStatusFromConfig(config) {
     oauthRedirectUri: oauthRedirectUri(),
     refreshToken: config.refreshToken ? "configured" : "",
     serverless: Boolean(config.serverless),
-    persistentConfig: !config.serverless,
+    databaseConfigured: Boolean(config.databaseConfigured),
+    adminKeyRequired: Boolean(config.adminKeyRequired),
+    adminConfigured: Boolean(config.adminConfigured),
+    persistentConfig: Boolean(!config.serverless || config.databaseConfigured),
     tokenExpiresAt: expiresAt,
     tokenUpdatedAt,
     tokenLikelyExpired,
@@ -1545,7 +1675,7 @@ async function refreshGscAccessToken(config) {
     delete next.oauthClientSecret;
   }
   delete next.oauthClientSource;
-  if (config.serverless) return next;
+  if (config.serverless && !config.databaseConfigured) return next;
   await writeGscConfig(next);
   return next;
 }
@@ -1757,11 +1887,12 @@ export function handleRequest(req, res) {
     return;
   }
   if (req.method === "POST" && requestPath === "/api/gsc/config") {
-    if (isServerlessRuntime()) {
-      return sendJson(res, 400, { error: "Vercel deployments cannot persist UI-saved OAuth config. Use a manual access token or run OAuth in a persistent Node environment." });
-    }
     readJsonBody(req, 50000)
       .then(async (body) => {
+        if (isServerlessRuntime() && !await persistentGscConfigEnabled()) {
+          throw new Error("Set DATABASE_URL and SOOS_ADMIN_KEY to save Search Console config on Vercel.");
+        }
+        await requireConfigAdmin(req, body);
         const siteUrl = typeof body.siteUrl === "string" ? body.siteUrl.trim() : "";
         const accessToken = typeof body.accessToken === "string" ? body.accessToken.trim() : "";
         const oauthClientId = typeof body.oauthClientId === "string" ? body.oauthClientId.trim() : "";
@@ -1778,24 +1909,34 @@ export function handleRequest(req, res) {
           updatedAt: new Date().toISOString(),
         };
         await writeGscConfig(next);
-        return sendJson(res, 200, gscStatusFromConfig(next));
+        const statusConfig = await readGscConfigWithEnv();
+        return sendJson(res, 200, gscStatusFromConfig(statusConfig));
       })
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
   if (req.method === "POST" && requestPath === "/api/gsc/clear") {
-    if (isServerlessRuntime()) {
-      return sendJson(res, 400, { error: "Vercel deployments do not persist UI-saved OAuth config." });
-    }
-    fs.rm(GSC_CONFIG_PATH, { force: true })
-      .then(() => sendJson(res, 200, gscStatusFromConfig({})))
+    readJsonBody(req, 50000)
+      .then(async (body) => {
+        if (isServerlessRuntime() && !await persistentGscConfigEnabled()) {
+          throw new Error("Vercel deployments do not persist UI-saved OAuth config without DATABASE_URL.");
+        }
+        await requireConfigAdmin(req, body);
+        await clearGscConfig();
+        const config = await readGscConfigWithEnv();
+        return sendJson(res, 200, gscStatusFromConfig(config));
+      })
       .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
     return;
   }
   if (req.method === "POST" && requestPath === "/api/gsc/oauth/start") {
-    readGscConfigWithEnv()
-      .then(async (config) => {
-        if (config.serverless) throw new Error("Start OAuth locally or in a persistent Node environment. Serverless deployments cannot persist OAuth refresh tokens.");
+    readJsonBody(req, 50000)
+      .then(async (body) => {
+        if (isServerlessRuntime() && !await persistentGscConfigEnabled()) {
+          throw new Error("Set DATABASE_URL and SOOS_ADMIN_KEY before starting OAuth on Vercel.");
+        }
+        await requireConfigAdmin(req, body);
+        const config = await readGscConfigWithEnv();
         const oauth = buildGscOAuthUrl(config);
         const storedConfig = await readGscConfig();
         await writeGscConfig({

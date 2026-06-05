@@ -1577,6 +1577,8 @@ const gscUiText = {
     propertyHelp: "URL-prefix: use the exact Search Console property. Domain property: use sc-domain:example.com.",
     accessToken: "Manual access token",
     accessHelp: "Optional fallback. Manual tokens usually expire after about 1 hour.",
+    adminKey: "Admin Key",
+    adminKeyHelp: "Required only for online saved config. Set SOOS_ADMIN_KEY in Vercel and enter the same value here.",
     oauthClientId: "OAuth Client ID",
     oauthClientSecret: "OAuth Client Secret",
     oauthIdHelp: "Saved locally. Use the help button for setup steps.",
@@ -1599,9 +1601,9 @@ const gscUiText = {
     test: "Test API connection",
     testing: "Testing...",
     clear: "Clear API config",
-    serverlessHelp: "Vercel mode: saved OAuth config is local-only. Use a manual access token for serverless deployments, or run the full OAuth flow locally.",
-    saveServerlessError: "Vercel deployments cannot persist OAuth config. Run the full OAuth flow locally, or use a manual access token.",
-    startServerlessError: "OAuth start is local-only because serverless deployments cannot persist refresh tokens.",
+    serverlessHelp: "Vercel mode: set DATABASE_URL and SOOS_ADMIN_KEY to save OAuth config online.",
+    saveServerlessError: "Set DATABASE_URL and SOOS_ADMIN_KEY before saving OAuth config on Vercel.",
+    startServerlessError: "Set DATABASE_URL and SOOS_ADMIN_KEY before starting OAuth on Vercel.",
     missingOAuthError: "Save OAuth Client ID and OAuth Client Secret before starting OAuth.",
     missingApiError: "Save a Property URL and access token, or complete OAuth, before testing the API connection.",
     missingPropertyError: "Enter the Search Console Property URL before testing the API connection.",
@@ -1613,6 +1615,8 @@ const gscUiText = {
     propertyHelp: "URL-prefix 属性必须和 Search Console 完全一致；Domain 属性使用 sc-domain:example.com。",
     accessToken: "手动 Access Token",
     accessHelp: "可选备用方式。手动 token 通常约 1 小时过期。",
+    adminKey: "Admin Key",
+    adminKeyHelp: "仅线上保存配置时需要。请在 Vercel 设置 SOOS_ADMIN_KEY，并在这里输入同一个值。",
     oauthClientId: "OAuth Client ID",
     oauthClientSecret: "OAuth Client Secret",
     oauthIdHelp: "保存在本地。点击问号查看获取步骤。",
@@ -1635,9 +1639,9 @@ const gscUiText = {
     test: "测试 API 连接",
     testing: "测试中...",
     clear: "清除 API 配置",
-    serverlessHelp: "Vercel 模式：OAuth 配置只能本地保存。线上可使用手动 Access Token，或在本地完成完整 OAuth 流程。",
-    saveServerlessError: "Vercel 部署无法持久保存 OAuth 配置。请在本地完成 OAuth 流程，或使用手动 Access Token。",
-    startServerlessError: "Start OAuth 仅适用于本地，因为 serverless 部署无法持久保存 refresh token。",
+    serverlessHelp: "Vercel 模式：设置 DATABASE_URL 和 SOOS_ADMIN_KEY 后，可以在线保存 OAuth 配置。",
+    saveServerlessError: "请先在 Vercel 设置 DATABASE_URL 和 SOOS_ADMIN_KEY，再保存 OAuth 配置。",
+    startServerlessError: "请先在 Vercel 设置 DATABASE_URL 和 SOOS_ADMIN_KEY，再开始 OAuth。",
     missingOAuthError: "请先保存 OAuth Client ID 和 OAuth Client Secret。",
     missingApiError: "请先保存 Property URL 和 access token，或完成 OAuth 授权。",
     missingPropertyError: "测试 API 连接前，请先输入 Search Console Property URL。",
@@ -1649,6 +1653,8 @@ const gscUiText = {
     propertyHelp: "URL-prefix 資源必須和 Search Console 完全一致；Domain 資源使用 sc-domain:example.com。",
     accessToken: "手動 Access Token",
     accessHelp: "可選備用方式。手動 token 通常約 1 小時過期。",
+    adminKey: "Admin Key",
+    adminKeyHelp: "僅線上儲存設定時需要。請在 Vercel 設定 SOOS_ADMIN_KEY，並在這裡輸入同一個值。",
     oauthClientId: "OAuth Client ID",
     oauthClientSecret: "OAuth Client Secret",
     oauthIdHelp: "儲存在本機。點問號查看取得步驟。",
@@ -1671,9 +1677,9 @@ const gscUiText = {
     test: "測試 API 連線",
     testing: "測試中...",
     clear: "清除 API 設定",
-    serverlessHelp: "Vercel 模式：OAuth 設定只能本機儲存。線上可使用手動 Access Token，或在本機完成完整 OAuth 流程。",
-    saveServerlessError: "Vercel 部署無法持久儲存 OAuth 設定。請在本機完成 OAuth 流程，或使用手動 Access Token。",
-    startServerlessError: "Start OAuth 僅適用於本機，因為 serverless 部署無法持久儲存 refresh token。",
+    serverlessHelp: "Vercel 模式：設定 DATABASE_URL 和 SOOS_ADMIN_KEY 後，可以線上儲存 OAuth 設定。",
+    saveServerlessError: "請先在 Vercel 設定 DATABASE_URL 和 SOOS_ADMIN_KEY，再儲存 OAuth 設定。",
+    startServerlessError: "請先在 Vercel 設定 DATABASE_URL 和 SOOS_ADMIN_KEY，再開始 OAuth。",
     missingOAuthError: "請先儲存 OAuth Client ID 和 OAuth Client Secret。",
     missingApiError: "請先儲存 Property URL 和 access token，或完成 OAuth 授權。",
     missingPropertyError: "測試 API 連線前，請先輸入 Search Console Property URL。",
@@ -1685,6 +1691,7 @@ const gscUiText = {
 function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, language }) {
   const copy = gscUiText[language] || gscUiText.en;
   const [accessToken, setAccessToken] = useState("");
+  const [adminKey, setAdminKey] = useState("");
   const [oauthClientId, setOauthClientId] = useState("");
   const [oauthClientSecret, setOauthClientSecret] = useState("");
   const [showOauthHelp, setShowOauthHelp] = useState(false);
@@ -1708,7 +1715,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
 
   async function saveConfig(event) {
     event.preventDefault();
-    if (status?.serverless) {
+    if (status?.serverless && !status?.databaseConfigured) {
       setError(copy.saveServerlessError);
       return;
     }
@@ -1718,8 +1725,11 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
     try {
       const response = await fetch("/api/gsc/config", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteUrl, accessToken, oauthClientId, oauthClientSecret }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "X-Soos-Admin-Key": adminKey } : {}),
+        },
+        body: JSON.stringify({ siteUrl, accessToken, oauthClientId, oauthClientSecret, adminKey }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not save Search Console config");
@@ -1735,7 +1745,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
   }
 
   async function clearConfig() {
-    if (status?.serverless) {
+    if (status?.serverless && !status?.databaseConfigured) {
       setError(copy.saveServerlessError);
       return;
     }
@@ -1743,7 +1753,14 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
     setMessage("");
     setError("");
     try {
-      const response = await fetch("/api/gsc/clear", { method: "POST" });
+      const response = await fetch("/api/gsc/clear", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "X-Soos-Admin-Key": adminKey } : {}),
+        },
+        body: JSON.stringify({ adminKey }),
+      });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not clear Search Console config");
       setAccessToken("");
@@ -1802,7 +1819,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
   }
 
   async function startOAuth() {
-    if (status?.serverless) {
+    if (status?.serverless && !status?.databaseConfigured) {
       setError(copy.startServerlessError);
       return;
     }
@@ -1814,7 +1831,14 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
     setMessage("");
     setError("");
     try {
-      const response = await fetch("/api/gsc/oauth/start", { method: "POST" });
+      const response = await fetch("/api/gsc/oauth/start", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "X-Soos-Admin-Key": adminKey } : {}),
+        },
+        body: JSON.stringify({ adminKey }),
+      });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not start OAuth");
       setMessage(copy.openingMessage);
@@ -1844,6 +1868,13 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
             <input type="password" placeholder={status?.token || "paste manual OAuth token"} value={accessToken} onChange={(event) => setAccessToken(event.target.value)} />
             <small>{copy.accessHelp}</small>
           </label>
+          {status?.adminKeyRequired || status?.databaseConfigured ? (
+            <label>
+              <strong>{copy.adminKey}</strong>
+              <input type="password" placeholder={status?.adminConfigured ? "configured in deployment" : "SOOS_ADMIN_KEY"} value={adminKey} onChange={(event) => setAdminKey(event.target.value)} />
+              <small>{copy.adminKeyHelp}</small>
+            </label>
+          ) : null}
           <label>
             <strong className="gsc-label-row">
               {copy.oauthClientId}
@@ -1896,8 +1927,9 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
           <small>{status?.note || "CSV import works now. API configuration enables URL Inspection and Search Analytics."}</small>
           {status?.tokenUpdatedAt ? <small>Token saved at {new Date(status.tokenUpdatedAt).toLocaleString()}.</small> : null}
           {status?.tokenExpiresAt ? <small>Access token expires at {new Date(status.tokenExpiresAt).toLocaleString()}.</small> : null}
-          {status?.refreshToken ? <small>Refresh token saved locally. Access tokens refresh automatically.</small> : null}
+          {status?.refreshToken ? <small>{status?.databaseConfigured ? "Refresh token saved in database. Access tokens refresh automatically." : "Refresh token saved locally. Access tokens refresh automatically."}</small> : null}
           {status?.oauthClientSource ? <small>OAuth client credentials source: saved config.</small> : null}
+          {status?.databaseConfigured ? <small>Database-backed config enabled.</small> : null}
           {status?.serverless ? <small>{copy.serverlessHelp}</small> : null}
         </div>
         {message ? <small className="gsc-api-message">{message}</small> : null}

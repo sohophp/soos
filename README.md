@@ -61,14 +61,18 @@ node --check server/api.js
 
 Runtime Google Search Console config is stored locally in `.soos-gsc.json`. This file may contain OAuth credentials and tokens, and is intentionally ignored by Git.
 
-`.env` is only for non-OAuth deployment helpers such as a temporary manual access token or public base URL:
+When `DATABASE_URL` is configured, soos stores the Search Console API config in a Neon/Postgres database instead of `.soos-gsc.json`. This is the recommended path for Vercel because Serverless Functions cannot persist local files between deployments.
+
+`.env` is only for deployment helpers, a database connection, an admin key, or an optional temporary manual access token:
 
 ```env
 SOOS_GSC_ACCESS_TOKEN=optional-manual-access-token
 SOOS_PUBLIC_BASE_URL=https://your-deployed-domain.example
+DATABASE_URL=postgresql://...
+SOOS_ADMIN_KEY=generate-a-long-random-value
 ```
 
-OAuth Client ID, OAuth Client Secret, and refresh token are managed through the UI and `.soos-gsc.json`, not `.env`.
+OAuth Client ID, OAuth Client Secret, and refresh token are managed through the UI and saved to `.soos-gsc.json` locally or to Neon when `DATABASE_URL` is set. They are not read from `.env`.
 
 ## Google Search Console OAuth
 
@@ -112,16 +116,18 @@ Recommended Vercel settings:
 Set these Environment Variables in Vercel Project Settings:
 
 ```env
-SOOS_GSC_ACCESS_TOKEN=optional-manual-access-token
 SOOS_PUBLIC_BASE_URL=https://your-vercel-domain.vercel.app
+DATABASE_URL=postgresql://...
+SOOS_ADMIN_KEY=generate-a-long-random-value
+SOOS_GSC_ACCESS_TOKEN=optional-manual-access-token
 ```
 
 Notes:
 
-- Vercel Serverless Functions do not persist `.soos-gsc.json`; UI-saved API config is local-only.
+- Vercel Serverless Functions do not persist `.soos-gsc.json`; set `DATABASE_URL` to save UI-managed OAuth config in Neon.
+- `SOOS_ADMIN_KEY` protects online config changes. Enter the same Admin Key in the Search Console API panel before saving, clearing, or starting OAuth.
 - Search Console Property URL is entered in the UI. It is not required as a Vercel environment variable.
-- OAuth Client ID, OAuth Client Secret, and refresh token are not read from Vercel environment variables.
-- For Vercel, use a manual access token or run the full OAuth flow in a persistent Node environment.
+- OAuth Client ID, OAuth Client Secret, and refresh token are saved through the UI. They are not read from Vercel environment variables.
 - Background audit jobs use in-memory state and are best-effort on serverless platforms. Direct scans through `/api/audit` are more reliable for Vercel.
 - If `/api/gsc/status` returns `Not Found`, confirm the deployed branch includes `api/index.js` and `vercel.json`, then redeploy. The Vercel rewrite maps `/api/:path*` to `api/index.js`.
 
