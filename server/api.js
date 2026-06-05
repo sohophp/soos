@@ -1362,8 +1362,10 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null) {
 }
 
 async function readJsonBody(req, maxLength = 100000) {
-  if (req.body && typeof req.body === "object") return req.body;
+  if (req.body && Buffer.isBuffer(req.body)) return JSON.parse(req.body.toString("utf8") || "{}");
+  if (req.body instanceof Uint8Array) return JSON.parse(Buffer.from(req.body).toString("utf8") || "{}");
   if (typeof req.body === "string") return JSON.parse(req.body || "{}");
+  if (req.body && typeof req.body === "object") return req.body;
   let raw = "";
   for await (const chunk of req) {
     raw += chunk;
