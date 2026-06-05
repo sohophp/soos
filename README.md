@@ -153,6 +153,7 @@ Search Analytics notes:
 - Page dimension rows feed GSC opportunities, Search Visibility, and CSV export.
 - Query, Page + Query, Country, and Device dimensions are displayed in the Search Analytics panel for exploration.
 - Page + Query rows also generate lightweight opportunities for high impressions with low CTR, rankings in positions 4-10, and pages spread across many queries.
+- Page + Query rows can be exported as a keyword opportunities CSV.
 
 ## Release Checklist
 

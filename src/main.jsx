@@ -990,6 +990,19 @@ function classifyGscForPage(page, gsc) {
   return "has_visibility";
 }
 
+function downloadCsvFile(filename, rows) {
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const href = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = href;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(href);
+}
+
 function downloadCsv(report, gscRows = []) {
   const gscByUrl = buildGscRowMap(gscRows);
   const rows = [
@@ -1070,16 +1083,7 @@ function downloadCsv(report, gscRows = []) {
     ]);
   }
 
-  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const href = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = href;
-  anchor.download = `soos-audit-${new Date().toISOString().slice(0, 19).replaceAll(":", "-")}.csv`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(href);
+  downloadCsvFile(`soos-audit-${new Date().toISOString().slice(0, 19).replaceAll(":", "-")}.csv`, rows);
 }
 function downloadTextFile(filename, content) {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8;" });
@@ -1845,6 +1849,42 @@ function buildSearchAnalyticsInsights(rows, dimension) {
   return insights.slice(0, 12);
 }
 
+function classifySearchQueryOpportunity(row) {
+  if ((row.impressions || 0) >= 100 && typeof row.ctr === "number" && row.ctr < 0.01) return "low_ctr";
+  if (typeof row.position === "number" && row.position >= 4 && row.position <= 10 && (row.impressions || 0) >= 50) return "striking_distance";
+  if (typeof row.position === "number" && row.position > 10 && row.position <= 20 && (row.impressions || 0) >= 100) return "page_two";
+  return "monitor";
+}
+
+function keywordOpportunityAction(type) {
+  if (type === "low_ctr") return "Rewrite title/meta description and align snippet copy with query intent.";
+  if (type === "striking_distance") return "Improve the answer section, add internal links, and strengthen topical relevance.";
+  if (type === "page_two") return "Expand content depth and add internal links from stronger related pages.";
+  return "Monitor performance and prioritize if impressions or position improve.";
+}
+
+function downloadKeywordOpportunitiesCsv(rows, insights) {
+  const insightByDetail = new Map((insights || []).map((insight) => [insight.detail, insight]));
+  const csvRows = [
+    ["page", "query", "clicks", "impressions", "ctr", "position", "opportunity_type", "recommended_action"],
+  ];
+  for (const row of (rows || []).filter((item) => item.page && item.query)) {
+    const insight = insightByDetail.get(`${row.query} on ${row.page}`) || insightByDetail.get(row.page);
+    const type = insight?.type || classifySearchQueryOpportunity(row);
+    csvRows.push([
+      row.page,
+      row.query,
+      row.clicks ?? 0,
+      row.impressions ?? 0,
+      typeof row.ctr === "number" ? (row.ctr * 100).toFixed(2) : "",
+      typeof row.position === "number" ? row.position.toFixed(1) : "",
+      type,
+      insight?.action || keywordOpportunityAction(type),
+    ]);
+  }
+  downloadCsvFile(`soos-keyword-opportunities-${new Date().toISOString().slice(0, 19).replaceAll(":", "-")}.csv`, csvRows);
+}
+
 function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
   const defaults = useMemo(() => defaultGscDateRange(), []);
   const [startDate, setStartDate] = useState(defaults.startDate);
@@ -1922,6 +1962,11 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
           <button className="export-button" type="submit" disabled={loading}>
             {loading ? "Loading..." : "Load Search Analytics"}
           </button>
+          {dimension === "page_query" && rows.length ? (
+            <button className="export-button" type="button" onClick={() => downloadKeywordOpportunitiesCsv(rows, insights)}>
+              Export keyword opportunities
+            </button>
+          ) : null}
         </div>
         {summary ? (
           <small>{summary.rows} {summary.dimension} rows loaded, {summary.clicks} clicks, {summary.impressions} impressions</small>
