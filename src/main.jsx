@@ -1785,6 +1785,66 @@ function defaultGscDateRange() {
   };
 }
 
+function buildSearchAnalyticsInsights(rows, dimension) {
+  if (dimension !== "page_query") return [];
+  const pageQueryRows = (rows || []).filter((row) => row.page && row.query);
+  const insights = [];
+  const lowCtr = pageQueryRows
+    .filter((row) => (row.impressions || 0) >= 100 && typeof row.ctr === "number" && row.ctr < 0.01)
+    .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
+    .slice(0, 5);
+  for (const row of lowCtr) {
+    insights.push({
+      type: "low_ctr",
+      severity: "warning",
+      title: "High impressions, low CTR",
+      detail: `${row.query} on ${row.page}`,
+      action: "Rewrite title/meta description to match the query intent and make the result more clickable.",
+      metrics: `${row.impressions} impressions, ${((row.ctr || 0) * 100).toFixed(2)}% CTR, position ${typeof row.position === "number" ? row.position.toFixed(1) : "-"}`,
+    });
+  }
+  const strikingDistance = pageQueryRows
+    .filter((row) => typeof row.position === "number" && row.position >= 4 && row.position <= 10 && (row.impressions || 0) >= 50)
+    .sort((a, b) => (a.position || 99) - (b.position || 99))
+    .slice(0, 5);
+  for (const row of strikingDistance) {
+    insights.push({
+      type: "striking_distance",
+      severity: "notice",
+      title: "Ranking within striking distance",
+      detail: `${row.query} on ${row.page}`,
+      action: "Strengthen the section that answers this query, add internal links, and improve snippet relevance.",
+      metrics: `${row.impressions} impressions, position ${row.position.toFixed(1)}`,
+    });
+  }
+  const byPage = new Map();
+  for (const row of pageQueryRows) {
+    if ((row.impressions || 0) < 30) continue;
+    const list = byPage.get(row.page) || [];
+    list.push(row);
+    byPage.set(row.page, list);
+  }
+  for (const [page, list] of byPage.entries()) {
+    const queryCount = list.length;
+    const impressions = list.reduce((sum, row) => sum + (row.impressions || 0), 0);
+    if (queryCount < 5 || impressions < 300) continue;
+    const topQueries = list
+      .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
+      .slice(0, 3)
+      .map((row) => row.query)
+      .join(", ");
+    insights.push({
+      type: "intent_spread",
+      severity: "notice",
+      title: "Page ranks for many queries",
+      detail: page,
+      action: `Cluster the page around the strongest intent. Top queries: ${topQueries}.`,
+      metrics: `${queryCount} queries, ${impressions} impressions`,
+    });
+  }
+  return insights.slice(0, 12);
+}
+
 function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
   const defaults = useMemo(() => defaultGscDateRange(), []);
   const [startDate, setStartDate] = useState(defaults.startDate);
@@ -1793,6 +1853,7 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
   const [rows, setRows] = useState([]);
+  const insights = useMemo(() => buildSearchAnalyticsInsights(rows, summary?.dimension || dimension), [dimension, rows, summary?.dimension]);
   const [error, setError] = useState("");
 
   async function loadAnalytics(event) {
@@ -1868,6 +1929,20 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
           <small>Loads page-level clicks, impressions, CTR, and average position into the same GSC opportunity analysis.</small>
         )}
         {dimension !== "page" ? <small>Only Page rows update GSC opportunities. Other dimensions are shown below for exploration.</small> : null}
+        {insights.length ? (
+          <div className="search-analytics-insights">
+            {insights.map((insight, index) => (
+              <article className={`search-analytics-insight ${insight.severity}`} key={`${insight.type}-${index}`}>
+                <strong>{insight.title}</strong>
+                <small>{insight.detail}</small>
+                <span>{insight.metrics}</span>
+                <em>{insight.action}</em>
+              </article>
+            ))}
+          </div>
+        ) : dimension === "page_query" && rows.length ? (
+          <small>No high-confidence Page + Query opportunities found with the current thresholds.</small>
+        ) : null}
         {rows.length ? (
           <div className="search-analytics-results">
             <div className="search-analytics-result head">

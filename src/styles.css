@@ -1175,7 +1175,8 @@ main {
   }
 
   .gsc-api-fields,
-  .search-analytics-fields {
+  .search-analytics-fields,
+  .search-analytics-insights {
     grid-template-columns: 1fr;
   }
 
@@ -1569,6 +1570,49 @@ main {
 .search-analytics-results {
   display: grid;
   gap: 6px;
+}
+
+.search-analytics-insights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.search-analytics-insight {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid #dfe6dd;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.search-analytics-insight strong {
+  color: #172018;
+  font-size: 13px;
+}
+
+.search-analytics-insight small,
+.search-analytics-insight span,
+.search-analytics-insight em {
+  min-width: 0;
+  color: #687169;
+  font-size: 12px;
+}
+
+.search-analytics-insight em {
+  color: #465047;
+  font-style: normal;
+}
+
+.search-analytics-insight.warning {
+  border-color: #f0dab0;
+  background: #fffaf0;
+}
+
+.search-analytics-insight.notice {
+  border-color: #cfe0f6;
+  background: #f7fbff;
 }
 
 .search-analytics-result {

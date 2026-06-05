@@ -9,6 +9,7 @@ All notable changes to soos will be documented in this file.
 - Vercel deployment support with `api/index.js` and `vercel.json`.
 - Environment-variable based GSC configuration for serverless deployments.
 - Search Analytics dimensions for Query, Page + Query, Country, and Device.
+- Page + Query Search Analytics opportunity cards for low CTR, striking-distance rankings, and broad query spread.
 
 ### Changed
 
