@@ -8,8 +8,7 @@ All notable changes to soos will be documented in this file.
 
 - Vercel deployment support with `api/index.js` and `vercel.json`.
 - Three-language OAuth setup help in the Search Console API panel.
-- Neon/Postgres-backed Search Console config storage for Vercel deployments.
-- Admin Key protection for online Search Console config changes.
+- Session-scoped Neon/Postgres storage for each visitor's Search Console connection.
 - Search Analytics dimensions for Query, Page + Query, Country, and Device.
 - Page + Query Search Analytics opportunity cards for low CTR, striking-distance rankings, and broad query spread.
 - Keyword opportunities CSV export from Page + Query Search Analytics rows.
@@ -17,7 +16,8 @@ All notable changes to soos will be documented in this file.
 ### Changed
 
 - API handler can now be reused by both local Node server and Vercel Serverless Functions.
-- OAuth Client ID, OAuth Client Secret, and refresh token are managed through UI-saved config instead of `.env`.
+- OAuth Client ID and Client Secret are now server-side deployment settings; visitors connect their own Google account from the UI.
+- Removed Admin Key and visitor-entered OAuth credential fields from the Search Console API panel.
 - UI avoids showing local debug callback URLs in OAuth setup hints.
 
 ## [0.1.0] - 2026-06-04

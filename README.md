@@ -59,31 +59,39 @@ node --check server/api.js
 
 ## Configuration
 
-Runtime Google Search Console config is stored locally in `.soos-gsc.json`. This file may contain OAuth credentials and tokens, and is intentionally ignored by Git.
+Runtime Google Search Console config is stored locally in `.soos-gsc.json` when no database is configured. This file may contain OAuth tokens and is intentionally ignored by Git.
 
-When `DATABASE_URL` is configured, soos stores the Search Console API config in a Neon/Postgres database instead of `.soos-gsc.json`. This is the recommended path for Vercel because Serverless Functions cannot persist local files between deployments.
+When `DATABASE_URL` is configured, soos stores each browser session's Search Console connection in Neon/Postgres instead of `.soos-gsc.json`. This is the recommended path for public Vercel deployments because different visitors need separate Google authorizations and Serverless Functions cannot persist local files between deployments.
 
-`.env` is only for deployment helpers, a database connection, an admin key, or an optional temporary manual access token:
+`.env` is for deployment helpers, the shared Google OAuth app, a database connection, or an optional temporary manual access token:
 
 ```env
-SOOS_GSC_ACCESS_TOKEN=optional-manual-access-token
 SOOS_PUBLIC_BASE_URL=https://your-deployed-domain.example
 DATABASE_URL=postgresql://...
-SOOS_ADMIN_KEY=generate-a-long-random-value
+GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
+SOOS_GSC_ACCESS_TOKEN=optional-manual-access-token
 ```
 
-OAuth Client ID, OAuth Client Secret, and refresh token are managed through the UI and saved to `.soos-gsc.json` locally or to Neon when `DATABASE_URL` is set. They are not read from `.env`.
+Visitors do not enter OAuth Client ID or Client Secret. The deployment owner configures one Google OAuth app on the server, and each visitor connects their own Google account from the UI.
 
 ## Google Search Console OAuth
 
+Deployment setup:
+
 1. Create or select a Google Cloud project.
 2. Enable Google Search Console API.
-3. Configure OAuth consent screen and add your Google account as a test user if the app is in testing mode.
-4. Create an OAuth Client ID.
+3. Configure OAuth consent screen and add test users if the app is still in testing mode.
+4. Create a Web application OAuth Client ID.
 5. Add an authorized redirect URI for the host you are using. It must end with `/api/gsc/oauth/callback`.
-6. In soos, fill Property URL and OAuth credentials. Use the `?` help button beside OAuth Client ID for setup steps.
-7. Click `Save API config`, then `Start OAuth`.
-8. After Google authorization, return to soos and click `Refresh status`, then `Test API connection`.
+6. Set `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` on the server.
+
+Visitor flow:
+
+1. Enter the exact Search Console Property URL.
+2. Click `Connect Google Search Console`.
+3. Sign in with the Google account that has access to the property.
+4. Return to soos, then click `Refresh status` and `Test API connection`.
 
 Property URL examples:
 
@@ -118,16 +126,17 @@ Set these Environment Variables in Vercel Project Settings:
 ```env
 SOOS_PUBLIC_BASE_URL=https://your-vercel-domain.vercel.app
 DATABASE_URL=postgresql://...
-SOOS_ADMIN_KEY=generate-a-long-random-value
+GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
 SOOS_GSC_ACCESS_TOKEN=optional-manual-access-token
 ```
 
 Notes:
 
-- Vercel Serverless Functions do not persist `.soos-gsc.json`; set `DATABASE_URL` to save UI-managed OAuth config in Neon.
-- `SOOS_ADMIN_KEY` protects online config changes. Enter the same Admin Key in the Search Console API panel before saving, clearing, or starting OAuth.
+- Vercel Serverless Functions do not persist `.soos-gsc.json`; set `DATABASE_URL` to save each visitor's Search Console connection in Neon.
 - Search Console Property URL is entered in the UI. It is not required as a Vercel environment variable.
-- OAuth Client ID, OAuth Client Secret, and refresh token are saved through the UI. They are not read from Vercel environment variables.
+- OAuth Client ID and Client Secret are deployment secrets. Visitors never enter them in the UI.
+- Each visitor's refresh token is scoped to the browser session cookie and saved separately in Neon.
 - Background audit jobs use in-memory state and are best-effort on serverless platforms. Direct scans through `/api/audit` are more reliable for Vercel.
 - If `/api/gsc/status` returns `Not Found`, confirm the deployed branch includes `api/index.js` and `vercel.json`, then redeploy. The Vercel rewrite maps `/api/:path*` to `api/index.js`.
 

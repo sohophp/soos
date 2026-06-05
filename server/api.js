@@ -20,6 +20,8 @@ const ENV_PATH = path.join(process.cwd(), ".env");
 const GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
 const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const SESSION_COOKIE = "soos_session";
+const SESSION_MAX_AGE = 60 * 60 * 24 * 365;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -32,20 +34,24 @@ function createJobError(code, message) {
 }
 
 function sendJson(res, status, body) {
-  res.writeHead(status, {
+  const headers = {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Soos-Admin-Key",
-  });
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+  if (res.soosSessionCookie) headers["Set-Cookie"] = res.soosSessionCookie;
+  res.writeHead(status, headers);
   res.end(JSON.stringify(body));
 }
 
 function sendHtml(res, status, html) {
-  res.writeHead(status, {
+  const headers = {
     "Content-Type": "text/html; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
-  });
+  };
+  if (res.soosSessionCookie) headers["Set-Cookie"] = res.soosSessionCookie;
+  res.writeHead(status, headers);
   res.end(html);
 }
 
@@ -1403,8 +1409,61 @@ async function databaseUrl() {
   return envValue("DATABASE_URL");
 }
 
-async function adminKey() {
-  return envValue("SOOS_ADMIN_KEY");
+async function oauthClientId() {
+  return envValue("GOOGLE_OAUTH_CLIENT_ID");
+}
+
+async function oauthClientSecret() {
+  return envValue("GOOGLE_OAUTH_CLIENT_SECRET");
+}
+
+async function oauthAppConfig() {
+  const [clientId, clientSecret] = await Promise.all([oauthClientId(), oauthClientSecret()]);
+  return {
+    oauthClientId: clientId,
+    oauthClientSecret: clientSecret,
+    oauthAppConfigured: Boolean(clientId && clientSecret),
+  };
+}
+
+function parseCookieHeader(header) {
+  const cookies = {};
+  for (const part of String(header || "").split(";")) {
+    const equalsAt = part.indexOf("=");
+    if (equalsAt <= 0) continue;
+    cookies[part.slice(0, equalsAt).trim()] = decodeURIComponent(part.slice(equalsAt + 1).trim());
+  }
+  return cookies;
+}
+
+function validSessionId(value) {
+  return /^[a-f0-9]{32}$/i.test(String(value || ""));
+}
+
+function buildSessionCookie(sessionId) {
+  const secure = process.env.VERCEL || /^https:\/\//i.test(process.env.SOOS_PUBLIC_BASE_URL || "");
+  return [
+    `${SESSION_COOKIE}=${encodeURIComponent(sessionId)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${SESSION_MAX_AGE}`,
+    secure ? "Secure" : "",
+  ].filter(Boolean).join("; ");
+}
+
+function ensureGscSession(req, res) {
+  const cookies = parseCookieHeader(req.headers?.cookie || "");
+  let sessionId = cookies[SESSION_COOKIE] || "";
+  if (!validSessionId(sessionId)) {
+    sessionId = crypto.randomBytes(16).toString("hex");
+    res.soosSessionCookie = buildSessionCookie(sessionId);
+  }
+  return sessionId;
+}
+
+function gscConfigKey(sessionId) {
+  return `gsc_config:${sessionId}`;
 }
 
 let neonSql = null;
@@ -1434,61 +1493,52 @@ function sanitizeGscConfigForStorage(config) {
     adminConfigured,
     adminKeyRequired,
     databaseConfigured,
+    oauthAppConfigured,
+    oauthClientId,
     oauthClientSource,
+    oauthClientSecret,
     persistentConfig,
+    sessionId,
     serverless,
     ...stored
   } = config || {};
   return stored;
 }
 
-async function readGscConfigFromDatabase() {
+async function readGscConfigFromDatabase(sessionId) {
   const sql = await getNeonSql();
   if (!sql) return null;
   await ensureNeonConfigTable(sql);
-  const rows = await sql`SELECT value FROM soos_config WHERE key = 'gsc_config' LIMIT 1`;
+  const rows = await sql`SELECT value FROM soos_config WHERE key = ${gscConfigKey(sessionId)} LIMIT 1`;
   const value = rows[0]?.value;
   if (typeof value === "string") return JSON.parse(value || "{}");
   return value || {};
 }
 
-async function writeGscConfigToDatabase(config) {
+async function writeGscConfigToDatabase(config, sessionId) {
   const sql = await getNeonSql();
   if (!sql) return false;
   await ensureNeonConfigTable(sql);
   const stored = sanitizeGscConfigForStorage(config);
   await sql`
     INSERT INTO soos_config (key, value, updated_at)
-    VALUES ('gsc_config', ${JSON.stringify(stored)}::jsonb, now())
+    VALUES (${gscConfigKey(sessionId)}, ${JSON.stringify(stored)}::jsonb, now())
     ON CONFLICT (key)
     DO UPDATE SET value = EXCLUDED.value, updated_at = now()
   `;
   return true;
 }
 
-async function clearGscConfigFromDatabase() {
+async function clearGscConfigFromDatabase(sessionId) {
   const sql = await getNeonSql();
   if (!sql) return false;
   await ensureNeonConfigTable(sql);
-  await sql`DELETE FROM soos_config WHERE key = 'gsc_config'`;
+  await sql`DELETE FROM soos_config WHERE key = ${gscConfigKey(sessionId)}`;
   return true;
 }
 
 async function persistentGscConfigEnabled() {
   return Boolean(await databaseUrl());
-}
-
-async function requireConfigAdmin(req, body = {}) {
-  const requiresAdmin = isServerlessRuntime() || await persistentGscConfigEnabled();
-  if (!requiresAdmin) return;
-  const expected = await adminKey();
-  if (!expected) {
-    throw new Error("Set SOOS_ADMIN_KEY before saving online Search Console config.");
-  }
-  const provided = String(req.headers["x-soos-admin-key"] || body.adminKey || "").trim();
-  if (!provided || provided !== expected) {
-    throw new Error("Admin key is missing or incorrect.");
-  }
 }
 
 function parseEnvText(text) {
@@ -1523,12 +1573,12 @@ function readProcessEnvConfig() {
   };
 }
 
-async function readGscConfigWithEnv() {
-  const [config, dotEnvConfig, databaseConfigured, configuredAdminKey] = await Promise.all([
-    readGscConfig(),
+async function readGscConfigWithEnv(sessionId) {
+  const [config, dotEnvConfig, databaseConfigured, oauthApp] = await Promise.all([
+    readGscConfig(sessionId),
     readDotEnvConfig(),
     persistentGscConfigEnabled(),
-    adminKey(),
+    oauthAppConfig(),
   ]);
   const processEnvConfig = readProcessEnvConfig();
   const envConfig = {
@@ -1541,18 +1591,18 @@ async function readGscConfigWithEnv() {
     siteUrl: config.siteUrl || "",
     accessToken: config.accessToken || envConfig.accessToken || "",
     refreshToken: config.refreshToken || "",
-    oauthClientId: config.oauthClientId || "",
-    oauthClientSecret: config.oauthClientSecret || "",
-    oauthClientSource: config.oauthClientId && config.oauthClientSecret ? "config" : "",
+    oauthClientId: oauthApp.oauthClientId || "",
+    oauthClientSecret: oauthApp.oauthClientSecret || "",
+    oauthAppConfigured: oauthApp.oauthAppConfigured,
+    oauthClientSource: oauthApp.oauthAppConfigured ? "server-env" : "",
+    sessionId,
     serverless,
     databaseConfigured,
-    adminKeyRequired: Boolean(serverless || databaseConfigured),
-    adminConfigured: Boolean(configuredAdminKey),
   };
 }
 
-async function readGscConfig() {
-  const databaseConfig = await readGscConfigFromDatabase();
+async function readGscConfig(sessionId) {
+  const databaseConfig = await readGscConfigFromDatabase(sessionId);
   if (databaseConfig) return databaseConfig;
   try {
     return JSON.parse(await fs.readFile(GSC_CONFIG_PATH, "utf8"));
@@ -1562,14 +1612,14 @@ async function readGscConfig() {
   }
 }
 
-async function writeGscConfig(config) {
+async function writeGscConfig(config, sessionId) {
   const stored = sanitizeGscConfigForStorage(config);
-  if (await writeGscConfigToDatabase(stored)) return;
+  if (await writeGscConfigToDatabase(stored, sessionId)) return;
   await fs.writeFile(GSC_CONFIG_PATH, JSON.stringify(stored, null, 2), "utf8");
 }
 
-async function clearGscConfig() {
-  if (await clearGscConfigFromDatabase()) return;
+async function clearGscConfig(sessionId) {
+  if (await clearGscConfigFromDatabase(sessionId)) return;
   await fs.rm(GSC_CONFIG_PATH, { force: true });
 }
 
@@ -1584,10 +1634,12 @@ function gscStatusFromConfig(config) {
       ? tokenAgeMs > 55 * 60 * 1000
       : false;
   const hasApiCredential = Boolean(config.accessToken || config.refreshToken);
-  const note = config.serverless && !config.databaseConfigured && !hasApiCredential
-    ? "Vercel deployments need DATABASE_URL for UI-saved OAuth config, or a manual access token."
+  const note = !config.oauthAppConfigured
+    ? "Server OAuth app is not configured. Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET."
+    : config.serverless && !config.databaseConfigured && !hasApiCredential
+    ? "Vercel deployments need DATABASE_URL to save each user's Search Console connection."
     : config.databaseConfigured
-      ? "Database-backed config is enabled. OAuth credentials and refresh token can be saved for this deployment."
+      ? "Connect Google Search Console with the Google account that has access to this property."
     : isOauth
       ? "OAuth refresh token configured. soos will refresh Search Console access automatically."
       : config.accessToken
@@ -1600,15 +1652,13 @@ function gscStatusFromConfig(config) {
     mode: isOauth ? "oauth-refresh" : config.accessToken ? "manual-token" : "not-configured",
     siteUrl: config.siteUrl || "",
     token: config.accessToken ? maskSecret(config.accessToken) : "",
-    oauthClientId: config.oauthClientId ? maskSecret(config.oauthClientId) : "",
-    oauthConfigured: Boolean(config.oauthClientId && config.oauthClientSecret),
+    oauthConfigured: Boolean(config.oauthAppConfigured),
+    oauthAppConfigured: Boolean(config.oauthAppConfigured),
     oauthClientSource: config.oauthClientSource || "",
     oauthRedirectUri: oauthRedirectUri(),
     refreshToken: config.refreshToken ? "configured" : "",
     serverless: Boolean(config.serverless),
     databaseConfigured: Boolean(config.databaseConfigured),
-    adminKeyRequired: Boolean(config.adminKeyRequired),
-    adminConfigured: Boolean(config.adminConfigured),
     persistentConfig: Boolean(!config.serverless || config.databaseConfigured),
     tokenExpiresAt: expiresAt,
     tokenUpdatedAt,
@@ -1671,17 +1721,14 @@ async function refreshGscAccessToken(config) {
     tokenExpiresAt: token.expires_in ? new Date(Date.now() + Number(token.expires_in) * 1000).toISOString() : "",
     updatedAt: new Date().toISOString(),
   };
-  if (config.oauthClientSource === "env") {
-    delete next.oauthClientSecret;
-  }
   delete next.oauthClientSource;
   if (config.serverless && !config.databaseConfigured) return next;
-  await writeGscConfig(next);
+  await writeGscConfig(next, config.sessionId);
   return next;
 }
 
 async function getGscConfigWithAccessToken(overrides = {}) {
-  const config = await readGscConfigWithEnv();
+  const config = await readGscConfigWithEnv(overrides.sessionId);
   if (typeof overrides.siteUrl === "string" && overrides.siteUrl.trim()) {
     config.siteUrl = overrides.siteUrl.trim();
   }
@@ -1697,7 +1744,7 @@ async function getGscConfigWithAccessToken(overrides = {}) {
 
 function buildGscOAuthUrl(config) {
   if (!config.siteUrl) throw new Error("Search Console property URL is required before starting OAuth.");
-  if (!config.oauthClientId || !config.oauthClientSecret) throw new Error("OAuth Client ID and Client Secret are required.");
+  if (!config.oauthClientId || !config.oauthClientSecret) throw new Error("Google OAuth app is not configured on the server.");
   const state = crypto.randomBytes(16).toString("hex");
   const authUrl = new URL(GOOGLE_OAUTH_AUTHORIZE_URL);
   authUrl.searchParams.set("client_id", config.oauthClientId);
@@ -1815,8 +1862,8 @@ function safeSearchAnalyticsDimension(value) {
   return GSC_SEARCH_ANALYTICS_DIMENSIONS[value] ? value : "page";
 }
 
-async function queryGscSearchAnalytics({ startDate, endDate, rowLimit = 25000, siteUrl = "", dimension = "page" }) {
-  const config = await getGscConfigWithAccessToken({ siteUrl });
+async function queryGscSearchAnalytics({ startDate, endDate, rowLimit = 25000, siteUrl = "", dimension = "page", sessionId = "" }) {
+  const config = await getGscConfigWithAccessToken({ siteUrl, sessionId });
   if (!config.siteUrl || !config.accessToken) {
     throw new Error("Search Console API is not configured.");
   }
@@ -1880,8 +1927,9 @@ export function handleRequest(req, res) {
   cleanupJobs();
   const requestPath = (req.url || "").split("?")[0];
   if (req.method === "OPTIONS") return sendJson(res, 200, {});
+  const sessionId = ensureGscSession(req, res);
   if (req.method === "GET" && requestPath === "/api/gsc/status") {
-    readGscConfigWithEnv()
+    readGscConfigWithEnv(sessionId)
       .then((config) => sendJson(res, 200, gscStatusFromConfig(config)))
       .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
     return;
@@ -1890,26 +1938,21 @@ export function handleRequest(req, res) {
     readJsonBody(req, 50000)
       .then(async (body) => {
         if (isServerlessRuntime() && !await persistentGscConfigEnabled()) {
-          throw new Error("Set DATABASE_URL and SOOS_ADMIN_KEY to save Search Console config on Vercel.");
+          throw new Error("Set DATABASE_URL before saving Search Console connections on Vercel.");
         }
-        await requireConfigAdmin(req, body);
         const siteUrl = typeof body.siteUrl === "string" ? body.siteUrl.trim() : "";
         const accessToken = typeof body.accessToken === "string" ? body.accessToken.trim() : "";
-        const oauthClientId = typeof body.oauthClientId === "string" ? body.oauthClientId.trim() : "";
-        const oauthClientSecret = typeof body.oauthClientSecret === "string" ? body.oauthClientSecret.trim() : "";
         if (!siteUrl) throw new Error("Search Console property URL is required.");
-        const current = await readGscConfig();
+        const current = await readGscConfig(sessionId);
         const next = {
           ...current,
           siteUrl,
           accessToken: accessToken || current.accessToken || "",
-          oauthClientId: oauthClientId || current.oauthClientId || "",
-          oauthClientSecret: oauthClientSecret || current.oauthClientSecret || "",
           tokenUpdatedAt: accessToken ? new Date().toISOString() : current.tokenUpdatedAt || current.updatedAt || "",
           updatedAt: new Date().toISOString(),
         };
-        await writeGscConfig(next);
-        const statusConfig = await readGscConfigWithEnv();
+        await writeGscConfig(next, sessionId);
+        const statusConfig = await readGscConfigWithEnv(sessionId);
         return sendJson(res, 200, gscStatusFromConfig(statusConfig));
       })
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
@@ -1917,13 +1960,12 @@ export function handleRequest(req, res) {
   }
   if (req.method === "POST" && requestPath === "/api/gsc/clear") {
     readJsonBody(req, 50000)
-      .then(async (body) => {
+      .then(async () => {
         if (isServerlessRuntime() && !await persistentGscConfigEnabled()) {
           throw new Error("Vercel deployments do not persist UI-saved OAuth config without DATABASE_URL.");
         }
-        await requireConfigAdmin(req, body);
-        await clearGscConfig();
-        const config = await readGscConfigWithEnv();
+        await clearGscConfig(sessionId);
+        const config = await readGscConfigWithEnv(sessionId);
         return sendJson(res, 200, gscStatusFromConfig(config));
       })
       .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
@@ -1933,17 +1975,24 @@ export function handleRequest(req, res) {
     readJsonBody(req, 50000)
       .then(async (body) => {
         if (isServerlessRuntime() && !await persistentGscConfigEnabled()) {
-          throw new Error("Set DATABASE_URL and SOOS_ADMIN_KEY before starting OAuth on Vercel.");
+          throw new Error("Set DATABASE_URL before starting OAuth on Vercel.");
         }
-        await requireConfigAdmin(req, body);
-        const config = await readGscConfigWithEnv();
-        const oauth = buildGscOAuthUrl(config);
-        const storedConfig = await readGscConfig();
+        const siteUrl = typeof body.siteUrl === "string" ? body.siteUrl.trim() : "";
+        if (!siteUrl) throw new Error("Search Console property URL is required before starting OAuth.");
+        const storedConfig = await readGscConfig(sessionId);
         await writeGscConfig({
           ...storedConfig,
+          siteUrl,
+          updatedAt: new Date().toISOString(),
+        }, sessionId);
+        const config = await readGscConfigWithEnv(sessionId);
+        const oauth = buildGscOAuthUrl(config);
+        await writeGscConfig({
+          ...storedConfig,
+          siteUrl,
           oauthState: oauth.state,
           updatedAt: new Date().toISOString(),
-        });
+        }, sessionId);
         return sendJson(res, 200, {
           authUrl: oauth.authUrl,
           redirectUri: oauth.redirectUri,
@@ -1957,7 +2006,7 @@ export function handleRequest(req, res) {
     const callbackUrl = new URL(req.url || "", `http://127.0.0.1:${PORT}`);
     const code = callbackUrl.searchParams.get("code") || "";
     const state = callbackUrl.searchParams.get("state") || "";
-    readGscConfigWithEnv()
+    readGscConfigWithEnv(sessionId)
       .then(async (config) => {
         if (!code) throw new Error("OAuth callback did not include an authorization code.");
         if (!config.oauthState || state !== config.oauthState) throw new Error("OAuth state did not match. Start OAuth again.");
@@ -1977,12 +2026,9 @@ export function handleRequest(req, res) {
           oauthState: "",
           updatedAt: new Date().toISOString(),
         };
-        if (config.oauthClientSource === "env") {
-          delete next.oauthClientSecret;
-        }
         delete next.oauthClientSource;
         if (!next.refreshToken) throw new Error("Google did not return a refresh token. Start OAuth again and approve offline access.");
-        await writeGscConfig(next);
+        await writeGscConfig(next, sessionId);
         return sendHtml(res, 200, "<!doctype html><meta charset=\"utf-8\"><title>soos OAuth connected</title><body style=\"font-family:system-ui;padding:24px\"><h1>Search Console OAuth connected</h1><p>You can close this tab and return to soos.</p></body>");
       })
       .catch((error) => sendHtml(res, 400, `<!doctype html><meta charset="utf-8"><title>soos OAuth error</title><body style="font-family:system-ui;padding:24px"><h1>OAuth failed</h1><p>${escapeHtml(error.message || error)}</p></body>`));
@@ -1990,21 +2036,21 @@ export function handleRequest(req, res) {
   }
   if (req.method === "POST" && requestPath === "/api/gsc/test") {
     readJsonBody(req, 50000)
-      .then((body) => testGscConnection({ siteUrl: body.siteUrl }))
+      .then((body) => testGscConnection({ siteUrl: body.siteUrl, sessionId }))
       .then((result) => sendJson(res, 200, result))
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
   if (req.method === "POST" && requestPath === "/api/gsc/search-analytics") {
     readJsonBody(req, 50000)
-      .then((body) => queryGscSearchAnalytics(body))
+      .then((body) => queryGscSearchAnalytics({ ...body, sessionId }))
       .then((result) => sendJson(res, 200, result))
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
   if (req.method === "POST" && requestPath === "/api/gsc/inspect") {
     readJsonBody(req, 200000)
-      .then((body) => inspectGscUrls(body.urls || [], { siteUrl: body.siteUrl }))
+      .then((body) => inspectGscUrls(body.urls || [], { siteUrl: body.siteUrl, sessionId }))
       .then((result) => sendJson(res, 200, result))
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
