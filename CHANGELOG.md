@@ -6,6 +6,7 @@ All notable changes to soos will be documented in this file.
 
 ### Added
 
+- Connected Google account display in the Search Console API panel.
 - Vercel deployment support with `api/index.js` and `vercel.json`.
 - Three-language OAuth setup help in the Search Console API panel.
 - Session-scoped Neon/Postgres storage for each visitor's Search Console connection.
@@ -18,6 +19,7 @@ All notable changes to soos will be documented in this file.
 - API handler can now be reused by both local Node server and Vercel Serverless Functions.
 - OAuth Client ID and Client Secret are now server-side deployment settings; visitors connect their own Google account from the UI.
 - Removed Admin Key and visitor-entered OAuth credential fields from the Search Console API panel.
+- Search Console OAuth now requests basic Google account identity so the connected account can be shown.
 - UI avoids showing local debug callback URLs in OAuth setup hints.
 
 ## [0.1.0] - 2026-06-04

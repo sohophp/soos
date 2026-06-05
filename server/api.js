@@ -17,9 +17,10 @@ const JOB_TTL_MS = 1000 * 60 * 60 * 4;
 const jobs = new Map();
 const GSC_CONFIG_PATH = path.join(process.cwd(), ".soos-gsc.json");
 const ENV_PATH = path.join(process.cwd(), ".env");
-const GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
+const GSC_SCOPE = "openid email profile https://www.googleapis.com/auth/webmasters.readonly";
 const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
 const SESSION_COOKIE = "soos_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 365;
 
@@ -1655,6 +1656,9 @@ function gscStatusFromConfig(config) {
     oauthConfigured: Boolean(config.oauthAppConfigured),
     oauthAppConfigured: Boolean(config.oauthAppConfigured),
     oauthClientSource: config.oauthClientSource || "",
+    googleAccountEmail: config.googleAccountEmail || "",
+    googleAccountName: config.googleAccountName || "",
+    googleAccountPicture: config.googleAccountPicture || "",
     oauthRedirectUri: oauthRedirectUri(),
     refreshToken: config.refreshToken ? "configured" : "",
     serverless: Boolean(config.serverless),
@@ -1702,6 +1706,20 @@ async function postGoogleToken(params) {
     throw new Error(body?.error_description || body?.error || `Google OAuth HTTP ${response.status}`);
   }
   return body;
+}
+
+async function fetchGoogleAccount(accessToken) {
+  if (!accessToken) return {};
+  const response = await fetch(GOOGLE_USERINFO_URL, {
+    headers: { "Authorization": `Bearer ${accessToken}` },
+  }).catch(() => null);
+  if (!response?.ok) return {};
+  const body = await response.json().catch(() => ({}));
+  return {
+    googleAccountEmail: body.email || "",
+    googleAccountName: body.name || "",
+    googleAccountPicture: body.picture || "",
+  };
 }
 
 async function refreshGscAccessToken(config) {
@@ -2017,10 +2035,12 @@ export function handleRequest(req, res) {
           redirect_uri: oauthRedirectUri(),
           grant_type: "authorization_code",
         });
+        const googleAccount = await fetchGoogleAccount(token.access_token || "");
         const next = {
           ...config,
           accessToken: token.access_token || "",
           refreshToken: token.refresh_token || config.refreshToken || "",
+          ...googleAccount,
           tokenUpdatedAt: new Date().toISOString(),
           tokenExpiresAt: token.expires_in ? new Date(Date.now() + Number(token.expires_in) * 1000).toISOString() : "",
           oauthState: "",

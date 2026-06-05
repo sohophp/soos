@@ -93,6 +93,8 @@ Visitor flow:
 3. Sign in with the Google account that has access to the property.
 4. Return to soos, then click `Refresh status` and `Test API connection`.
 
+soos requests Search Console read-only access plus basic Google account identity (`openid email profile`) so the UI can show which Google account is connected. Existing connections created before this scope was added may need to reconnect once before the email appears.
+
 Property URL examples:
 
 - URL-prefix property: `https://www.example.com/`

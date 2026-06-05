@@ -1584,6 +1584,9 @@ const gscUiText = {
     ],
     docsLabel: "Search Console users and permissions",
     connect: "Connect Google Search Console",
+    connectedAs: "Connected as",
+    connectedAccountFallback: "Google account connected",
+    reconnect: "Reconnect",
     opening: "Opening...",
     refresh: "Refresh status",
     test: "Test API connection",
@@ -1596,6 +1599,7 @@ const gscUiText = {
     missingPropertyError: "Enter the Search Console Property URL before testing the API connection.",
     openingMessage: "Opening Google OAuth.",
     disconnectedMessage: "Search Console connection removed for this browser.",
+    reconnectHint: "Reconnect once if the account email is not shown.",
   },
   "zh-CN": {
     propertyUrl: "Property URL",
@@ -1609,6 +1613,9 @@ const gscUiText = {
     ],
     docsLabel: "Search Console 用户和权限说明",
     connect: "连接 Google Search Console",
+    connectedAs: "已连接账号",
+    connectedAccountFallback: "Google 账号已连接",
+    reconnect: "重新连接",
     opening: "打开中...",
     refresh: "刷新状态",
     test: "测试 API 连接",
@@ -1621,6 +1628,7 @@ const gscUiText = {
     missingPropertyError: "测试 API 连接前，请先输入 Search Console Property URL。",
     openingMessage: "正在打开 Google OAuth。",
     disconnectedMessage: "已清除此浏览器的 Search Console 连接。",
+    reconnectHint: "如果未显示账号邮箱，请重新连接一次。",
   },
   "zh-TW": {
     propertyUrl: "Property URL",
@@ -1634,6 +1642,9 @@ const gscUiText = {
     ],
     docsLabel: "Search Console 使用者和權限說明",
     connect: "連接 Google Search Console",
+    connectedAs: "已連接帳號",
+    connectedAccountFallback: "Google 帳號已連接",
+    reconnect: "重新連接",
     opening: "開啟中...",
     refresh: "重新整理狀態",
     test: "測試 API 連線",
@@ -1646,6 +1657,7 @@ const gscUiText = {
     missingPropertyError: "測試 API 連線前，請先輸入 Search Console Property URL。",
     openingMessage: "正在開啟 Google OAuth。",
     disconnectedMessage: "已清除此瀏覽器的 Search Console 連線。",
+    reconnectHint: "如果未顯示帳號信箱，請重新連接一次。",
   },
 };
 
@@ -1668,6 +1680,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
       ? "Token likely expired"
       : "Token saved"
       : "No token saved";
+  const connectedAccount = status?.googleAccountEmail || status?.googleAccountName || "";
 
   async function clearConfig() {
     if (status?.serverless && !status?.databaseConfigured) {
@@ -1781,15 +1794,24 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
           <label>
             <strong className="gsc-label-row">
               {copy.propertyUrl}
-              <button className="gsc-help-button" type="button" onClick={() => setShowOauthHelp((value) => !value)} aria-label={copy.oauthHelpTitle}>
-                ?
-              </button>
+              {!status?.configured ? (
+                <button className="gsc-help-button" type="button" onClick={() => setShowOauthHelp((value) => !value)} aria-label={copy.oauthHelpTitle}>
+                  ?
+                </button>
+              ) : null}
             </strong>
-            <input type="text" placeholder="https://example.com/ or sc-domain:example.com" value={siteUrl} onChange={(event) => onSiteUrlChange(event.target.value)} />
-            <small>{copy.propertyHelp}</small>
+            <input type="text" placeholder="https://example.com/ or sc-domain:example.com" value={siteUrl} onChange={(event) => onSiteUrlChange(event.target.value)} disabled={status?.configured} />
+            {!status?.configured ? <small>{copy.propertyHelp}</small> : null}
           </label>
         </div>
-        {showOauthHelp ? (
+        {status?.configured ? (
+          <div className="gsc-oauth-help">
+            <strong>{copy.connectedAs}</strong>
+            <span>{connectedAccount || copy.connectedAccountFallback}</span>
+            {!connectedAccount ? <small>{copy.reconnectHint}</small> : null}
+          </div>
+        ) : null}
+        {showOauthHelp && !status?.configured ? (
           <div className="gsc-oauth-help">
             <strong>{copy.oauthHelpTitle}</strong>
             <ol>
@@ -1803,9 +1825,16 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
           </div>
         ) : null}
         <div className="gsc-api-actions">
-          <button className="export-button" type="button" onClick={startOAuth} disabled={oauthLoading}>
-            {oauthLoading ? copy.opening : copy.connect}
-          </button>
+          {!status?.configured ? (
+            <button className="export-button" type="button" onClick={startOAuth} disabled={oauthLoading}>
+              {oauthLoading ? copy.opening : copy.connect}
+            </button>
+          ) : null}
+          {status?.configured && !connectedAccount ? (
+            <button className="export-button" type="button" onClick={startOAuth} disabled={oauthLoading}>
+              {oauthLoading ? copy.opening : copy.reconnect}
+            </button>
+          ) : null}
           <button className="export-button" type="button" onClick={refreshStatus} disabled={testing || oauthLoading}>
             {copy.refresh}
           </button>
@@ -1819,12 +1848,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
           ) : null}
         </div>
         <div className="gsc-api-help">
-          <small>{status?.note || "CSV import works now. API configuration enables URL Inspection and Search Analytics."}</small>
-          {status?.tokenUpdatedAt ? <small>Token saved at {new Date(status.tokenUpdatedAt).toLocaleString()}.</small> : null}
-          {status?.tokenExpiresAt ? <small>Access token expires at {new Date(status.tokenExpiresAt).toLocaleString()}.</small> : null}
-          {status?.refreshToken ? <small>{status?.databaseConfigured ? "Refresh token saved in database. Access tokens refresh automatically." : "Refresh token saved locally. Access tokens refresh automatically."}</small> : null}
-          {status?.oauthClientSource ? <small>OAuth app source: server configuration.</small> : null}
-          {status?.databaseConfigured ? <small>Database-backed config enabled.</small> : null}
+          {!status?.configured ? <small>{status?.note || "CSV import works now. API configuration enables URL Inspection and Search Analytics."}</small> : null}
           {status?.serverless ? <small>{copy.serverlessHelp}</small> : null}
         </div>
         {message ? <small className="gsc-api-message">{message}</small> : null}
