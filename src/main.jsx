@@ -2163,6 +2163,39 @@ const inspectionDiagnosisText = {
   },
 };
 
+const structuredDiagnosticText = {
+  en: {
+    json_syntax: "Invalid JSON syntax", missing_context: "Missing @context", unresolved_reference: "Broken graph reference",
+    missing_required: "Missing required field", missing_required_any: "Missing required alternative",
+    missing_recommended: "Recommended field missing", invalid_breadcrumb: "Invalid breadcrumb list",
+    invalid_url: "Invalid URL", page_url_mismatch: "Page URL mismatch", name_mismatch: "Name and title differ",
+    name_not_visible: "Name not found in visible text", image_not_visible: "Image not found in page signals",
+    invalid_value: "Invalid value", invalid_length: "Invalid text length", invalid_count: "Invalid item count",
+    duplicate_value: "Duplicate value", non_sequential: "Non-sequential positions", invalid_date: "Invalid date",
+    invalid_number: "Invalid number",
+  },
+  "zh-CN": {
+    json_syntax: "JSON 语法无效", missing_context: "缺少 @context", unresolved_reference: "Graph 引用断裂",
+    missing_required: "缺少必填字段", missing_required_any: "缺少必填的备选字段",
+    missing_recommended: "缺少建议字段", invalid_breadcrumb: "面包屑列表无效",
+    invalid_url: "网址无效", page_url_mismatch: "结构化网址与页面不一致", name_mismatch: "名称与页面标题不一致",
+    name_not_visible: "名称未出现在可见内容", image_not_visible: "图片未出现在页面信号中",
+    invalid_value: "字段值无效", invalid_length: "文本长度无效", invalid_count: "项目数量无效",
+    duplicate_value: "存在重复值", non_sequential: "顺序编号不连续", invalid_date: "日期格式无效",
+    invalid_number: "数字格式无效",
+  },
+  "zh-TW": {
+    json_syntax: "JSON 語法無效", missing_context: "缺少 @context", unresolved_reference: "Graph 參照中斷",
+    missing_required: "缺少必填欄位", missing_required_any: "缺少必填的替代欄位",
+    missing_recommended: "缺少建議欄位", invalid_breadcrumb: "麵包屑清單無效",
+    invalid_url: "網址無效", page_url_mismatch: "結構化網址與頁面不一致", name_mismatch: "名稱與頁面標題不一致",
+    name_not_visible: "名稱未出現在可見內容", image_not_visible: "圖片未出現在頁面訊號中",
+    invalid_value: "欄位值無效", invalid_length: "文字長度無效", invalid_count: "項目數量無效",
+    duplicate_value: "存在重複值", non_sequential: "順序編號不連續", invalid_date: "日期格式無效",
+    invalid_number: "數字格式無效",
+  },
+};
+
 const gscSupportingText = {
   en: {
     csvTitle: "Search Console CSV", optional: "optional", rowsLoaded: "rows loaded",
@@ -3412,7 +3445,7 @@ function googleRichIssues(inspection) {
   return issues;
 }
 
-function StructuredDataDiagnostics({ report, inspectionResults, copy }) {
+function StructuredDataDiagnostics({ report, inspectionResults, copy, language }) {
   const [filter, setFilter] = useState("all");
   const inspectionByUrl = useMemo(
     () => new Map((inspectionResults || []).map((item) => [normalizeReportUrl(item.url), item])),
@@ -3456,6 +3489,7 @@ function StructuredDataDiagnostics({ report, inspectionResults, copy }) {
     }),
     { errors: 0, recommendations: 0, google: 0 },
   );
+  const diagnosticLabels = structuredDiagnosticText[language] || structuredDiagnosticText.en;
 
   function exportDiagnostics() {
     const exportRows = [["url", "source", "severity", "schema_type", "property", "detail"]];
@@ -3507,7 +3541,7 @@ function StructuredDataDiagnostics({ report, inspectionResults, copy }) {
             <div className="structured-data-issues">
               {[...row.localErrors, ...row.recommendations].slice(0, 4).map((item, index) => (
                 <small key={`${item.code}-${item.property}-${index}`}>
-                  {item.type}.{item.property || item.code}: {item.detail}
+                  {diagnosticLabels[item.code] || item.code} · {item.type}.{item.property || "-"}: {item.detail}
                 </small>
               ))}
               {row.googleIssues.slice(0, 3).map((item, index) => (
@@ -3600,7 +3634,7 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
       </div>
       {result && pendingUrls.length ? <small className="inspection-remaining">{pendingUrls.length} {copy.remaining}</small> : null}
       {error ? <div className="url-inspection-error">{error}</div> : null}
-      <StructuredDataDiagnostics report={report} inspectionResults={result?.results || []} copy={copy} />
+      <StructuredDataDiagnostics report={report} inspectionResults={result?.results || []} copy={copy} language={language} />
       <UrlSetComparison report={report} gscRows={gscRows} inspectionResults={result?.results || []} copy={copy} />
       {result ? (
         <>

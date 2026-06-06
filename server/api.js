@@ -713,6 +713,39 @@ const STRUCTURED_DATA_RULES = {
     requiredAny: [["jobLocation", "applicantLocationRequirements"]],
     recommended: ["validThrough", "employmentType", "baseSalary", "identifier"],
   },
+  Course: {
+    required: [["name"], ["description"]],
+    recommended: ["provider"],
+  },
+  Dataset: {
+    required: [["name"], ["description"]],
+    recommended: ["creator", "license", "identifier", "distribution"],
+  },
+  SoftwareApplication: {
+    required: [["name"], ["offers"]],
+    requiredAny: [["aggregateRating", "review"]],
+    recommended: ["applicationCategory", "operatingSystem"],
+  },
+  ProfilePage: {
+    required: [["mainEntity"]],
+    recommended: ["dateCreated", "dateModified"],
+  },
+  QAPage: {
+    required: [["mainEntity"]],
+  },
+  DiscussionForumPosting: {
+    required: [["author"], ["datePublished"]],
+    requiredAny: [["text", "image", "video", "url"]],
+    recommended: ["url", "comment", "commentCount", "dateModified"],
+  },
+  SocialMediaPosting: {
+    required: [["author"], ["datePublished"]],
+    requiredAny: [["text", "image", "video", "url"]],
+    recommended: ["url", "comment", "commentCount", "dateModified"],
+  },
+  ItemList: {
+    required: [["itemListElement"]],
+  },
 };
 
 const ARTICLE_TYPES = new Set(["Article", "NewsArticle", "BlogPosting"]);
@@ -737,6 +770,15 @@ function graphUrl(value, baseUrl) {
   } catch {
     return "";
   }
+}
+
+function isIsoDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}(?:T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?)?$/.test(value)) return false;
+  return !Number.isNaN(Date.parse(value));
+}
+
+function isNonNegativeNumber(value) {
+  return value !== "" && value !== null && value !== undefined && Number.isFinite(Number(value)) && Number(value) >= 0;
 }
 
 export function inspectJsonLd(html, baseUrl, pageTitle = "") {
@@ -918,6 +960,153 @@ export function inspectJsonLd(html, baseUrl, pageTitle = "") {
         if (!currency) addDiagnostic("notice", "missing_recommended", "Offer", "priceCurrency", `Offer ${index + 1}`);
       });
     }
+
+    if (types.includes("SoftwareApplication")) {
+      const offers = Array.isArray(node.offers) ? node.offers : node.offers ? [node.offers] : [];
+      offers.forEach((offer, index) => {
+        if (!isNonNegativeNumber(offer?.price ?? offer?.priceSpecification?.price)) {
+          addDiagnostic("warning", "invalid_value", "Offer", "price", `Software offer ${index + 1} needs a non-negative price`);
+        }
+      });
+    }
+
+    if (types.includes("Dataset")) {
+      const descriptionLength = String(node.description || "").trim().length;
+      if (descriptionLength && descriptionLength < 50) {
+        addDiagnostic("warning", "invalid_length", primaryType, "description", `${descriptionLength} characters; Google requires at least 50`);
+      }
+      const distributions = Array.isArray(node.distribution) ? node.distribution : node.distribution ? [node.distribution] : [];
+      distributions.forEach((distribution, index) => {
+        if (!hasStructuredValue(distribution, "contentUrl")) {
+          addDiagnostic("warning", "missing_required", "DataDownload", "contentUrl", `Distribution ${index + 1}`);
+        }
+      });
+    }
+
+    if (types.includes("ProfilePage") && node.mainEntity) {
+      const entities = Array.isArray(node.mainEntity) ? node.mainEntity : [node.mainEntity];
+      entities.forEach((entity, index) => {
+        if (!hasStructuredValue(entity, "name") && !hasStructuredValue(entity, "alternateName")) {
+          addDiagnostic("warning", "missing_required_any", structuredTypes(entity)[0] || "Profile entity", "name / alternateName", `Profile entity ${index + 1}`);
+        }
+      });
+    }
+
+    if (types.includes("QAPage") && node.mainEntity) {
+      const questions = Array.isArray(node.mainEntity) ? node.mainEntity : [node.mainEntity];
+      if (questions.length !== 1) addDiagnostic("warning", "invalid_count", primaryType, "mainEntity", `Expected one Question, found ${questions.length}`);
+      questions.forEach((question, index) => {
+        if (!hasStructuredValue(question, "name")) addDiagnostic("warning", "missing_required", "Question", "name", `Question ${index + 1}`);
+        if (!isNonNegativeNumber(question.answerCount)) addDiagnostic("warning", "invalid_value", "Question", "answerCount", `Question ${index + 1}`);
+        if (!hasStructuredValue(question, "acceptedAnswer") && !hasStructuredValue(question, "suggestedAnswer")) {
+          addDiagnostic("warning", "missing_required_any", "Question", "acceptedAnswer / suggestedAnswer", `Question ${index + 1}`);
+        }
+        const answers = [
+          ...(Array.isArray(question.acceptedAnswer) ? question.acceptedAnswer : question.acceptedAnswer ? [question.acceptedAnswer] : []),
+          ...(Array.isArray(question.suggestedAnswer) ? question.suggestedAnswer : question.suggestedAnswer ? [question.suggestedAnswer] : []),
+        ];
+        answers.forEach((answer, answerIndex) => {
+          if (!hasStructuredValue(answer, "text")) addDiagnostic("warning", "missing_required", "Answer", "text", `Answer ${answerIndex + 1}`);
+        });
+      });
+    }
+
+    if (types.includes("DiscussionForumPosting") || types.includes("SocialMediaPosting")) {
+      const authors = Array.isArray(node.author) ? node.author : node.author ? [node.author] : [];
+      authors.forEach((author, index) => {
+        if (!hasStructuredValue(author, "name")) addDiagnostic("warning", "missing_required", "Author", "name", `Author ${index + 1}`);
+      });
+      const comments = Array.isArray(node.comment) ? node.comment : node.comment ? [node.comment] : [];
+      comments.forEach((comment, index) => {
+        if (!hasStructuredValue(comment, "author")) addDiagnostic("warning", "missing_required", "Comment", "author", `Comment ${index + 1}`);
+        if (!hasStructuredValue(comment, "datePublished")) addDiagnostic("warning", "missing_required", "Comment", "datePublished", `Comment ${index + 1}`);
+        if (!hasStructuredValue(comment, "text") && !hasStructuredValue(comment, "image") && !hasStructuredValue(comment, "video")) {
+          addDiagnostic("warning", "missing_required_any", "Comment", "text / image / video", `Comment ${index + 1}`);
+        }
+      });
+    }
+
+    if (types.some((type) => LOCAL_BUSINESS_TYPES.has(type)) && node.address && typeof node.address === "object") {
+      if (!hasStructuredValue(node.address, "streetAddress")) {
+        addDiagnostic("notice", "missing_recommended", "PostalAddress", "streetAddress", primaryType);
+      }
+      if (!hasStructuredValue(node.address, "addressLocality")) {
+        addDiagnostic("notice", "missing_recommended", "PostalAddress", "addressLocality", primaryType);
+      }
+      if (!hasStructuredValue(node.address, "addressCountry")) {
+        addDiagnostic("notice", "missing_recommended", "PostalAddress", "addressCountry", primaryType);
+      }
+    }
+
+    if (types.includes("Event") && node.location && typeof node.location === "object") {
+      if (!hasStructuredValue(node.location, "name")) addDiagnostic("warning", "missing_required", "Place", "name", "Event location");
+      if (!hasStructuredValue(node.location, "address") && !hasStructuredValue(node.location, "url")) {
+        addDiagnostic("warning", "missing_required_any", "Place", "address / url", "Event location");
+      }
+    }
+
+    if (types.includes("JobPosting")) {
+      if (node.hiringOrganization && typeof node.hiringOrganization === "object" && !hasStructuredValue(node.hiringOrganization, "name")) {
+        addDiagnostic("warning", "missing_required", "Organization", "name", "Hiring organization");
+      }
+      const locations = Array.isArray(node.jobLocation) ? node.jobLocation : node.jobLocation ? [node.jobLocation] : [];
+      locations.forEach((location, index) => {
+        if (!hasStructuredValue(location, "address")) {
+          addDiagnostic("warning", "missing_required", "Place", "address", `Job location ${index + 1}`);
+        }
+      });
+    }
+
+    if (types.some((type) => ARTICLE_TYPES.has(type))) {
+      const authors = Array.isArray(node.author) ? node.author : node.author ? [node.author] : [];
+      authors.forEach((author, index) => {
+        if (typeof author === "object" && !hasStructuredValue(author, "name")) {
+          addDiagnostic("notice", "missing_recommended", structuredTypes(author)[0] || "Author", "name", `Author ${index + 1}`);
+        }
+      });
+    }
+
+    if (types.includes("ItemList") && Array.isArray(node.itemListElement)) {
+      const positions = [];
+      const urls = new Set();
+      node.itemListElement.forEach((item, index) => {
+        if (!isNonNegativeNumber(item?.position) || Number(item.position) < 1) {
+          addDiagnostic("warning", "invalid_value", "ListItem", "position", `Item ${index + 1}`);
+        } else {
+          positions.push(Number(item.position));
+        }
+        const itemValue = item?.url || item?.item;
+        const itemUrl = graphUrl(
+          typeof itemValue === "string" ? itemValue : itemValue?.url || itemValue?.["@id"],
+          baseUrl,
+        );
+        if (!itemUrl) addDiagnostic("warning", "missing_required", "ListItem", "url", `Item ${index + 1}`);
+        else if (urls.has(itemUrl)) addDiagnostic("warning", "duplicate_value", "ListItem", "url", itemUrl);
+        else urls.add(itemUrl);
+      });
+      const sortedPositions = [...positions].sort((a, b) => a - b);
+      if (sortedPositions.some((position, index) => position !== index + 1)) {
+        addDiagnostic("notice", "non_sequential", "ItemList", "position", sortedPositions.join(", "));
+      }
+    }
+
+    for (const property of ["datePublished", "dateModified", "dateCreated", "uploadDate", "startDate", "endDate", "datePosted", "validThrough"]) {
+      if (hasStructuredValue(node, property) && !isIsoDate(node[property])) {
+        addDiagnostic("warning", "invalid_date", primaryType, property, String(node[property]));
+      }
+    }
+    for (const property of ["ratingValue", "ratingCount", "reviewCount", "bestRating", "worstRating", "commentCount", "answerCount", "upvoteCount"]) {
+      if (hasStructuredValue(node, property) && !isNonNegativeNumber(node[property])) {
+        addDiagnostic("warning", "invalid_number", primaryType, property, String(node[property]));
+      }
+    }
+    const ratings = [node.aggregateRating, node.reviewRating].flat().filter(Boolean);
+    ratings.forEach((rating, index) => {
+      if (!hasStructuredValue(rating, "ratingValue")) addDiagnostic("warning", "missing_required", "Rating", "ratingValue", `Rating ${index + 1}`);
+      if (!hasStructuredValue(rating, "ratingCount") && !hasStructuredValue(rating, "reviewCount") && node.aggregateRating) {
+        addDiagnostic("warning", "missing_required_any", "AggregateRating", "ratingCount / reviewCount", `Rating ${index + 1}`);
+      }
+    });
 
     const pageUrlValue = node.url || node.mainEntityOfPage?.["@id"] || node.mainEntityOfPage;
     const structuredPageUrl = typeof pageUrlValue === "string" ? graphUrl(pageUrlValue, baseUrl) : "";

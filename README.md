@@ -182,7 +182,8 @@ Structured data notes:
 
 - Enable Page content checks to parse JSON-LD and run local structured data validation.
 - soos parses top-level objects, arrays, and `@graph` nodes, then checks syntax, local `@id` references, common Google-required fields, and recommended enhancements.
-- The first rule set covers common Article, Product, Breadcrumb, FAQ, LocalBusiness, Video, Recipe, Event, JobPosting, Organization, and WebSite markup.
+- The rule set covers common Article, Product, Breadcrumb, FAQ, LocalBusiness, Video, Recipe, Event, JobPosting, Course, Dataset, SoftwareApplication, ProfilePage, QAPage, discussion post, ItemList, Organization, and WebSite markup.
+- Nested checks cover addresses, event and job locations, employers, authors, comments, answers, offers, ratings, dates, prices, counts, and ordered list positions.
 - Name, URL, and image consistency checks are diagnostic hints. Confirm warnings with Google's Rich Results Test because lazy-loaded images and rendered content may not appear in the fetched HTML.
 - Current rules follow the Google Search Central structured data documentation: https://developers.google.com/search/docs/appearance/structured-data/search-gallery
 

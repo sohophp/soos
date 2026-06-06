@@ -19,6 +19,9 @@ All notable changes to soos will be documented in this file.
 - Structured data syntax, local reference, required-field, recommendation, URL, name, and image consistency diagnostics.
 - Combined local structured data and Google rich results findings with filters and CSV export.
 - Structured data regression tests included in `npm run check`.
+- Structured data rules for Course, Dataset, SoftwareApplication, ProfilePage, QAPage, discussion posts, and ItemList.
+- Nested address, location, employer, author, comment, date, rating, price, count, and list-order validation.
+- English, Simplified Chinese, and Traditional Chinese labels for structured data diagnostic codes.
 - Neon-backed audit job records scoped to each browser session.
 - Automatic active-job restoration after a page refresh.
 - Interrupted worker detection and recoverable audit restart after a server cold start.

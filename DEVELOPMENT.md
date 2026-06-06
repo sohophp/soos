@@ -183,7 +183,7 @@ soos 的目标关系链是：
 - [x] 对比结构化数据中的 URL、图片、名称和页面可见内容。
 - [x] 合并本地验证结果与 Google rich results issue。
 
-当前已覆盖的首批类型：Article、NewsArticle、BlogPosting、Product、Offer、BreadcrumbList、FAQPage、LocalBusiness 常见子类型、VideoObject、Recipe、Event、JobPosting、Organization 和 WebSite。后续仍需扩充 Google Search Gallery 中的其它类型和更深层嵌套对象规则。
+当前已覆盖的类型：Article、NewsArticle、BlogPosting、Product、Offer、BreadcrumbList、FAQPage、LocalBusiness 常见子类型、VideoObject、Recipe、Event、JobPosting、Organization、WebSite、Course、Dataset、SoftwareApplication、ProfilePage、QAPage、DiscussionForumPosting、SocialMediaPosting 和 ItemList。后续仍需扩充 Google Search Gallery 中的其它类型和少见类型专属细则。
 
 ### Milestone E：Googlebot 日志
 
@@ -241,6 +241,11 @@ soos 的目标关系链是：
 - 对比结构化数据页面 URL、名称、图片与页面 title、可见文本、图片和 Open Graph 信号。
 - 增加三语言结构化数据总览、类别筛选、本地/Google 合并结果和 CSV 导出。
 - 增加 `tests/structured-data.test.js`，并纳入 `npm run check`。
+- 扩展 Course、Dataset、SoftwareApplication、ProfilePage、QAPage、DiscussionForumPosting、SocialMediaPosting 和 ItemList 规则。
+- 增加 Dataset 描述长度、Software 价格、日期、评分、计数和列表位置格式验证。
+- 增加 LocalBusiness 地址、Event 地点、JobPosting 雇主/地点、讨论作者/评论和 Article 作者嵌套对象验证。
+- 结构化数据内部诊断代码增加 English、简体中文和繁體中文可读标签。
+- 扩展回归样例到 42 个预期诊断，`npm run check` 通过。
 
 ## 9. 当前完成度
 
@@ -255,7 +260,7 @@ soos 的目标关系链是：
 | URL Inspection 诊断 | 95% |
 | Google URL 对照矩阵 | 85% |
 | URL 集合对比 | 100% |
-| 结构化数据验证 | 70% |
+| 结构化数据验证 | 85% |
 | Googlebot 日志分析 | 0% |
 | 定时监控 | 0% |
 
