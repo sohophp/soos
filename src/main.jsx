@@ -1678,6 +1678,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
 
   useEffect(() => {
     function handleMessage(event) {
+      if (event.origin !== window.location.origin) return;
       if (event.data?.type !== "soos:gsc-oauth-connected") return;
       refreshStatus("oauth-connected");
     }
@@ -1778,6 +1779,11 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
     setOauthLoading(true);
     setMessage("");
     setError("");
+    const oauthWindow = window.open("", "soos-gsc-oauth", "popup,width=620,height=760");
+    if (oauthWindow) {
+      oauthWindow.document.title = "Connecting Google Search Console";
+      oauthWindow.document.body.innerHTML = "<p style=\"font-family:system-ui;padding:24px\">Opening Google OAuth...</p>";
+    }
     try {
       const response = await fetch("/api/gsc/oauth/start", {
         method: "POST",
@@ -1787,8 +1793,13 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not start OAuth");
       setMessage(copy.openingMessage);
-      window.open(body.authUrl, "_blank", "noopener,noreferrer");
+      if (oauthWindow) {
+        oauthWindow.location.href = body.authUrl;
+      } else {
+        window.location.href = body.authUrl;
+      }
     } catch (err) {
+      oauthWindow?.close();
       setError(err.message || String(err));
     } finally {
       setOauthLoading(false);

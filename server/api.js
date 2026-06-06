@@ -2079,7 +2079,7 @@ export function handleRequest(req, res) {
         delete next.oauthClientSource;
         if (!next.refreshToken) throw new Error("Google did not return a refresh token. Start OAuth again and approve offline access.");
         await writeGscConfig(next, sessionId);
-        return sendHtml(res, 200, `<!doctype html><meta charset="utf-8"><title>soos OAuth connected</title><body style="font-family:system-ui;padding:24px"><h1>Search Console OAuth connected</h1><p>You can close this tab and return to soos.</p><script>try{if(window.opener){window.opener.postMessage({type:"soos:gsc-oauth-connected"},"*");setTimeout(function(){window.close()},800)}}catch(error){}</script></body>`);
+        return sendHtml(res, 200, `<!doctype html><meta charset="utf-8"><title>soos OAuth connected</title><body style="font-family:system-ui;padding:24px"><h1>Search Console OAuth connected</h1><p>You can close this tab and return to soos.</p><script>try{if(window.opener){window.opener.postMessage({type:"soos:gsc-oauth-connected"},window.location.origin);setTimeout(function(){window.close()},800)}}catch(error){}</script></body>`);
       })
       .catch((error) => sendHtml(res, 400, `<!doctype html><meta charset="utf-8"><title>soos OAuth error</title><body style="font-family:system-ui;padding:24px"><h1>OAuth failed</h1><p>${escapeHtml(error.message || error)}</p></body>`));
     return;

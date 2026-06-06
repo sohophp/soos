@@ -23,6 +23,7 @@ All notable changes to soos will be documented in this file.
 - OAuth Client ID and Client Secret are now server-side deployment settings; visitors connect their own Google account from the UI.
 - Removed Admin Key and visitor-entered OAuth credential fields from the Search Console API panel.
 - Search Console OAuth now requests basic Google account identity so the connected account can be shown.
+- OAuth opens a dedicated popup immediately and securely refreshes the opener after a successful callback.
 - UI avoids showing local debug callback URLs in OAuth setup hints.
 
 ## [0.1.0] - 2026-06-04
