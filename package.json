@@ -10,7 +10,8 @@
     "build": "vite build",
     "test:structured-data": "node tests/structured-data.test.js",
     "test:googlebot-log": "node tests/googlebot-log.test.js",
-    "check": "node --check server/api.js && node --check api/index.js && npm run test:structured-data && npm run test:googlebot-log && npm run build",
+    "test:gsc-sitemaps": "node tests/gsc-sitemaps.test.js",
+    "check": "node --check server/api.js && node --check api/index.js && npm run test:structured-data && npm run test:googlebot-log && npm run test:gsc-sitemaps && npm run build",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

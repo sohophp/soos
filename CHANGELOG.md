@@ -11,6 +11,8 @@ All notable changes to soos will be documented in this file.
 
 ### Added
 
+- Search Console Sitemaps API status with submitted sitemap discovery, last download time, pending state, errors, warnings, submitted URL totals, and current-audit sitemap matching.
+- A focused Sitemaps API response normalization test that deliberately excludes Google's deprecated sitemap indexed totals.
 - A living development guide with project goals, architecture, completion tracking and milestone roadmap.
 - A three-language Google URL alignment matrix with state filters and CSV export.
 - Cumulative, user-controlled URL Inspection batches for sites with more than 25 scanned URLs.

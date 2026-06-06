@@ -25,6 +25,7 @@ Paid scheduled scans such as Vercel Cron are intentionally excluded.
 - Request-driven serverless workers with Neon leases, so scan work completes inside each API request instead of relying on background promises.
 - Google Search Console CSV import with English and Chinese column support.
 - Google Search Console API integration for Search Analytics dimensions and URL Inspection.
+- Search Console Sitemaps API status for submitted files, last download time, pending state, errors, warnings, and current-audit sitemap matching.
 - URL set comparison across sitemap, scanned internal links, Search Analytics, and Google sitemap/referrer signals.
 - Sitemap orphan detection and HTTP/HTTPS, www, trailing-slash, and query URL variant diagnosis.
 - JSON-LD graph parsing, common Google field rules, page-signal consistency checks, and rich results issue comparison.

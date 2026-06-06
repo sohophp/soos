@@ -7,6 +7,7 @@ import dns from "node:dns/promises";
 import net from "node:net";
 import { ProxyAgent } from "undici";
 import { neon } from "@neondatabase/serverless";
+import { normalizeGscSitemapResponse } from "../src/gsc-sitemaps.js";
 
 const PORT = Number(process.env.SOOS_API_PORT || 4177);
 const USER_AGENT = "soos/0.2 SEO audit";
@@ -2921,6 +2922,27 @@ async function testGscConnection(options = {}) {
   };
 }
 
+async function listGscSitemaps(options = {}) {
+  const config = await getGscConfigWithAccessToken(options);
+  if (!config.siteUrl || !config.accessToken) {
+    throw new Error("Search Console API is not configured.");
+  }
+  const endpoint = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(config.siteUrl)}/sitemaps`;
+  const response = await fetch(endpoint, {
+    headers: { "Authorization": `Bearer ${config.accessToken}` },
+  }).catch((error) => {
+    throw new Error(friendlyGscNetworkError(error));
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(friendlyGscApiError(response.status, body, `Search Console Sitemaps HTTP ${response.status}`));
+  }
+  return {
+    siteUrl: config.siteUrl,
+    ...normalizeGscSitemapResponse(body),
+  };
+}
+
 async function inspectGscUrl(config, inspectionUrl) {
   const response = await fetch("https://searchconsole.googleapis.com/v1/urlInspection/index:inspect", {
     method: "POST",
@@ -3304,6 +3326,13 @@ export function handleRequest(req, res) {
   if (req.method === "POST" && requestPath === "/api/gsc/search-analytics") {
     readJsonBody(req, 50000)
       .then((body) => queryGscSearchAnalytics({ ...body, sessionId }))
+      .then((result) => sendJson(res, 200, result))
+      .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
+    return;
+  }
+  if (req.method === "POST" && requestPath === "/api/gsc/sitemaps") {
+    readJsonBody(req, 50000)
+      .then((body) => listGscSitemaps({ siteUrl: body.siteUrl, sessionId }))
       .then((result) => sendJson(res, 200, result))
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;

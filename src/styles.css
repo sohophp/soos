@@ -1525,6 +1525,110 @@ main {
 .gsc-api-error {
   color: #9f1f17 !important;
 }
+
+.gsc-sitemaps-panel .panel-head span {
+  color: #687169;
+  font-size: 13px;
+}
+
+.gsc-sitemaps-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.gsc-sitemaps-actions strong,
+.gsc-sitemaps-actions small {
+  display: block;
+}
+
+.gsc-sitemaps-actions small,
+.gsc-sitemaps-note {
+  margin-top: 4px;
+  color: #687169;
+}
+
+.gsc-sitemaps-body {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+.gsc-sitemap-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid #cddfce;
+  border-radius: 6px;
+  background: #f7fbf6;
+  color: #1f6b3a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gsc-sitemap-current.missing {
+  border-color: #f0dab0;
+  background: #fffaf0;
+  color: #8a5a00;
+}
+
+.gsc-sitemap-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #dfe6dd;
+  border-radius: 6px;
+}
+
+.gsc-sitemap-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.6fr) repeat(4, minmax(140px, 0.8fr));
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-top: 1px solid #edf1eb;
+  font-size: 12px;
+}
+
+.gsc-sitemap-row:first-child {
+  border-top: 0;
+}
+
+.gsc-sitemap-row strong,
+.gsc-sitemap-row small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gsc-sitemap-row strong {
+  color: #172018;
+}
+
+.gsc-sitemap-row span,
+.gsc-sitemap-row small {
+  color: #687169;
+}
+
+@media (max-width: 760px) {
+  .gsc-sitemaps-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .gsc-sitemaps-actions .export-button {
+    width: 100%;
+  }
+
+  .gsc-sitemap-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .url-inspection {
   border-color: #dfe6dd;
 }

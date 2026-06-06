@@ -2147,6 +2147,13 @@ const gscDataText = {
     noIssue: "No immediate index issue", noIssueDetail: "Google reports this URL as passing URL Inspection checks.",
     noIssueAction: "Keep monitoring performance data and canonical consistency.",
     inspectPropertyFirst: "Enter the Search Console Property URL before running URL Inspection.",
+    sitemapsTitle: "Google sitemap status", sitemapsLoad: "Load sitemap status", sitemapsLoading: "Loading...",
+    sitemapsHelp: "Shows sitemaps submitted to this Search Console property, Google's last download, and reported errors or warnings.",
+    sitemapsTotal: "submitted sitemaps", sitemapsPending: "pending", sitemapsErrors: "with errors",
+    sitemapsWarnings: "with warnings", sitemapsSubmittedUrls: "submitted URLs", sitemapsLastRead: "Last read",
+    sitemapsLastSubmitted: "Last submitted", sitemapsCurrentFound: "Current audit sitemap is listed by Google",
+    sitemapsCurrentMissing: "Current audit sitemap is not listed for this property", sitemapsNoData: "Google returned no submitted sitemaps.",
+    sitemapsIndex: "Sitemap index", sitemapsFile: "Sitemap", sitemapsDeprecatedNote: "URL-level index coverage is not inferred from deprecated sitemap indexed totals.",
   },
   "zh-CN": {
     analyticsTitle: "Search Analytics API", ready: "已就绪", configureFirst: "请先连接 GSC",
@@ -2202,6 +2209,13 @@ const gscDataText = {
     noIssue: "没有明显索引问题", noIssueDetail: "Google 报告该网址通过了网址检查。",
     noIssueAction: "继续监控表现数据和 canonical 一致性。",
     inspectPropertyFirst: "运行网址检查前，请先输入 Search Console Property URL。",
+    sitemapsTitle: "Google Sitemap 状态", sitemapsLoad: "加载 Sitemap 状态", sitemapsLoading: "加载中...",
+    sitemapsHelp: "显示该 Search Console property 已提交的 sitemap、Google 最后读取时间以及错误和警告。",
+    sitemapsTotal: "个已提交 sitemap", sitemapsPending: "个待处理", sitemapsErrors: "个有错误",
+    sitemapsWarnings: "个有警告", sitemapsSubmittedUrls: "个已提交网址", sitemapsLastRead: "最后读取",
+    sitemapsLastSubmitted: "最后提交", sitemapsCurrentFound: "Google 列表中包含当前扫描 sitemap",
+    sitemapsCurrentMissing: "该 property 的 Google 列表中没有当前扫描 sitemap", sitemapsNoData: "Google 没有返回已提交的 sitemap。",
+    sitemapsIndex: "Sitemap 索引", sitemapsFile: "Sitemap", sitemapsDeprecatedNote: "不会使用已弃用的 sitemap indexed 汇总数量推断单个网址的收录状态。",
   },
   "zh-TW": {
     analyticsTitle: "Search Analytics API", ready: "已就緒", configureFirst: "請先連接 GSC",
@@ -2257,6 +2271,13 @@ const gscDataText = {
     noIssue: "沒有明顯索引問題", noIssueDetail: "Google 回報該網址通過網址檢查。",
     noIssueAction: "繼續監控成效資料和 canonical 一致性。",
     inspectPropertyFirst: "執行網址檢查前，請先輸入 Search Console Property URL。",
+    sitemapsTitle: "Google Sitemap 狀態", sitemapsLoad: "載入 Sitemap 狀態", sitemapsLoading: "載入中...",
+    sitemapsHelp: "顯示該 Search Console property 已提交的 sitemap、Google 最後讀取時間以及錯誤和警告。",
+    sitemapsTotal: "個已提交 sitemap", sitemapsPending: "個待處理", sitemapsErrors: "個有錯誤",
+    sitemapsWarnings: "個有警告", sitemapsSubmittedUrls: "個已提交網址", sitemapsLastRead: "最後讀取",
+    sitemapsLastSubmitted: "最後提交", sitemapsCurrentFound: "Google 清單中包含目前掃描 sitemap",
+    sitemapsCurrentMissing: "該 property 的 Google 清單中沒有目前掃描 sitemap", sitemapsNoData: "Google 沒有回傳已提交的 sitemap。",
+    sitemapsIndex: "Sitemap 索引", sitemapsFile: "Sitemap", sitemapsDeprecatedNote: "不會使用已棄用的 sitemap indexed 彙總數量推斷單一網址的收錄狀態。",
   },
 };
 
@@ -3761,6 +3782,103 @@ function StructuredDataDiagnostics({ report, inspectionResults, copy, language }
   );
 }
 
+function GscSitemapsPanel({ status, siteUrl, currentSitemapUrl, language }) {
+  const copy = gscDataText[language] || gscDataText.en;
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setResult(null);
+    setError("");
+  }, [siteUrl]);
+
+  async function loadSitemaps() {
+    if (!status?.configured) {
+      setError(copy.connectFirst);
+      return;
+    }
+    if (!siteUrl.trim()) {
+      setError(copy.propertyFirst);
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/gsc/sitemaps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteUrl }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Could not load Search Console sitemaps");
+      setResult(body);
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const currentKey = normalizeReportUrl(currentSitemapUrl || "");
+  const currentFound = currentKey
+    ? (result?.sitemaps || []).some((item) => normalizeReportUrl(item.path) === currentKey)
+    : null;
+
+  return (
+    <section className="panel gsc-sitemaps-panel">
+      <div className="panel-head">
+        <h2>{copy.sitemapsTitle}</h2>
+        <span>{status?.configured ? copy.ready : copy.configureFirst}</span>
+      </div>
+      <div className="gsc-sitemaps-actions">
+        <div>
+          <strong>{copy.sitemapsTitle}</strong>
+          <small>{copy.sitemapsHelp}</small>
+        </div>
+        <button className="export-button" type="button" onClick={loadSitemaps} disabled={loading || !status?.configured}>
+          {loading ? copy.sitemapsLoading : copy.sitemapsLoad}
+        </button>
+      </div>
+      {error ? <div className="url-inspection-error">{error}</div> : null}
+      {result ? (
+        <div className="gsc-sitemaps-body">
+          <div className="coverage-disposition-summary">
+            <span>{result.summary?.total || 0} {copy.sitemapsTotal}</span>
+            <span>{result.summary?.pending || 0} {copy.sitemapsPending}</span>
+            <span>{result.summary?.withErrors || 0} {copy.sitemapsErrors}</span>
+            <span>{result.summary?.withWarnings || 0} {copy.sitemapsWarnings}</span>
+            <span>{result.summary?.submittedUrls || 0} {copy.sitemapsSubmittedUrls}</span>
+          </div>
+          {currentFound !== null ? (
+            <div className={`gsc-sitemap-current ${currentFound ? "found" : "missing"}`}>
+              {currentFound ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+              <span>{currentFound ? copy.sitemapsCurrentFound : copy.sitemapsCurrentMissing}</span>
+            </div>
+          ) : null}
+          {(result.sitemaps || []).length ? (
+            <div className="gsc-sitemap-list">
+              {result.sitemaps.map((item) => (
+                <article className="gsc-sitemap-row" key={item.path}>
+                  <div>
+                    <strong title={item.path}>{item.path}</strong>
+                    <small>{item.sitemapIndex ? copy.sitemapsIndex : copy.sitemapsFile}{item.type ? ` / ${item.type}` : ""}</small>
+                  </div>
+                  <span>{copy.sitemapsLastRead}: {item.lastDownloaded || "-"}</span>
+                  <span>{copy.sitemapsLastSubmitted}: {item.lastSubmitted || "-"}</span>
+                  <span>{item.submittedUrls} {copy.sitemapsSubmittedUrls}</span>
+                  <span>{item.errors} {copy.sitemapsErrors} / {item.warnings} {copy.sitemapsWarnings}</span>
+                </article>
+              ))}
+            </div>
+          ) : <small>{copy.sitemapsNoData}</small>}
+          <small className="gsc-sitemaps-note">{copy.sitemapsDeprecatedNote}</small>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
   const copy = gscDataText[language] || gscDataText.en;
   const [loading, setLoading] = useState(false);
@@ -4730,6 +4848,7 @@ useEffect(() => {
       </label>
       <SearchConsoleApiConfig status={gscStatus} onStatus={setGscStatus} siteUrl={gscSiteUrl} onSiteUrlChange={setGscSiteUrl} language={language} />
       <SearchAnalyticsPanel status={gscStatus} siteUrl={gscSiteUrl} onRows={setGscRows} language={language} />
+      <GscSitemapsPanel status={gscStatus} siteUrl={gscSiteUrl} currentSitemapUrl={report?.input?.sitemapUrl} language={language} />
       <SearchConsoleImport rows={gscRows} onImport={setGscRows} onClear={() => setGscRows([])} language={language} />
 
       <RetainedJobsPanel
