@@ -35,9 +35,6 @@ All notable changes to soos will be documented in this file.
 - Lightweight retained-task list responses that omit full report payloads until opened.
 - URL-level issue fingerprints for new-regression and resolved-issue comparisons.
 - Multiple historical versions of the same site instead of replacing the previous scan.
-- Neon-backed daily, weekly, and 30-day audit schedules.
-- Protected scheduled-audit processor with checkpoint continuation and worker leases.
-- Daily Vercel Cron configuration and scheduled-audit management UI.
 - Neon-backed audit job records scoped to each browser session.
 - Automatic active-job restoration after a page refresh.
 - Interrupted worker detection and recoverable audit restart after a server cold start.
@@ -53,6 +50,10 @@ All notable changes to soos will be documented in this file.
 - Removed reliance on post-response background promises for Vercel audit jobs.
 - Updated the crawler user agent to `soos/0.2 SEO audit`.
 - Historical reports without internal-link data no longer produce false orphan-page findings.
+
+### Removed
+
+- Scheduled audit and Vercel Cron support to avoid requiring a paid scheduling feature.
 
 ## [0.2.0] - 2026-06-06
 

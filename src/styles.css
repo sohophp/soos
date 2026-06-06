@@ -356,60 +356,6 @@ main {
   color: #687169;
 }
 
-.scheduled-audits {
-  margin-top: 12px;
-}
-
-.scheduled-audits .panel-head > div small {
-  display: block;
-  margin-top: 3px;
-  color: #687169;
-  font-size: 12px;
-}
-
-.schedule-create {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(130px, 190px) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 12px 16px;
-}
-
-.schedule-create strong {
-  min-width: 0;
-  overflow: hidden;
-  color: #172018;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.schedule-list {
-  display: grid;
-}
-
-.schedule-row {
-  display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) minmax(100px, 0.4fr) minmax(180px, 0.8fr) minmax(180px, 0.8fr) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 16px;
-  border-top: 1px solid #edf1eb;
-  font-size: 12px;
-}
-
-.schedule-row strong {
-  min-width: 0;
-  overflow: hidden;
-  color: #172018;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.schedule-row span,
-.schedule-row small {
-  color: #687169;
-}
-
 .history-list {
   display: grid;
   gap: 10px;
@@ -2253,15 +2199,8 @@ main {
     grid-template-columns: 1fr;
   }
 
-  .retained-job-row strong,
-  .schedule-create strong,
-  .schedule-row strong {
+  .retained-job-row strong {
     white-space: normal;
-  }
-
-  .schedule-create,
-  .schedule-row {
-    grid-template-columns: 1fr;
   }
 
   .url-set-row,

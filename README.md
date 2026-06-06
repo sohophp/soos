@@ -80,7 +80,6 @@ DATABASE_URL=postgresql://...
 GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
 SOOS_TOKEN_ENCRYPTION_KEY=generate-a-long-random-value
-CRON_SECRET=generate-a-separate-long-random-value
 ```
 
 Visitors do not enter OAuth Client ID or Client Secret. The deployment owner configures one Google OAuth app on the server, and each visitor connects their own Google account from the UI.
@@ -150,7 +149,6 @@ DATABASE_URL=postgresql://...
 GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
 SOOS_TOKEN_ENCRYPTION_KEY=generate-a-long-random-value
-CRON_SECRET=generate-a-separate-long-random-value
 ```
 
 Notes:
@@ -168,10 +166,6 @@ Notes:
 - Pause and stop take effect between checkpoint batches; an in-flight batch is allowed to finish before the saved task state changes.
 - The Retained Neon Tasks panel lists tasks owned by the current browser session. Completed reports can be opened, recoverable jobs can continue, and deletion also removes checkpoint batches.
 - Repeated scans of the same site are retained as separate browser-history versions. Comparison reports identify newly introduced URL issue types and resolved URL issue types.
-- Scheduled Audits stores daily, weekly, or 30-day plans in Neon. The included Vercel Cron calls `/api/cron/audits` daily at 03:00 UTC.
-- Set `CRON_SECRET` in Vercel. Vercel sends it as a bearer token to protect the Cron endpoint.
-- Scheduled scans use the standard 250 URL limit and disable performance checks. Checkpoints and leases allow interrupted runs to continue on the next Cron call.
-- Vercel Hobby Cron is suitable for lightweight daily/weekly/monthly monitoring. Large or more frequent monitoring can call the same endpoint from an external scheduler using `Authorization: Bearer <CRON_SECRET>`.
 - If `/api/gsc/status` returns `Not Found`, confirm the deployed branch includes `api/index.js` and `vercel.json`, then redeploy. The Vercel rewrite maps `/api/:path*` to `api/index.js`.
 
 Search Analytics notes:

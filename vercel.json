@@ -9,13 +9,7 @@
   ],
   "functions": {
     "api/index.js": {
-      "maxDuration": 300
+      "maxDuration": 60
     }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/audits",
-      "schedule": "0 3 * * *"
-    }
-  ]
+  }
 }
