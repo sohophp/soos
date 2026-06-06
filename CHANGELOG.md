@@ -9,6 +9,7 @@ All notable changes to soos will be documented in this file.
 - Connected Google account display in the Search Console API panel.
 - Three-language pre-connection guidance for the complete Google authorization flow.
 - English, Simplified Chinese, and Traditional Chinese UI text for Search Analytics and URL Inspection diagnostics.
+- Three-language Search Console CSV, GSC opportunity, and Search Visibility labels.
 - OAuth callback auto-refresh for the opener window and token revoke on disconnect.
 - Vercel deployment support with `api/index.js` and `vercel.json`.
 - Three-language OAuth setup help in the Search Console API panel.
@@ -19,6 +20,7 @@ All notable changes to soos will be documented in this file.
 - Additional Search Analytics opportunity cards for top-rank/no-click and page-two query opportunities.
 - Expanded URL Inspection diagnostics for sitemap/referrer discovery, mobile usability, rich results, duplicate/alternate states, soft 404, and discovered-not-crawled states.
 - Copy-all blocked URL actions on grouped robots.txt impact cards.
+- GSC opportunity deduplication, severity sorting, and suppression of ranking/CTR hints for technically blocked URLs.
 - Keyword opportunities CSV export from Page + Query Search Analytics rows.
 
 ### Changed

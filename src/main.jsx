@@ -2034,6 +2034,48 @@ const inspectionDiagnosisText = {
   },
 };
 
+const gscSupportingText = {
+  en: {
+    csvTitle: "Search Console CSV", optional: "optional", rowsLoaded: "rows loaded",
+    importTitle: "Import page performance", importHelp: "Use a Search Console Performance export by Pages. CSV, TSV, and semicolon-separated files are supported.",
+    importButton: "Import CSV", clearButton: "Clear GSC data", reading: "Reading", imported: "rows imported",
+    parsed: "rows parsed", importFailed: "import failed", cleared: "Imported CSV data cleared",
+    noRows: "No page rows found. Export Search Console Performance by Pages with Page, Clicks, Impressions, CTR, and Position columns.",
+    opportunities: "GSC opportunities", sampleUrls: "Sample URLs",
+    indexableNoImpressions: ["Technically indexable, no GSC impressions", "These URLs look indexable in this audit but do not appear in the imported GSC performance rows."],
+    lowRanking: ["Visible but ranking low", "These URLs have impressions but average position is worse than 20."],
+    lowCtr: ["Visible but CTR is low", "These URLs have at least 100 impressions and less than 1% calculated CTR."],
+    blockedVisibility: ["GSC visibility with technical blockers", "These URLs have GSC impressions but also have crawl, indexability, or canonical blockers in this audit."],
+    missingSitemap: ["GSC pages missing from sitemap", "These URLs appear in GSC performance data but are not in the scanned sitemap set."],
+  },
+  "zh-CN": {
+    csvTitle: "Search Console CSV", optional: "可选", rowsLoaded: "行已加载",
+    importTitle: "导入网页表现", importHelp: "请使用 Search Console“效果”报告中的“网页”导出文件，支持 CSV、TSV 和分号分隔格式。",
+    importButton: "导入 CSV", clearButton: "清除 GSC 数据", reading: "正在读取", imported: "行已导入",
+    parsed: "行已解析", importFailed: "导入失败", cleared: "已清除导入的 CSV 数据",
+    noRows: "未找到网页数据行。请从 Search Console“效果 > 网页”导出，并包含网页、点击、展示、CTR 和排名列。",
+    opportunities: "GSC 优化机会", sampleUrls: "示例网址",
+    indexableNoImpressions: ["技术上可收录，但没有 GSC 展示", "这些网址在本次检查中看起来可以收录，但未出现在导入的 GSC 表现数据中。"],
+    lowRanking: ["已有展示但排名较低", "这些网址已有展示，但平均排名低于第 20 位。"],
+    lowCtr: ["已有展示但点击率较低", "这些网址至少有 100 次展示，计算出的 CTR 低于 1%。"],
+    blockedVisibility: ["已有 GSC 展示但存在技术阻挡", "这些网址已有 GSC 展示，同时存在抓取、索引或 canonical 阻挡。"],
+    missingSitemap: ["GSC 网页未出现在 sitemap", "这些网址出现在 GSC 表现数据中，但不在本次扫描的 sitemap URL 集合内。"],
+  },
+  "zh-TW": {
+    csvTitle: "Search Console CSV", optional: "選用", rowsLoaded: "列已載入",
+    importTitle: "匯入網頁成效", importHelp: "請使用 Search Console「成效」報表中的「網頁」匯出檔，支援 CSV、TSV 和分號分隔格式。",
+    importButton: "匯入 CSV", clearButton: "清除 GSC 資料", reading: "正在讀取", imported: "列已匯入",
+    parsed: "列已解析", importFailed: "匯入失敗", cleared: "已清除匯入的 CSV 資料",
+    noRows: "未找到網頁資料列。請從 Search Console「成效 > 網頁」匯出，並包含網頁、點擊、曝光、CTR 和排名欄位。",
+    opportunities: "GSC 優化機會", sampleUrls: "範例網址",
+    indexableNoImpressions: ["技術上可收錄，但沒有 GSC 曝光", "這些網址在本次檢查中看起來可以收錄，但未出現在匯入的 GSC 成效資料中。"],
+    lowRanking: ["已有曝光但排名較低", "這些網址已有曝光，但平均排名低於第 20 位。"],
+    lowCtr: ["已有曝光但點閱率較低", "這些網址至少有 100 次曝光，計算出的 CTR 低於 1%。"],
+    blockedVisibility: ["已有 GSC 曝光但存在技術阻擋", "這些網址已有 GSC 曝光，同時存在檢索、索引或 canonical 阻擋。"],
+    missingSitemap: ["GSC 網頁未出現在 sitemap", "這些網址出現在 GSC 成效資料中，但不在本次掃描的 sitemap URL 集合內。"],
+  },
+};
+
 function buildSearchAnalyticsInsights(rows, dimension, language = "en") {
   const locale = language === "zh-CN" ? "zh-CN" : language === "zh-TW" ? "zh-TW" : "en";
   const insightText = {
@@ -2057,7 +2099,7 @@ function buildSearchAnalyticsInsights(rows, dimension, language = "en") {
   const insights = [];
   const seenInsightDetails = new Set();
   function addInsight(insight) {
-    const key = `${insight.type}:${insight.detail}`;
+    const key = insight.detail;
     if (seenInsightDetails.has(key)) return;
     seenInsightDetails.add(key);
     insights.push(insight);
@@ -2315,7 +2357,8 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows, language }) {
     </section>
   );
 }
-function SearchConsoleImport({ rows, onImport, onClear }) {
+function SearchConsoleImport({ rows, onImport, onClear, language }) {
+  const copy = gscSupportingText[language] || gscSupportingText.en;
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -2323,21 +2366,21 @@ function SearchConsoleImport({ rows, onImport, onClear }) {
     const file = event.target.files?.[0];
     if (!file) return;
     setError("");
-    setMessage(`Reading ${file.name}...`);
+    setMessage(`${copy.reading} ${file.name}...`);
     try {
       const text = await file.text();
       const parsed = parseSearchConsoleCsv(text);
       if (!parsed.length) {
-        setError("No page rows found. Export Search Console Performance by Pages, and use CSV/TSV with Page, Clicks, Impressions, CTR, Position columns.");
-        setMessage(`${file.name}: 0 rows parsed`);
+        setError(copy.noRows);
+        setMessage(`${file.name}: 0 ${copy.parsed}`);
         onImport([]);
       } else {
         onImport(parsed);
-        setMessage(`${file.name}: ${parsed.length} rows imported`);
+        setMessage(`${file.name}: ${parsed.length} ${copy.imported}`);
       }
     } catch (err) {
       setError(err.message || String(err));
-      setMessage(`${file.name}: import failed`);
+      setMessage(`${file.name}: ${copy.importFailed}`);
     } finally {
       event.target.value = "";
     }
@@ -2345,31 +2388,31 @@ function SearchConsoleImport({ rows, onImport, onClear }) {
 
   function clearImportedRows() {
     onClear();
-    setMessage("Imported CSV data cleared");
+    setMessage(copy.cleared);
     setError("");
   }
 
   return (
     <section className="panel gsc-import">
       <div className="panel-head">
-        <h2>Search Console CSV</h2>
-        <span>{rows.length ? `${rows.length} rows loaded` : "optional"}</span>
+        <h2>{copy.csvTitle}</h2>
+        <span>{rows.length ? `${rows.length} ${copy.rowsLoaded}` : copy.optional}</span>
       </div>
       <div className="gsc-import-body">
         <div>
-          <strong>Import page performance</strong>
-          <small>Use a Google Search Console Performance export by Pages. CSV, TSV, and semicolon-separated files are supported.</small>
+          <strong>{copy.importTitle}</strong>
+          <small>{copy.importHelp}</small>
           {message ? <small className="gsc-import-message">{message}</small> : null}
           {error ? <small className="gsc-import-error">{error}</small> : null}
         </div>
         <div className="gsc-import-actions">
           <label className="export-button file-button">
-            Import CSV
+            {copy.importButton}
             <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values,text/plain" onChange={handleFile} />
           </label>
           {rows.length ? (
             <button className="export-button" type="button" onClick={clearImportedRows}>
-              Clear GSC data
+              {copy.clearButton}
             </button>
           ) : null}
         </div>
@@ -2379,6 +2422,17 @@ function SearchConsoleImport({ rows, onImport, onClear }) {
 }
 function buildGscRowMap(rows) {
   return new Map((rows || []).map((row) => [row.key, row]));
+}
+
+function uniqueGscRows(rows) {
+  const byKey = new Map();
+  for (const row of rows || []) {
+    const key = row.key || normalizeReportUrl(row.page || "");
+    if (!key) continue;
+    const current = byKey.get(key);
+    if (!current || (row.impressions || 0) > (current.impressions || 0)) byKey.set(key, row);
+  }
+  return [...byKey.values()];
 }
 
 function isTechnicallyIndexablePage(page) {
@@ -2394,9 +2448,10 @@ function isTechnicallyIndexablePage(page) {
   return !(page.issues || []).some((issue) => blockers.has(issue.type));
 }
 
-function buildGscOpportunities(report, rows) {
+function buildGscOpportunities(report, rows, language = "en") {
+  const copy = gscSupportingText[language] || gscSupportingText.en;
   const pages = report?.pages || [];
-  const gscRows = rows || [];
+  const gscRows = uniqueGscRows(rows);
   if (!gscRows.length || !pages.length) return [];
 
   const gscByUrl = buildGscRowMap(gscRows);
@@ -2406,11 +2461,11 @@ function buildGscOpportunities(report, rows) {
     .filter((page) => (gscByUrl.get(normalizeReportUrl(page.url))?.impressions || 0) === 0);
   const lowRanking = pages.filter((page) => {
     const row = gscByUrl.get(normalizeReportUrl(page.url));
-    return row && (row.impressions || 0) > 0 && typeof row.position === "number" && row.position > 20;
+    return row && isTechnicallyIndexablePage(page) && (row.impressions || 0) > 0 && typeof row.position === "number" && row.position > 20;
   });
   const lowCtr = pages.filter((page) => {
     const row = gscByUrl.get(normalizeReportUrl(page.url));
-    if (!row || (row.impressions || 0) < 100) return false;
+    if (!row || !isTechnicallyIndexablePage(page) || (row.impressions || 0) < 100) return false;
     const ctr = row.clicks != null && row.impressions ? row.clicks / row.impressions : null;
     return ctr != null && ctr < 0.01;
   });
@@ -2432,49 +2487,55 @@ function buildGscOpportunities(report, rows) {
   return [
     makeItem(
       "indexable_no_impressions",
-      "Technically indexable, no GSC impressions",
+      copy.indexableNoImpressions[0],
       "warning",
       technicallyIndexableNoImpressions,
-      "These URLs look indexable in this audit but do not appear in the imported GSC performance rows.",
+      copy.indexableNoImpressions[1],
     ),
     makeItem(
       "low_ranking",
-      "Visible but ranking low",
+      copy.lowRanking[0],
       "notice",
       lowRanking,
-      "These URLs have impressions but average position is worse than 20.",
+      copy.lowRanking[1],
     ),
     makeItem(
       "low_ctr",
-      "Visible but CTR is low",
+      copy.lowCtr[0],
       "notice",
       lowCtr,
-      "These URLs have at least 100 impressions and less than 1% calculated CTR.",
+      copy.lowCtr[1],
     ),
     makeItem(
       "blocked_with_visibility",
-      "GSC visibility with technical blockers",
+      copy.blockedVisibility[0],
       "critical",
       blockedWithVisibility,
-      "These URLs have GSC impressions but also have crawl, indexability, or canonical blockers in this audit.",
+      copy.blockedVisibility[1],
     ),
     makeItem(
       "gsc_not_in_sitemap",
-      "GSC pages missing from sitemap",
+      copy.missingSitemap[0],
       "notice",
       gscNotInSitemap,
-      "These URLs appear in GSC performance data but are not in the scanned sitemap set.",
+      copy.missingSitemap[1],
     ),
-  ].filter((item) => item.count > 0);
+  ]
+    .filter((item) => item.count > 0)
+    .sort((a, b) => {
+      const severityRank = { critical: 3, warning: 2, notice: 1 };
+      return (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0) || b.count - a.count;
+    });
 }
 
-function GscOpportunities({ report, rows }) {
-  const opportunities = buildGscOpportunities(report, rows || []);
+function GscOpportunities({ report, rows, language }) {
+  const copy = gscSupportingText[language] || gscSupportingText.en;
+  const opportunities = buildGscOpportunities(report, rows || [], language);
   if (!rows?.length || !opportunities.length) return null;
   return (
     <section className="panel gsc-opportunities">
       <div className="panel-head">
-        <h2>GSC opportunities</h2>
+        <h2>{copy.opportunities}</h2>
         <span>{opportunities.length}</span>
       </div>
       <div className="impact-list">
@@ -2490,7 +2551,7 @@ function GscOpportunities({ report, rows }) {
             </div>
             {item.sampleUrls.length ? (
               <div className="impact-samples">
-                <strong>Sample URLs</strong>
+                <strong>{copy.sampleUrls}</strong>
                 {item.sampleUrls.map((url) => (
                   <small key={`${item.key}-${url}`}>{url}</small>
                 ))}
@@ -2528,9 +2589,10 @@ function buildSearchVisibility(report) {
   };
 }
 
-function SearchVisibility({ report, t, gscRows }) {
+function SearchVisibility({ report, t, gscRows, language }) {
   if (!report?.pages?.length) return null;
   const label = (key, fallback) => t?.[key] || fallback;
+  const flaggedLabel = language === "zh-CN" ? "个标记" : language === "zh-TW" ? "個標記" : "flagged";
   const visibility = buildSearchVisibility(report);
   const gsc = summarizeGscRows(report, gscRows || []);
   return (
@@ -2547,7 +2609,7 @@ function SearchVisibility({ report, t, gscRows }) {
         </div>
         <div className="visibility-card">
           <strong>{label("gscConfirmation", "Needs GSC confirmation")}</strong>
-          <span>{visibility.hardBlocked + visibility.canonicalized} flagged</span>
+          <span>{visibility.hardBlocked + visibility.canonicalized} {flaggedLabel}</span>
           <small>{label("gscHelp", "Confirmed indexing status requires Google Search Console URL Inspection data.")}</small>
         </div>
         <div className="visibility-card">
@@ -2863,8 +2925,8 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
       <StatusFlags flags={report.statusFlags} t={t} />
       <ExecutiveSummary summary={report.executiveSummary} t={t} />
       <ScoreCard score={report.summary.healthScore} t={t} />
-      <SearchVisibility report={report} t={t} gscRows={gscRows} />
-      <GscOpportunities report={report} rows={gscRows} />
+      <SearchVisibility report={report} t={t} gscRows={gscRows} language={language} />
+      <GscOpportunities report={report} rows={gscRows} language={language} />
       <UrlInspectionPanel report={report} gscStatus={gscStatus} siteUrl={gscSiteUrl} language={language} />
       <section className="summary">
         <Stat label={t.urls} value={report.summary.urlCount} />
@@ -3209,7 +3271,7 @@ useEffect(() => {
       </label>
       <SearchConsoleApiConfig status={gscStatus} onStatus={setGscStatus} siteUrl={gscSiteUrl} onSiteUrlChange={setGscSiteUrl} language={language} />
       <SearchAnalyticsPanel status={gscStatus} siteUrl={gscSiteUrl} onRows={setGscRows} language={language} />
-      <SearchConsoleImport rows={gscRows} onImport={setGscRows} onClear={() => setGscRows([])} />
+      <SearchConsoleImport rows={gscRows} onImport={setGscRows} onClear={() => setGscRows([])} language={language} />
 
 
       <HistoryPanel
