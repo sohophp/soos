@@ -1682,8 +1682,16 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
       if (event.data?.type !== "soos:gsc-oauth-connected") return;
       refreshStatus("oauth-connected");
     }
+    function handleStorage(event) {
+      if (event.key !== "soos:gsc-oauth-connected" || !event.newValue) return;
+      refreshStatus("oauth-connected");
+    }
     window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
   const tokenState = status?.refreshToken
@@ -1784,6 +1792,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
       oauthWindow.document.title = "Connecting Google Search Console";
       oauthWindow.document.body.innerHTML = "<p style=\"font-family:system-ui;padding:24px\">Opening Google OAuth...</p>";
     }
+    let popupPoll = null;
     try {
       const response = await fetch("/api/gsc/oauth/start", {
         method: "POST",
@@ -1795,10 +1804,17 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
       setMessage(copy.openingMessage);
       if (oauthWindow) {
         oauthWindow.location.href = body.authUrl;
+        popupPoll = window.setInterval(() => {
+          if (!oauthWindow.closed) return;
+          window.clearInterval(popupPoll);
+          popupPoll = null;
+          refreshStatus("oauth-closed");
+        }, 600);
       } else {
         window.location.href = body.authUrl;
       }
     } catch (err) {
+      if (popupPoll) window.clearInterval(popupPoll);
       oauthWindow?.close();
       setError(err.message || String(err));
     } finally {

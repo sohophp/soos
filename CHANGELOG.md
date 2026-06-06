@@ -24,6 +24,7 @@ All notable changes to soos will be documented in this file.
 - Removed Admin Key and visitor-entered OAuth credential fields from the Search Console API panel.
 - Search Console OAuth now requests basic Google account identity so the connected account can be shown.
 - OAuth opens a dedicated popup immediately and securely refreshes the opener after a successful callback.
+- OAuth completion also broadcasts through local storage, and closing the popup triggers a status refresh as a fallback.
 - UI avoids showing local debug callback URLs in OAuth setup hints.
 
 ## [0.1.0] - 2026-06-04
