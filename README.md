@@ -9,7 +9,7 @@ soos is a local-first React + Node SEO audit tool for sitemap, robots.txt, index
 - Audits canonical, hreflang/alternate, title, description, H1, lang, viewport, JSON-LD, robots rules, and sitemap consistency.
 - Optional page content checks and lightweight performance checks.
 - Pause, resume, stop, background worker scans, history, CSV export, and summary export.
-- Neon-backed background job metadata and completed reports, with automatic recovery after page refresh.
+- Neon-backed background jobs, completed reports, and URL-batch checkpoints with automatic recovery after page refresh.
 - Google Search Console CSV import with English and Chinese column support.
 - Google Search Console API integration for Search Analytics dimensions and URL Inspection.
 - OAuth refresh token support so access tokens can refresh automatically.
@@ -152,7 +152,8 @@ Notes:
 - Browser sessions and inactive Neon GSC records expire after 90 days. Disconnect rotates the session cookie, removes the saved connection, and attempts to revoke Google access.
 - Background audit jobs use in-memory state and are best-effort on serverless platforms. Direct scans through `/api/audit` are more reliable for Vercel.
 - With `DATABASE_URL`, background job ownership, progress, request settings, and completed reports are retained in Neon for 7 days. Refreshing the page restores the active task.
-- If a serverless worker stops mid-scan, soos marks the task as interrupted and automatically restarts the audit from the beginning. URL-level checkpoints and true continuation from the last processed URL require the upcoming chunked worker queue.
+- Page inspection results are checkpointed to Neon every 10 URLs. If a serverless worker stops mid-scan, soos marks the task as interrupted and automatically resumes from the last completed batch. At most the unfinished batch is repeated.
+- Sitemap discovery is checkpointed before page inspection, so a resumed task does not re-fetch completed sitemap files or already saved page results.
 - If `/api/gsc/status` returns `Not Found`, confirm the deployed branch includes `api/index.js` and `vercel.json`, then redeploy. The Vercel rewrite maps `/api/:path*` to `api/index.js`.
 
 Search Analytics notes:

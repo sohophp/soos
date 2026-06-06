@@ -12,6 +12,7 @@ const MAX_SITEMAPS = 30;
 const MAX_URLS = 250;
 const BACKGROUND_MAX_URLS = 2000;
 const PAGE_CONCURRENCY = 5;
+const PAGE_CHECKPOINT_BATCH_SIZE = 10;
 const FETCH_TIMEOUT_MS = 15000;
 const JOB_TTL_MS = 1000 * 60 * 60 * 4;
 const PERSISTED_JOB_TTL_DAYS = 7;
@@ -79,6 +80,11 @@ function jobSnapshot(job) {
     result: job.result || null,
     error: job.error || null,
     recoverable: Boolean(job.recoverable),
+    checkpoint: job.checkpoint ? {
+      phase: job.checkpoint.phase,
+      processedUrls: job.checkpoint.pages?.length || 0,
+      totalUrls: job.checkpoint.pageUrls?.length || 0,
+    } : null,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
   };
@@ -104,6 +110,7 @@ function createJob(sessionId, request) {
     result: null,
     error: null,
     recoverable: false,
+    checkpoint: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -125,6 +132,7 @@ function updateJob(job, patch) {
   if (patch.result !== undefined) job.result = patch.result;
   if (patch.error !== undefined) job.error = patch.error;
   if (patch.recoverable !== undefined) job.recoverable = Boolean(patch.recoverable);
+  if (patch.checkpoint !== undefined) job.checkpoint = patch.checkpoint;
   if (patch.progress) {
     job.progress = {
       ...job.progress,
@@ -1216,6 +1224,8 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null) {
   const startedAt = Date.now();
   const detected = detectInputUrls(normalizedInput, auditOptions);
   const robotsUrl = detected.robotsUrl;
+  const checkpointKey = JSON.stringify({ normalizedInput, auditOptions });
+  const savedCheckpoint = job?.checkpoint?.key === checkpointKey ? job.checkpoint : null;
   const fetchContext = {};
   if (auditOptions.proxyEnabled) {
     try {
@@ -1225,75 +1235,122 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null) {
     }
   }
   let robots;
-  await waitForJob(job);
-  onProgress?.({
-    stage: "preparing",
-    label: "Preparing scan",
-    percent: 8,
-    processedUrls: 0,
-    totalUrls: 0,
-    processedSitemaps: 0,
-    discoveredSitemaps: 1,
-  });
-  try {
+  let sitemapReports;
+  let pageUrls;
+  let truncated;
+  let urlLimitReached;
+  let sitemapLimitReached;
+  if (savedCheckpoint?.phase === "inspecting" && Array.isArray(savedCheckpoint.pageUrls) && Array.isArray(savedCheckpoint.sitemapReports)) {
+    robots = savedCheckpoint.robots;
+    sitemapReports = savedCheckpoint.sitemapReports;
+    pageUrls = savedCheckpoint.pageUrls;
+    truncated = Boolean(savedCheckpoint.truncated);
+    urlLimitReached = Boolean(savedCheckpoint.urlLimitReached);
+    sitemapLimitReached = Boolean(savedCheckpoint.sitemapLimitReached);
+  } else {
     await waitForJob(job);
-    const fetchedRobots = await fetchText(robotsUrl, fetchContext);
-    const parsedRobots = fetchedRobots.ok ? parseRobots(fetchedRobots.text) : { groups: [], sitemaps: [] };
-    robots = {
-      url: robotsUrl,
-      status: fetchedRobots.status,
-      found: fetchedRobots.ok,
-      groups: parsedRobots.groups,
-      sitemaps: parsedRobots.sitemaps,
-      contentPreview: fetchedRobots.ok ? fetchedRobots.text.slice(0, 4000) : "",
-      analysis: fetchedRobots.ok ? analyzeRobots(parsedRobots, robotsUrl, detected.sitemapUrl) : null,
-    };
-  } catch (error) {
-    robots = { url: robotsUrl, status: null, found: false, groups: [], sitemaps: [], error: String(error.message || error), analysis: null };
-  }
+    onProgress?.({
+      stage: "preparing",
+      label: "Preparing scan",
+      percent: 8,
+      processedUrls: 0,
+      totalUrls: 0,
+      processedSitemaps: 0,
+      discoveredSitemaps: 1,
+    });
+    try {
+      await waitForJob(job);
+      const fetchedRobots = await fetchText(robotsUrl, fetchContext);
+      const parsedRobots = fetchedRobots.ok ? parseRobots(fetchedRobots.text) : { groups: [], sitemaps: [] };
+      robots = {
+        url: robotsUrl,
+        status: fetchedRobots.status,
+        found: fetchedRobots.ok,
+        groups: parsedRobots.groups,
+        sitemaps: parsedRobots.sitemaps,
+        contentPreview: fetchedRobots.ok ? fetchedRobots.text.slice(0, 4000) : "",
+        analysis: fetchedRobots.ok ? analyzeRobots(parsedRobots, robotsUrl, detected.sitemapUrl) : null,
+      };
+    } catch (error) {
+      robots = { url: robotsUrl, status: null, found: false, groups: [], sitemaps: [], error: String(error.message || error), analysis: null };
+    }
 
-  const { sitemapReports, pageUrls, truncated, urlLimitReached, sitemapLimitReached } = await collectSitemapsWithProgress(
-    detected.sitemapUrl,
-    fetchContext,
-    (progress) => {
-      const sitemapBase = progress.discoveredSitemaps ? Math.min(progress.processedSitemaps / progress.discoveredSitemaps, 1) : 0;
-      onProgress?.({
-        stage: "fetching",
-        label: "Fetching sitemap and robots.txt",
-        percent: Math.min(15 + Math.round(sitemapBase * 25), 40),
-        ...progress,
-      });
-    },
-    job,
-    auditOptions.maxUrls,
-  );
+    const sitemapCollection = await collectSitemapsWithProgress(
+      detected.sitemapUrl,
+      fetchContext,
+      (progress) => {
+        const sitemapBase = progress.discoveredSitemaps ? Math.min(progress.processedSitemaps / progress.discoveredSitemaps, 1) : 0;
+        onProgress?.({
+          stage: "fetching",
+          label: "Fetching sitemap and robots.txt",
+          percent: Math.min(15 + Math.round(sitemapBase * 25), 40),
+          ...progress,
+        });
+      },
+      job,
+      auditOptions.maxUrls,
+    );
+    ({ sitemapReports, pageUrls, truncated, urlLimitReached, sitemapLimitReached } = sitemapCollection);
+    await saveAuditCheckpoint(job, {
+      key: checkpointKey,
+      phase: "inspecting",
+      robots,
+      sitemapReports,
+      pageUrls,
+      truncated,
+      urlLimitReached,
+      sitemapLimitReached,
+      pages: [],
+    });
+  }
   const sitemapUrlSet = new Set(pageUrls.map((url) => normalizeUrl(url)).filter(Boolean));
-  let inspectedCount = 0;
+  const checkpointPages = savedCheckpoint?.phase === "inspecting" && Array.isArray(savedCheckpoint.pages)
+    ? savedCheckpoint.pages.slice(0, pageUrls.length)
+    : [];
+  const inspectedPages = [...checkpointPages];
+  let inspectedCount = inspectedPages.length;
   await waitForJob(job);
   onProgress?.({
     stage: "inspecting",
     label: "Inspecting URLs",
-    percent: pageUrls.length ? 45 : 85,
-    processedUrls: 0,
+    percent: pageUrls.length ? Math.min(45 + Math.round((inspectedCount / pageUrls.length) * 45), 90) : 85,
+    processedUrls: inspectedCount,
     totalUrls: pageUrls.length,
     processedSitemaps: sitemapReports.length,
     discoveredSitemaps: sitemapReports.length,
   });
-  const pages = await mapLimit(pageUrls, PAGE_CONCURRENCY, async (url) => {
-    const page = await inspectPage(url, robots.found ? robots : null, sitemapUrlSet, auditOptions, fetchContext, job);
-    inspectedCount += 1;
-    const urlBase = pageUrls.length ? inspectedCount / pageUrls.length : 1;
-    onProgress?.({
-      stage: "inspecting",
-      label: "Inspecting URLs",
-      percent: Math.min(45 + Math.round(urlBase * 45), 90),
-      processedUrls: inspectedCount,
-      totalUrls: pageUrls.length,
-      processedSitemaps: sitemapReports.length,
-      discoveredSitemaps: sitemapReports.length,
-    });
-    return page;
-  }, job);
+  for (let offset = inspectedCount; offset < pageUrls.length; offset += PAGE_CHECKPOINT_BATCH_SIZE) {
+    await waitForJob(job);
+    const batchUrls = pageUrls.slice(offset, offset + PAGE_CHECKPOINT_BATCH_SIZE);
+    const batchPages = await mapLimit(batchUrls, PAGE_CONCURRENCY, async (url) => {
+      const page = await inspectPage(url, robots.found ? robots : null, sitemapUrlSet, auditOptions, fetchContext, job);
+      inspectedCount += 1;
+      const urlBase = pageUrls.length ? inspectedCount / pageUrls.length : 1;
+      onProgress?.({
+        stage: "inspecting",
+        label: "Inspecting URLs",
+        percent: Math.min(45 + Math.round(urlBase * 45), 90),
+        processedUrls: inspectedCount,
+        totalUrls: pageUrls.length,
+        processedSitemaps: sitemapReports.length,
+        discoveredSitemaps: sitemapReports.length,
+      });
+      return page;
+    }, job);
+    inspectedPages.push(...batchPages);
+    await saveAuditCheckpoint(job, {
+      key: checkpointKey,
+      phase: "inspecting",
+      robots,
+      sitemapReports,
+      pageUrls,
+      truncated,
+      urlLimitReached,
+      sitemapLimitReached,
+      pages: inspectedPages,
+    }, batchPages, Math.floor(offset / PAGE_CHECKPOINT_BATCH_SIZE));
+  }
+  const pages = structuredClone(inspectedPages);
   if (auditOptions.contentChecks) addDuplicateContentIssues(pages);
   addAlternateReciprocityIssues(pages);
   for (const page of pages) {
@@ -1557,6 +1614,14 @@ function auditJobKey(jobId) {
   return `audit_job:${jobId}`;
 }
 
+function auditJobBatchPrefix(jobId) {
+  return `audit_job_batch:${jobId}:`;
+}
+
+function auditJobBatchKey(jobId, batchIndex) {
+  return `${auditJobBatchPrefix(jobId)}${String(batchIndex).padStart(6, "0")}`;
+}
+
 let neonSql = null;
 let neonReady = false;
 
@@ -1583,13 +1648,18 @@ async function ensureNeonConfigTable(sql) {
   `;
   await sql`
     DELETE FROM soos_config
-    WHERE key LIKE 'audit_job:%'
+    WHERE (key LIKE 'audit_job:%' OR key LIKE 'audit_job_batch:%')
       AND updated_at < now() - (${PERSISTED_JOB_TTL_DAYS} * interval '1 day')
   `;
   neonReady = true;
 }
 
 function storedAuditJob(job) {
+  const checkpoint = job.checkpoint ? {
+    ...job.checkpoint,
+    processedUrls: job.checkpoint.pages?.length || job.checkpoint.processedUrls || 0,
+    pages: undefined,
+  } : null;
   return {
     id: job.id,
     sessionId: job.sessionId,
@@ -1599,6 +1669,7 @@ function storedAuditJob(job) {
     result: job.result || null,
     error: job.error || null,
     recoverable: Boolean(job.recoverable),
+    checkpoint,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
   };
@@ -1615,6 +1686,42 @@ async function persistAuditJob(job) {
     ON CONFLICT (key)
     DO UPDATE SET value = EXCLUDED.value, updated_at = now()
   `;
+  return true;
+}
+
+async function persistAuditJobBatch(jobId, batchIndex, pages) {
+  const sql = await getNeonSql();
+  if (!sql) return false;
+  await ensureNeonConfigTable(sql);
+  await sql`
+    INSERT INTO soos_config (key, value, updated_at)
+    VALUES (${auditJobBatchKey(jobId, batchIndex)}, ${JSON.stringify({ pages })}::jsonb, now())
+    ON CONFLICT (key)
+    DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+  `;
+  return true;
+}
+
+async function readAuditJobBatches(sql, jobId) {
+  const prefix = `${auditJobBatchPrefix(jobId)}%`;
+  const rows = await sql`
+    SELECT value
+    FROM soos_config
+    WHERE key LIKE ${prefix}
+    ORDER BY key
+  `;
+  return rows.flatMap((row) => {
+    const value = typeof row.value === "string" ? JSON.parse(row.value || "{}") : row.value || {};
+    return Array.isArray(value.pages) ? value.pages : [];
+  });
+}
+
+async function clearAuditJobBatches(jobId) {
+  const sql = await getNeonSql();
+  if (!sql) return false;
+  await ensureNeonConfigTable(sql);
+  const prefix = `${auditJobBatchPrefix(jobId)}%`;
+  await sql`DELETE FROM soos_config WHERE key LIKE ${prefix}`;
   return true;
 }
 
@@ -1645,6 +1752,13 @@ async function flushAuditJob(job) {
   await persistAuditJob(job);
 }
 
+async function saveAuditCheckpoint(job, checkpoint, batch = null, batchIndex = 0) {
+  if (!job) return;
+  if (batch?.length) await persistAuditJobBatch(job.id, batchIndex, batch);
+  updateJob(job, { checkpoint });
+  await flushAuditJob(job);
+}
+
 async function readPersistedAuditJob(jobId, sessionId) {
   const sql = await getNeonSql();
   if (!sql) return null;
@@ -1658,6 +1772,9 @@ async function readPersistedAuditJob(jobId, sessionId) {
     createdAt: Number(stored.createdAt) || Date.now(),
     updatedAt: Number(stored.updatedAt) || Date.now(),
   };
+  if (job.checkpoint && !Array.isArray(job.checkpoint.pages)) {
+    job.checkpoint.pages = await readAuditJobBatches(sql, job.id);
+  }
   const runningElsewhere = ["running", "queued"].includes(job.status) && !activeJobRuns.has(job.id);
   if (runningElsewhere && Date.now() - job.updatedAt > JOB_HEARTBEAT_TIMEOUT_MS) {
     job.status = "interrupted";
@@ -2197,6 +2314,7 @@ async function runAuditJob(job) {
         discoveredSitemaps: result.summary.sitemapCount,
       },
       result,
+      checkpoint: null,
     });
   } catch (error) {
     if (error?.code === "JOB_STOPPED" || job.status === "stopped") {
@@ -2221,6 +2339,11 @@ async function runAuditJob(job) {
     await flushAuditJob(job).catch((error) => {
       console.error(`Could not finalize audit job ${job.id}:`, error);
     });
+    if (job.status === "done") {
+      await clearAuditJobBatches(job.id).catch((error) => {
+        console.error(`Could not clear audit checkpoint batches for ${job.id}:`, error);
+      });
+    }
   }
 }
 

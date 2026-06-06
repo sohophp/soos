@@ -9,11 +9,13 @@ All notable changes to soos will be documented in this file.
 - Neon-backed audit job records scoped to each browser session.
 - Automatic active-job restoration after a page refresh.
 - Interrupted worker detection and recoverable audit restart after a server cold start.
+- Sitemap discovery and page-result checkpoints for true URL-batch continuation.
 
 ### Changed
 
 - Completed background reports remain available in Neon for 7 days.
 - Background job endpoints now enforce browser-session ownership.
+- Page inspection persists every 10 URLs and resumes from the last completed batch.
 - Updated the crawler user agent to `soos/0.2 SEO audit`.
 
 ## [0.2.0] - 2026-06-06
