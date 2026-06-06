@@ -75,6 +75,8 @@ const dictionaries = {
     exportCsv: "Export CSV",
     exportSummary: "Export Summary",
     showMatchingUrls: "Show matching URLs",
+    copyBlockedUrls: "Copy blocked URLs",
+    copiedBlockedUrls: "Copied",
     final: "Final",
     canonical: "Canonical",
     alternates: "Alternates",
@@ -196,6 +198,8 @@ const dictionaries = {
     exportCsv: "\u5bfc\u51fa CSV",
     exportSummary: "\u5bfc\u51fa\u6458\u8981",
     showMatchingUrls: "\u67e5\u770b\u5bf9\u5e94\u7f51\u5740",
+    copyBlockedUrls: "复制被阻挡网址",
+    copiedBlockedUrls: "已复制",
     final: "\u6700\u7ec8\u5730\u5740",
     canonical: "Canonical",
     alternates: "Alternates",
@@ -317,6 +321,8 @@ const dictionaries = {
     exportCsv: "\u532f\u51fa CSV",
     exportSummary: "\u532f\u51fa\u6458\u8981",
     showMatchingUrls: "\u67e5\u770b\u5c0d\u61c9\u7db2\u5740",
+    copyBlockedUrls: "複製被阻擋網址",
+    copiedBlockedUrls: "已複製",
     final: "\u6700\u7d42\u5730\u5740",
     canonical: "Canonical",
     alternates: "Alternates",
@@ -735,6 +741,7 @@ function Sitemaps({ sitemaps, t }) {
 }
 
 function RobotsDetails({ robots, t, onSelectIssue }) {
+  const [copiedRule, setCopiedRule] = useState("");
   if (!robots?.found) return null;
   const analysis = robots.analysis;
   const impactLabels = {
@@ -816,6 +823,20 @@ function RobotsDetails({ robots, t, onSelectIssue }) {
                 >
                   {t.showMatchingUrls}
                 </button>
+                {item.affectedUrls?.length ? (
+                  <button
+                    className="impact-filter"
+                    type="button"
+                    onClick={async () => {
+                      const key = `${item.scope}-${item.rule}`;
+                      await navigator.clipboard.writeText(item.affectedUrls.join("\n"));
+                      setCopiedRule(key);
+                      window.setTimeout(() => setCopiedRule((current) => (current === key ? "" : current)), 1600);
+                    }}
+                  >
+                    {copiedRule === `${item.scope}-${item.rule}` ? t.copiedBlockedUrls : t.copyBlockedUrls}
+                  </button>
+                ) : null}
               </article>
             ))}
           </div>
@@ -1575,12 +1596,13 @@ const gscUiText = {
   en: {
     propertyUrl: "Property URL",
     propertyHelp: "URL-prefix: use the exact Search Console property. Domain property: use sc-domain:example.com.",
-    oauthHelpTitle: "How Search Console connection works",
+    oauthHelpTitle: "How to connect Google Search Console",
     oauthHelpSteps: [
-      "Enter the exact Search Console property URL.",
       "Click Connect Google Search Console.",
-      "Sign in with the Google account that has access to that Search Console property.",
-      "After authorization, return to soos and test the connection.",
+      "Choose the Google account that has access to the Search Console property.",
+      "If Google shows “This app isn’t verified”, open the advanced option and continue to soos.",
+      "On the Sign in to soos screen, click Continue.",
+      "Under what soos can access, select “View Search Console data for your verified sites”, then click Continue.",
     ],
     docsLabel: "Search Console users and permissions",
     connect: "Connect Google Search Console",
@@ -1606,12 +1628,13 @@ const gscUiText = {
   "zh-CN": {
     propertyUrl: "Property URL",
     propertyHelp: "URL-prefix 属性必须和 Search Console 完全一致；Domain 属性使用 sc-domain:example.com。",
-    oauthHelpTitle: "Search Console 连接方式",
+    oauthHelpTitle: "Search Console 连接步骤",
     oauthHelpSteps: [
-      "输入和 Search Console 完全一致的 Property URL。",
-      "点击 Connect Google Search Console。",
-      "使用拥有该 Search Console property 权限的 Google 账号登录。",
-      "授权完成后回到 soos，点击测试 API 连接。",
+      "点击“连接 Google Search Console”。",
+      "选择拥有该 Search Console property 权限的 Google 账号。",
+      "如果显示“此应用未经 Google 验证”，请打开高级选项并继续前往 soos。",
+      "在“登录 soos”页面点击“继续”。",
+      "在“选择 soos 可访问哪些服务”中，选中“查看您的已验证网站的 Search Console 数据”，然后点击“继续”。",
     ],
     docsLabel: "Search Console 用户和权限说明",
     connect: "连接 Google Search Console",
@@ -1637,12 +1660,13 @@ const gscUiText = {
   "zh-TW": {
     propertyUrl: "Property URL",
     propertyHelp: "URL-prefix 資源必須和 Search Console 完全一致；Domain 資源使用 sc-domain:example.com。",
-    oauthHelpTitle: "Search Console 連線方式",
+    oauthHelpTitle: "Search Console 連線步驟",
     oauthHelpSteps: [
-      "輸入和 Search Console 完全一致的 Property URL。",
-      "點擊 Connect Google Search Console。",
-      "使用擁有該 Search Console property 權限的 Google 帳號登入。",
-      "授權完成後回到 soos，點擊測試 API 連線。",
+      "點擊「連接 Google Search Console」。",
+      "選擇擁有該 Search Console property 權限的 Google 帳號。",
+      "如果顯示「此應用程式未經 Google 驗證」，請開啟進階選項並繼續前往 soos。",
+      "在「登入 soos」頁面點擊「繼續」。",
+      "在「選擇 soos 可存取哪些服務」中，選取「查看已驗證網站的 Search Console 資料」，然後點擊「繼續」。",
     ],
     docsLabel: "Search Console 使用者和權限說明",
     connect: "連接 Google Search Console",
@@ -1669,7 +1693,7 @@ const gscUiText = {
 
 function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, language }) {
   const copy = gscUiText[language] || gscUiText.en;
-  const [showOauthHelp, setShowOauthHelp] = useState(false);
+  const [showOauthHelp, setShowOauthHelp] = useState(true);
   const [testing, setTesting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
   const [message, setMessage] = useState("");

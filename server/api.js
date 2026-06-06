@@ -316,12 +316,14 @@ function summarizeRobotsImpact(pages) {
         scope,
         count: 0,
         sampleUrls: [],
+        affectedUrls: [],
         details: new Set(),
       });
     }
     const entry = bucket.get(key);
     entry.count += 1;
     if (entry.sampleUrls.length < 5) entry.sampleUrls.push(url);
+    if (entry.affectedUrls.length < 500 && !entry.affectedUrls.includes(url)) entry.affectedUrls.push(url);
     if (detail) entry.details.add(detail);
   };
 
@@ -345,6 +347,7 @@ function summarizeRobotsImpact(pages) {
       scope: entry.scope,
       count: entry.count,
       sampleUrls: entry.sampleUrls,
+      affectedUrls: entry.affectedUrls,
       details: [...entry.details].slice(0, 5),
     }))
     .sort((a, b) => b.count - a.count);

@@ -93,8 +93,11 @@ Visitor flow:
 
 1. Enter the exact Search Console Property URL.
 2. Click `Connect Google Search Console`.
-3. Sign in with the Google account that has access to the property.
-4. Return to soos, then click `Refresh status` and `Test API connection`.
+3. Choose the Google account that has access to the property.
+4. If Google shows an unverified-app warning, open the advanced option and continue to soos after confirming you are using the expected soos domain.
+5. Continue through the soos sign-in screen.
+6. Select the permission to view Search Console data for verified sites, then continue.
+7. Return to soos and click `Test API connection`.
 
 soos requests Search Console read-only access plus basic Google account identity (`openid email profile`) so the UI can show which Google account is connected. Existing connections created before this scope was added may need to reconnect once before the email appears.
 
