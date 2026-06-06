@@ -104,6 +104,7 @@ const dictionaries = {
     progressFinalizing: "Finalizing report",
     progressPaused: "Paused",
     progressStopped: "Stopped",
+    progressInterrupted: "Worker interrupted, restarting audit",
     pause: "Pause",
     resume: "Resume",
     stop: "Stop",
@@ -227,6 +228,7 @@ const dictionaries = {
     progressFinalizing: "\u751f\u6210\u62a5\u544a",
     progressPaused: "\u5df2\u6682\u505c",
     progressStopped: "\u5df2\u505c\u6b62",
+    progressInterrupted: "\u540e\u53f0 worker \u5df2\u4e2d\u65ad\uff0c\u6b63\u5728\u91cd\u65b0\u6267\u884c\u68c0\u67e5",
     pause: "\u6682\u505c",
     resume: "\u7ee7\u7eed",
     stop: "\u505c\u6b62",
@@ -350,6 +352,7 @@ const dictionaries = {
     progressFinalizing: "\u7522\u751f\u5831\u544a",
     progressPaused: "\u5df2\u66ab\u505c",
     progressStopped: "\u5df2\u505c\u6b62",
+    progressInterrupted: "\u80cc\u666f worker \u5df2\u4e2d\u65b7\uff0c\u6b63\u5728\u91cd\u65b0\u57f7\u884c\u6aa2\u67e5",
     pause: "\u66ab\u505c",
     resume: "\u7e7c\u7e8c",
     stop: "\u505c\u6b62",
@@ -3067,6 +3070,8 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
   );
 }
 
+const ACTIVE_AUDIT_JOB_KEY = "soos:active-audit-job";
+
 function App() {
   const [sitemapUrl, setSitemapUrl] = useState("");
   const [language, setLanguage] = useState(() => detectLanguage());
@@ -3106,6 +3111,49 @@ useEffect(() => {
     return () => window.clearInterval(timer);
   }, [loading, currentJobStartedAt]);
 
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(ACTIVE_AUDIT_JOB_KEY) || "null");
+      if (!saved?.id) return;
+      const startedAt = Number(saved.startedAt) || Date.now();
+      setLoading(true);
+      setError("");
+      setCurrentJobId(saved.id);
+      setCurrentJobStartedAt(startedAt);
+      setElapsedNow(Date.now() - startedAt);
+      setProgress({ label: t.progressPreparing, value: 5, meta: "" });
+      pollAuditJob(saved.id)
+        .catch((err) => setError(err.message || String(err)))
+        .finally(resetJobUi);
+    } catch {
+      window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
+    }
+  }, []);
+
+  function resetJobUi() {
+    window.setTimeout(() => {
+      setLoading(false);
+      setProgress(null);
+      setCurrentJobId(null);
+      setJobStatus(null);
+      setCurrentJobStartedAt(null);
+      setElapsedNow(0);
+    }, 250);
+  }
+
+  function saveCompletedReport(result) {
+    setReport(result);
+    setHistory((currentHistory) => {
+      const nextHistory = [
+        toHistoryEntry(result),
+        ...currentHistory.filter((item) => item.input?.originalUrl !== result.input?.originalUrl),
+      ].slice(0, historyLimit);
+      saveHistory(nextHistory);
+      return nextHistory;
+    });
+    setComparisonEntry(null);
+  }
+
   async function controlJob(action) {
     if (!currentJobId) return;
     const response = await fetch(`/api/audit-jobs/${currentJobId}/control`, {
@@ -3117,6 +3165,73 @@ useEffect(() => {
     if (!response.ok) throw new Error(body.error || "Could not control audit");
     if (action === "pause" && body.status === "paused") setPauseCount((count) => count + 1);
     setJobStatus(body.status);
+  }
+
+  async function pollAuditJob(jobId) {
+    let restartedInterruptedJob = false;
+    while (true) {
+      const pollResponse = await fetch(`/api/audit-jobs/${jobId}`);
+      const pollBody = await pollResponse.json();
+      if (!pollResponse.ok) {
+        window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
+        throw new Error(pollBody.error || "Audit failed");
+      }
+      setJobStatus(pollBody.status);
+
+      const progressLabel =
+        pollBody.status === "paused"
+          ? t.progressPaused
+          : pollBody.status === "stopped"
+            ? t.progressStopped
+            : pollBody.status === "interrupted"
+              ? t.progressInterrupted
+              : pollBody.progress?.stage === "fetching"
+                ? t.progressFetching
+                : pollBody.progress?.stage === "inspecting"
+                  ? t.progressInspecting
+                  : pollBody.progress?.stage === "finalizing"
+                    ? t.progressFinalizing
+                    : t.progressPreparing;
+      const metaParts = [];
+      if (pollBody.progress?.discoveredSitemaps) {
+        metaParts.push(`${pollBody.progress.processedSitemaps || 0}/${pollBody.progress.discoveredSitemaps} sitemap`);
+      }
+      if (pollBody.progress?.totalUrls) {
+        metaParts.push(`${pollBody.progress.processedUrls || 0}/${pollBody.progress.totalUrls} URLs`);
+      }
+      setProgress({
+        label: progressLabel,
+        value: pollBody.progress?.percent || 0,
+        meta: metaParts.join(" | "),
+      });
+
+      if (pollBody.status === "done") {
+        window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
+        setProgress({ label: t.progressFinalizing, value: 100, meta: metaParts.join(" | ") });
+        saveCompletedReport(pollBody.result);
+        return;
+      }
+      if (pollBody.status === "interrupted" && pollBody.recoverable && !restartedInterruptedJob) {
+        restartedInterruptedJob = true;
+        const restartResponse = await fetch(`/api/audit-jobs/${jobId}/control`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "restart" }),
+        });
+        const restartBody = await restartResponse.json();
+        if (!restartResponse.ok) throw new Error(restartBody.error || "Could not restart interrupted audit");
+        setJobStatus(restartBody.status);
+      } else if (pollBody.status === "stopped") {
+        window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
+        setProgress({ label: t.progressStopped, value: pollBody.progress?.percent || 0, meta: metaParts.join(" | ") });
+        return;
+      } else if (pollBody.status === "error" || pollBody.status === "interrupted") {
+        window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
+        throw new Error(pollBody.error || "Audit failed");
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, 500));
+    }
   }
 
   async function runAudit(event) {
@@ -3147,72 +3262,14 @@ useEffect(() => {
       if (!startResponse.ok) throw new Error(startBody.error || "Audit failed");
       setCurrentJobId(startBody.id);
       setJobStatus(startBody.status);
-      setCurrentJobStartedAt(Date.now());
-
-      while (true) {
-        const pollResponse = await fetch(`/api/audit-jobs/${startBody.id}`);
-        const pollBody = await pollResponse.json();
-        if (!pollResponse.ok) throw new Error(pollBody.error || "Audit failed");
-        setJobStatus(pollBody.status);
-
-        const progressLabel =
-          pollBody.status === "paused"
-            ? t.progressPaused
-            : pollBody.status === "stopped"
-              ? t.progressStopped
-              : pollBody.progress?.stage === "fetching"
-            ? t.progressFetching
-            : pollBody.progress?.stage === "inspecting"
-              ? t.progressInspecting
-              : pollBody.progress?.stage === "finalizing"
-                ? t.progressFinalizing
-                : t.progressPreparing;
-        const metaParts = [];
-        if (pollBody.progress?.discoveredSitemaps) {
-          metaParts.push(`${pollBody.progress.processedSitemaps || 0}/${pollBody.progress.discoveredSitemaps} sitemap`);
-        }
-        if (pollBody.progress?.totalUrls) {
-          metaParts.push(`${pollBody.progress.processedUrls || 0}/${pollBody.progress.totalUrls} URLs`);
-        }
-        setProgress({
-          label: progressLabel,
-          value: pollBody.progress?.percent || 0,
-          meta: metaParts.join(" | "),
-        });
-
-        if (pollBody.status === "done") {
-          setProgress({ label: t.progressFinalizing, value: 100, meta: metaParts.join(" | ") });
-          setReport(pollBody.result);
-          const nextHistory = [
-            toHistoryEntry(pollBody.result),
-            ...history.filter((item) => item.input?.originalUrl !== pollBody.result.input?.originalUrl),
-          ].slice(0, historyLimit);
-          setHistory(nextHistory);
-          saveHistory(nextHistory);
-          setComparisonEntry(null);
-          break;
-        }
-        if (pollBody.status === "stopped") {
-          setProgress({ label: t.progressStopped, value: pollBody.progress?.percent || 0, meta: metaParts.join(" | ") });
-          break;
-        }
-        if (pollBody.status === "error") {
-          throw new Error(pollBody.error || "Audit failed");
-        }
-
-        await new Promise((resolve) => window.setTimeout(resolve, 500));
-      }
+      const startedAt = Date.now();
+      setCurrentJobStartedAt(startedAt);
+      window.localStorage.setItem(ACTIVE_AUDIT_JOB_KEY, JSON.stringify({ id: startBody.id, startedAt }));
+      await pollAuditJob(startBody.id);
     } catch (err) {
       setError(err.message || String(err));
     } finally {
-      window.setTimeout(() => {
-        setLoading(false);
-        setProgress(null);
-        setCurrentJobId(null);
-        setJobStatus(null);
-        setCurrentJobStartedAt(null);
-        setElapsedNow(0);
-      }, 250);
+      resetJobUi();
     }
   }
 

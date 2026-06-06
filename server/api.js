@@ -7,14 +7,19 @@ import { ProxyAgent } from "undici";
 import { neon } from "@neondatabase/serverless";
 
 const PORT = Number(process.env.SOOS_API_PORT || 4177);
-const USER_AGENT = "soos/0.1 SEO audit";
+const USER_AGENT = "soos/0.2 SEO audit";
 const MAX_SITEMAPS = 30;
 const MAX_URLS = 250;
 const BACKGROUND_MAX_URLS = 2000;
 const PAGE_CONCURRENCY = 5;
 const FETCH_TIMEOUT_MS = 15000;
 const JOB_TTL_MS = 1000 * 60 * 60 * 4;
+const PERSISTED_JOB_TTL_DAYS = 7;
+const JOB_PERSIST_INTERVAL_MS = 1500;
+const JOB_HEARTBEAT_TIMEOUT_MS = 45000;
 const jobs = new Map();
+const activeJobRuns = new Set();
+const jobPersistTimers = new Map();
 const GSC_CONFIG_PATH = path.join(process.cwd(), ".soos-gsc.json");
 const ENV_PATH = path.join(process.cwd(), ".env");
 const GSC_SCOPE = "openid email profile https://www.googleapis.com/auth/webmasters.readonly";
@@ -73,13 +78,19 @@ function jobSnapshot(job) {
     progress: job.progress,
     result: job.result || null,
     error: job.error || null,
+    recoverable: Boolean(job.recoverable),
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
   };
 }
 
-function createJob() {
+function createJob(sessionId, request) {
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const now = Date.now();
   const job = {
     id,
+    sessionId,
+    request,
     status: "queued",
     progress: {
       stage: "queued",
@@ -92,7 +103,9 @@ function createJob() {
     },
     result: null,
     error: null,
-    updatedAt: Date.now(),
+    recoverable: false,
+    createdAt: now,
+    updatedAt: now,
   };
   jobs.set(id, job);
   return job;
@@ -111,6 +124,7 @@ function updateJob(job, patch) {
   if (patch.status) job.status = patch.status;
   if (patch.result !== undefined) job.result = patch.result;
   if (patch.error !== undefined) job.error = patch.error;
+  if (patch.recoverable !== undefined) job.recoverable = Boolean(patch.recoverable);
   if (patch.progress) {
     job.progress = {
       ...job.progress,
@@ -118,6 +132,7 @@ function updateJob(job, patch) {
     };
   }
   job.updatedAt = Date.now();
+  scheduleJobPersistence(job);
 }
 
 async function waitForJob(job) {
@@ -1538,6 +1553,10 @@ function gscConfigKey(sessionId) {
   return `gsc_config:${sessionId}`;
 }
 
+function auditJobKey(jobId) {
+  return `audit_job:${jobId}`;
+}
+
 let neonSql = null;
 let neonReady = false;
 
@@ -1562,7 +1581,101 @@ async function ensureNeonConfigTable(sql) {
     WHERE key LIKE 'gsc_config:%'
       AND updated_at < now() - interval '90 days'
   `;
+  await sql`
+    DELETE FROM soos_config
+    WHERE key LIKE 'audit_job:%'
+      AND updated_at < now() - (${PERSISTED_JOB_TTL_DAYS} * interval '1 day')
+  `;
   neonReady = true;
+}
+
+function storedAuditJob(job) {
+  return {
+    id: job.id,
+    sessionId: job.sessionId,
+    request: job.request,
+    status: job.status,
+    progress: job.progress,
+    result: job.result || null,
+    error: job.error || null,
+    recoverable: Boolean(job.recoverable),
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+  };
+}
+
+async function persistAuditJob(job) {
+  const sql = await getNeonSql();
+  if (!sql) return false;
+  await ensureNeonConfigTable(sql);
+  const stored = storedAuditJob(job);
+  await sql`
+    INSERT INTO soos_config (key, value, updated_at)
+    VALUES (${auditJobKey(job.id)}, ${JSON.stringify(stored)}::jsonb, now())
+    ON CONFLICT (key)
+    DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+  `;
+  return true;
+}
+
+function scheduleJobPersistence(job, immediate = false) {
+  if (!job?.id) return;
+  const existing = jobPersistTimers.get(job.id);
+  if (existing && !immediate) return;
+  if (existing) clearTimeout(existing);
+  const delay = immediate || ["done", "error", "stopped", "interrupted"].includes(job.status)
+    ? 0
+    : JOB_PERSIST_INTERVAL_MS;
+  const timer = setTimeout(() => {
+    jobPersistTimers.delete(job.id);
+    persistAuditJob(job).catch((error) => {
+      console.error(`Could not persist audit job ${job.id}:`, error);
+    });
+  }, delay);
+  timer.unref?.();
+  jobPersistTimers.set(job.id, timer);
+}
+
+async function flushAuditJob(job) {
+  const timer = jobPersistTimers.get(job.id);
+  if (timer) {
+    clearTimeout(timer);
+    jobPersistTimers.delete(job.id);
+  }
+  await persistAuditJob(job);
+}
+
+async function readPersistedAuditJob(jobId, sessionId) {
+  const sql = await getNeonSql();
+  if (!sql) return null;
+  await ensureNeonConfigTable(sql);
+  const rows = await sql`SELECT value FROM soos_config WHERE key = ${auditJobKey(jobId)} LIMIT 1`;
+  const value = rows[0]?.value;
+  const stored = typeof value === "string" ? JSON.parse(value || "{}") : value || null;
+  if (!stored || stored.sessionId !== sessionId) return null;
+  const job = {
+    ...stored,
+    createdAt: Number(stored.createdAt) || Date.now(),
+    updatedAt: Number(stored.updatedAt) || Date.now(),
+  };
+  const runningElsewhere = ["running", "queued"].includes(job.status) && !activeJobRuns.has(job.id);
+  if (runningElsewhere && Date.now() - job.updatedAt > JOB_HEARTBEAT_TIMEOUT_MS) {
+    job.status = "interrupted";
+    job.error = "The previous worker stopped before this audit completed. Restart the audit to continue.";
+    job.recoverable = true;
+    job.updatedAt = Date.now();
+    await persistAuditJob(job);
+  }
+  if (!["running", "queued", "paused"].includes(job.status) || activeJobRuns.has(job.id)) {
+    jobs.set(job.id, job);
+  }
+  return job;
+}
+
+async function findAuditJob(jobId, sessionId) {
+  const memoryJob = jobs.get(jobId);
+  if (memoryJob?.sessionId === sessionId) return memoryJob;
+  return readPersistedAuditJob(jobId, sessionId);
 }
 
 function sanitizeGscConfigForStorage(config) {
@@ -2042,6 +2155,75 @@ async function queryGscSearchAnalytics({ startDate, endDate, rowLimit = 25000, s
     rows,
   };
 }
+
+async function runAuditJob(job) {
+  if (!job || activeJobRuns.has(job.id)) return;
+  activeJobRuns.add(job.id);
+  updateJob(job, {
+    status: "running",
+    error: null,
+    recoverable: false,
+    result: null,
+    progress: {
+      stage: "preparing",
+      label: "Preparing scan",
+      percent: 5,
+      processedUrls: 0,
+      totalUrls: 0,
+      processedSitemaps: 0,
+      discoveredSitemaps: 0,
+    },
+  });
+  await flushAuditJob(job);
+  try {
+    const result = await audit(
+      job.request?.sitemapUrl,
+      job.request?.options,
+      (progress) => updateJob(job, { progress }),
+      job,
+    );
+    if (job.status === "stopped") return;
+    updateJob(job, {
+      status: "done",
+      error: null,
+      recoverable: false,
+      progress: {
+        stage: "done",
+        label: "Completed",
+        percent: 100,
+        processedUrls: result.summary.urlCount,
+        totalUrls: result.summary.urlCount,
+        processedSitemaps: result.summary.sitemapCount,
+        discoveredSitemaps: result.summary.sitemapCount,
+      },
+      result,
+    });
+  } catch (error) {
+    if (error?.code === "JOB_STOPPED" || job.status === "stopped") {
+      updateJob(job, {
+        status: "stopped",
+        progress: {
+          ...job.progress,
+          label: "Stopped",
+        },
+        error: null,
+        recoverable: true,
+      });
+    } else {
+      updateJob(job, {
+        status: "error",
+        error: String(error.message || error),
+        recoverable: true,
+      });
+    }
+  } finally {
+    activeJobRuns.delete(job.id);
+    await flushAuditJob(job).catch((error) => {
+      console.error(`Could not finalize audit job ${job.id}:`, error);
+    });
+  }
+}
+
 export function handleRequest(req, res) {
   cleanupJobs();
   const requestPath = (req.url || "").split("?")[0];
@@ -2181,85 +2363,54 @@ export function handleRequest(req, res) {
   }
   if (req.method === "GET" && /^\/api\/audit-jobs\/[^/]+$/.test(requestPath)) {
     const id = requestPath.split("/").pop();
-    const job = jobs.get(id);
-    if (!job) return sendJson(res, 404, { error: "Job not found" });
-    return sendJson(res, 200, jobSnapshot(job));
+    findAuditJob(id, sessionId)
+      .then((job) => {
+        if (!job) return sendJson(res, 404, { error: "Job not found" });
+        return sendJson(res, 200, jobSnapshot(job));
+      })
+      .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
+    return;
   }
   if (req.method === "POST" && /^\/api\/audit-jobs\/[^/]+\/control$/.test(requestPath)) {
     const parts = requestPath.split("/");
     const id = parts[3];
-    const job = jobs.get(id);
-    if (!job) return sendJson(res, 404, { error: "Job not found" });
     readJsonBody(req, 20000)
-      .then((body) => {
-      try {
+      .then(async (body) => {
+        const job = await findAuditJob(id, sessionId);
+        if (!job) return sendJson(res, 404, { error: "Job not found" });
         if (body.action === "pause" && job.status === "running") {
           updateJob(job, { status: "paused", progress: { label: "Paused" } });
         } else if (body.action === "resume" && job.status === "paused") {
-          updateJob(job, { status: "running", progress: { label: job.progress.stage === "inspecting" ? "Inspecting URLs" : job.progress.label } });
+          if (activeJobRuns.has(job.id)) {
+            updateJob(job, { status: "running", progress: { label: job.progress.stage === "inspecting" ? "Inspecting URLs" : job.progress.label } });
+          } else {
+            void runAuditJob(job);
+            return sendJson(res, 202, jobSnapshot(job));
+          }
         } else if (body.action === "stop" && (job.status === "running" || job.status === "paused")) {
-          updateJob(job, { status: "stopped", progress: { label: "Stopped" }, error: null });
+          updateJob(job, { status: "stopped", progress: { label: "Stopped" }, error: null, recoverable: true });
+        } else if (body.action === "restart" && ["interrupted", "error", "stopped"].includes(job.status)) {
+          await flushAuditJob(job);
+          void runAuditJob(job);
+          return sendJson(res, 202, jobSnapshot(job));
         }
+        await flushAuditJob(job);
         return sendJson(res, 200, jobSnapshot(job));
-      } catch (error) {
-        return sendJson(res, 400, { error: String(error.message || error) });
-      }
-    })
+      })
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
   if (req.method === "POST" && requestPath === "/api/audit-jobs") {
     readJsonBody(req, 100000)
-      .then((body) => {
-      try {
-        const job = createJob();
-        updateJob(job, {
-          status: "running",
-          progress: {
-            stage: "preparing",
-            label: "Preparing scan",
-            percent: 5,
-          },
+      .then(async (body) => {
+        const job = createJob(sessionId, {
+          sitemapUrl: body.sitemapUrl,
+          options: body.options || {},
         });
-        audit(body.sitemapUrl, body.options, (progress) => updateJob(job, { progress }), job)
-          .then((result) => {
-            if (job.status === "stopped") return;
-            updateJob(job, {
-              status: "done",
-              progress: {
-                stage: "done",
-                label: "Completed",
-                percent: 100,
-                processedUrls: result.summary.urlCount,
-                totalUrls: result.summary.urlCount,
-                processedSitemaps: result.summary.sitemapCount,
-                discoveredSitemaps: result.summary.sitemapCount,
-              },
-              result,
-            });
-          })
-          .catch((error) => {
-            if (error?.code === "JOB_STOPPED" || job.status === "stopped") {
-              updateJob(job, {
-                status: "stopped",
-                progress: {
-                  ...job.progress,
-                  label: "Stopped",
-                },
-                error: null,
-              });
-              return;
-            }
-            updateJob(job, {
-              status: "error",
-              error: String(error.message || error),
-            });
-          });
+        await flushAuditJob(job);
+        void runAuditJob(job);
         return sendJson(res, 202, jobSnapshot(job));
-      } catch (error) {
-        return sendJson(res, 400, { error: String(error.message || error) });
-      }
-    })
+      })
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
     return;
   }
