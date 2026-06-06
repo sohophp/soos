@@ -23,7 +23,8 @@ const GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
 const GOOGLE_OAUTH_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const SESSION_COOKIE = "soos_session";
-const SESSION_MAX_AGE = 60 * 60 * 24 * 365;
+const SESSION_MAX_AGE = 60 * 60 * 24 * 90;
+const ENCRYPTED_TOKEN_PREFIX = "enc:v1";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -1421,6 +1422,64 @@ async function oauthClientSecret() {
   return envValue("GOOGLE_OAUTH_CLIENT_SECRET");
 }
 
+async function tokenEncryptionKeys() {
+  const secrets = [await envValue("SOOS_TOKEN_ENCRYPTION_KEY"), await oauthClientSecret()].filter(Boolean);
+  return [...new Set(secrets)].map((secret) => crypto.createHash("sha256").update(secret).digest());
+}
+
+async function tokenEncryptionKey() {
+  return (await tokenEncryptionKeys())[0] || null;
+}
+
+async function encryptToken(value) {
+  if (!value || String(value).startsWith(`${ENCRYPTED_TOKEN_PREFIX}:`)) return value || "";
+  const key = await tokenEncryptionKey();
+  if (!key) return value;
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(String(value), "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return [ENCRYPTED_TOKEN_PREFIX, iv.toString("base64url"), tag.toString("base64url"), encrypted.toString("base64url")].join(":");
+}
+
+async function decryptToken(value) {
+  if (!value || !String(value).startsWith(`${ENCRYPTED_TOKEN_PREFIX}:`)) return value || "";
+  const keys = await tokenEncryptionKeys();
+  if (!keys.length) throw new Error("SOOS_TOKEN_ENCRYPTION_KEY or GOOGLE_OAUTH_CLIENT_SECRET is required to decrypt stored tokens.");
+  const parts = String(value).split(":");
+  if (parts.length !== 5) throw new Error("Stored token encryption format is invalid.");
+  const iv = Buffer.from(parts[2], "base64url");
+  const tag = Buffer.from(parts[3], "base64url");
+  const encrypted = Buffer.from(parts[4], "base64url");
+  for (const key of keys) {
+    try {
+      const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+      decipher.setAuthTag(tag);
+      return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
+    } catch {
+      // Try the fallback key to support deployments adding a dedicated encryption key later.
+    }
+  }
+  throw new Error("Stored token could not be decrypted with the configured keys.");
+}
+
+async function protectStoredConfig(config) {
+  const stored = sanitizeGscConfigForStorage(config);
+  return {
+    ...stored,
+    accessToken: await encryptToken(stored.accessToken || ""),
+    refreshToken: await encryptToken(stored.refreshToken || ""),
+  };
+}
+
+async function revealStoredConfig(config) {
+  return {
+    ...(config || {}),
+    accessToken: await decryptToken(config?.accessToken || ""),
+    refreshToken: await decryptToken(config?.refreshToken || ""),
+  };
+}
+
 async function oauthAppConfig() {
   const [clientId, clientSecret] = await Promise.all([oauthClientId(), oauthClientSecret()]);
   return {
@@ -1466,6 +1525,12 @@ function ensureGscSession(req, res) {
   return sessionId;
 }
 
+function rotateGscSession(res) {
+  const sessionId = crypto.randomBytes(16).toString("hex");
+  res.soosSessionCookie = buildSessionCookie(sessionId);
+  return sessionId;
+}
+
 function gscConfigKey(sessionId) {
   return `gsc_config:${sessionId}`;
 }
@@ -1488,6 +1553,11 @@ async function ensureNeonConfigTable(sql) {
       value jsonb NOT NULL,
       updated_at timestamptz NOT NULL DEFAULT now()
     )
+  `;
+  await sql`
+    DELETE FROM soos_config
+    WHERE key LIKE 'gsc_config:%'
+      AND updated_at < now() - interval '90 days'
   `;
   neonReady = true;
 }
@@ -1515,15 +1585,15 @@ async function readGscConfigFromDatabase(sessionId) {
   await ensureNeonConfigTable(sql);
   const rows = await sql`SELECT value FROM soos_config WHERE key = ${gscConfigKey(sessionId)} LIMIT 1`;
   const value = rows[0]?.value;
-  if (typeof value === "string") return JSON.parse(value || "{}");
-  return value || {};
+  const stored = typeof value === "string" ? JSON.parse(value || "{}") : value || {};
+  return revealStoredConfig(stored);
 }
 
 async function writeGscConfigToDatabase(config, sessionId) {
   const sql = await getNeonSql();
   if (!sql) return false;
   await ensureNeonConfigTable(sql);
-  const stored = sanitizeGscConfigForStorage(config);
+  const stored = await protectStoredConfig(config);
   await sql`
     INSERT INTO soos_config (key, value, updated_at)
     VALUES (${gscConfigKey(sessionId)}, ${JSON.stringify(stored)}::jsonb, now())
@@ -1609,7 +1679,7 @@ async function readGscConfig(sessionId) {
   const databaseConfig = await readGscConfigFromDatabase(sessionId);
   if (databaseConfig) return databaseConfig;
   try {
-    return JSON.parse(await fs.readFile(GSC_CONFIG_PATH, "utf8"));
+    return revealStoredConfig(JSON.parse(await fs.readFile(GSC_CONFIG_PATH, "utf8")));
   } catch (error) {
     if (error?.code === "ENOENT") return {};
     throw error;
@@ -1617,7 +1687,7 @@ async function readGscConfig(sessionId) {
 }
 
 async function writeGscConfig(config, sessionId) {
-  const stored = sanitizeGscConfigForStorage(config);
+  const stored = await protectStoredConfig(config);
   if (await writeGscConfigToDatabase(stored, sessionId)) return;
   await fs.writeFile(GSC_CONFIG_PATH, JSON.stringify(stored, null, 2), "utf8");
 }
@@ -2013,7 +2083,8 @@ export function handleRequest(req, res) {
         const current = await readGscConfigWithEnv(sessionId);
         const revoke = await revokeGoogleToken(current);
         await clearGscConfig(sessionId);
-        const config = await readGscConfigWithEnv(sessionId);
+        const nextSessionId = rotateGscSession(res);
+        const config = await readGscConfigWithEnv(nextSessionId);
         return sendJson(res, 200, { ...gscStatusFromConfig(config), revoke });
       })
       .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));

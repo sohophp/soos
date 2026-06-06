@@ -1601,6 +1601,7 @@ const gscUiText = {
     disconnectedMessage: "Search Console connection removed for this browser.",
     revokeNotConfirmed: "Google token revoke was not confirmed.",
     reconnectHint: "Reconnect once if the account email is not shown.",
+    privacyNote: "Your Search Console connection is isolated to this browser session. Disconnect removes the stored connection and attempts to revoke Google access.",
   },
   "zh-CN": {
     propertyUrl: "Property URL",
@@ -1631,6 +1632,7 @@ const gscUiText = {
     disconnectedMessage: "已清除此浏览器的 Search Console 连接。",
     revokeNotConfirmed: "Google token 撤销未确认。",
     reconnectHint: "如果未显示账号邮箱，请重新连接一次。",
+    privacyNote: "Search Console 授权仅用于当前浏览器会话。断开连接会删除已保存的连接，并尝试撤销 Google 授权。",
   },
   "zh-TW": {
     propertyUrl: "Property URL",
@@ -1661,6 +1663,7 @@ const gscUiText = {
     disconnectedMessage: "已清除此瀏覽器的 Search Console 連線。",
     revokeNotConfirmed: "Google token 撤銷未確認。",
     reconnectHint: "如果未顯示帳號信箱，請重新連接一次。",
+    privacyNote: "Search Console 授權僅用於目前瀏覽器工作階段。中斷連線會刪除已儲存的連線，並嘗試撤銷 Google 授權。",
   },
 };
 
@@ -1889,6 +1892,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
         <div className="gsc-api-help">
           {!status?.configured ? <small>{status?.note || "CSV import works now. API configuration enables URL Inspection and Search Analytics."}</small> : null}
           {status?.serverless ? <small>{copy.serverlessHelp}</small> : null}
+          <small>{copy.privacyNote}</small>
         </div>
         {message ? <small className="gsc-api-message">{message}</small> : null}
         {error ? <small className="gsc-api-error">{error}</small> : null}

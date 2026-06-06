@@ -11,6 +11,7 @@ All notable changes to soos will be documented in this file.
 - Vercel deployment support with `api/index.js` and `vercel.json`.
 - Three-language OAuth setup help in the Search Console API panel.
 - Session-scoped Neon/Postgres storage for each visitor's Search Console connection.
+- AES-256-GCM encryption for stored Search Console access and refresh tokens.
 - Search Analytics dimensions for Query, Page + Query, Country, and Device.
 - Page + Query Search Analytics opportunity cards for low CTR, striking-distance rankings, and broad query spread.
 - Additional Search Analytics opportunity cards for top-rank/no-click and page-two query opportunities.
@@ -25,6 +26,7 @@ All notable changes to soos will be documented in this file.
 - Search Console OAuth now requests basic Google account identity so the connected account can be shown.
 - OAuth opens a dedicated popup immediately and securely refreshes the opener after a successful callback.
 - OAuth completion also broadcasts through local storage, and closing the popup triggers a status refresh as a fallback.
+- GSC browser sessions now expire after 90 days; inactive Neon sessions are cleaned up and Disconnect rotates the session cookie.
 - UI avoids showing local debug callback URLs in OAuth setup hints.
 
 ## [0.1.0] - 2026-06-04

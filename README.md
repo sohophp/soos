@@ -70,10 +70,13 @@ SOOS_PUBLIC_BASE_URL=https://your-deployed-domain.example
 DATABASE_URL=postgresql://...
 GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
+SOOS_TOKEN_ENCRYPTION_KEY=generate-a-long-random-value
 SOOS_GSC_ACCESS_TOKEN=optional-manual-access-token
 ```
 
 Visitors do not enter OAuth Client ID or Client Secret. The deployment owner configures one Google OAuth app on the server, and each visitor connects their own Google account from the UI.
+
+`SOOS_TOKEN_ENCRYPTION_KEY` is recommended for production. soos encrypts stored access and refresh tokens with AES-256-GCM. If the variable is omitted, the Google OAuth Client Secret is used to derive the encryption key. Keep the selected key stable; changing it makes existing encrypted connections unreadable.
 
 ## Google Search Console OAuth
 
@@ -132,6 +135,7 @@ SOOS_PUBLIC_BASE_URL=https://your-vercel-domain.vercel.app
 DATABASE_URL=postgresql://...
 GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
+SOOS_TOKEN_ENCRYPTION_KEY=generate-a-long-random-value
 SOOS_GSC_ACCESS_TOKEN=optional-manual-access-token
 ```
 
@@ -140,7 +144,8 @@ Notes:
 - Vercel Serverless Functions do not persist `.soos-gsc.json`; set `DATABASE_URL` to save each visitor's Search Console connection in Neon.
 - Search Console Property URL is entered in the UI. It is not required as a Vercel environment variable.
 - OAuth Client ID and Client Secret are deployment secrets. Visitors never enter them in the UI.
-- Each visitor's refresh token is scoped to the browser session cookie and saved separately in Neon.
+- Each visitor's encrypted refresh token is scoped to the browser session cookie and saved separately in Neon.
+- Browser sessions and inactive Neon GSC records expire after 90 days. Disconnect rotates the session cookie, removes the saved connection, and attempts to revoke Google access.
 - Background audit jobs use in-memory state and are best-effort on serverless platforms. Direct scans through `/api/audit` are more reliable for Vercel.
 - If `/api/gsc/status` returns `Not Found`, confirm the deployed branch includes `api/index.js` and `vercel.json`, then redeploy. The Vercel rewrite maps `/api/:path*` to `api/index.js`.
 
