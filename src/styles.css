@@ -1221,15 +1221,6 @@ main {
     white-space: normal;
   }
 
-  .url-set-row {
-    grid-template-columns: 1fr;
-  }
-
-  .url-set-row strong,
-  .url-set-row small {
-    white-space: normal;
-  }
-
   .robots-metrics {
     grid-template-columns: 1fr;
   }
@@ -1856,6 +1847,58 @@ main {
   color: #687169;
 }
 
+.structured-data-diagnostics {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+.structured-data-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #dfe6dd;
+  border-radius: 6px;
+}
+
+.structured-data-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.4fr) minmax(150px, 0.7fr) minmax(150px, 0.7fr) minmax(260px, 1.4fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border-top: 1px solid #edf1eb;
+  font-size: 12px;
+}
+
+.structured-data-row:first-child {
+  border-top: 0;
+}
+
+.structured-data-row > div:first-child,
+.structured-data-issues {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.structured-data-row strong,
+.structured-data-row small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.structured-data-row strong {
+  overflow: hidden;
+  color: #172018;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.structured-data-row span,
+.structured-data-row small {
+  color: #687169;
+}
+
 .search-analytics-panel {
   margin-top: 12px;
 }
@@ -1983,4 +2026,17 @@ main {
 
 .gsc-import-error {
   color: #9f1f17 !important;
+}
+
+@media (max-width: 780px) {
+  .url-set-row,
+  .structured-data-row {
+    grid-template-columns: 1fr;
+  }
+
+  .url-set-row strong,
+  .url-set-row small,
+  .structured-data-row strong {
+    white-space: normal;
+  }
 }

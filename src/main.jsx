@@ -2011,6 +2011,11 @@ const gscDataText = {
     googleMissingReferrer: "Google reports no referring URL", urlVariant: "Conflicting URL variants",
     sourceInternal: "Internal links", sourceGsc: "Search Analytics", sourceSitemap: "Sitemap",
     sourceGoogle: "Google Inspection", sourceVariants: "Multiple sources", inboundLinks: "scanned inbound links",
+    structuredTitle: "Structured data diagnosis", structuredHelp: "Combines local JSON-LD graph validation with Google rich results findings.",
+    structuredExport: "Export structured data diagnosis", structuredAll: "All marked-up pages",
+    structuredErrors: "Required or graph errors", structuredRecommendations: "Recommended improvements",
+    structuredGoogle: "Google rich result issues", structuredNodes: "nodes", structuredTypes: "Types",
+    structuredLocalIssues: "Local issues", structuredGoogleVerdict: "Google verdict", structuredNoIssues: "No detected issues",
     noIssue: "No immediate index issue", noIssueDetail: "Google reports this URL as passing URL Inspection checks.",
     noIssueAction: "Keep monitoring performance data and canonical consistency.",
     inspectPropertyFirst: "Enter the Search Console Property URL before running URL Inspection.",
@@ -2060,6 +2065,11 @@ const gscDataText = {
     googleMissingReferrer: "Google 未报告来源网址", urlVariant: "存在冲突的网址变体",
     sourceInternal: "站内链接", sourceGsc: "Search Analytics", sourceSitemap: "Sitemap",
     sourceGoogle: "Google 网址检查", sourceVariants: "多个来源", inboundLinks: "条已扫描入链",
+    structuredTitle: "结构化数据诊断", structuredHelp: "合并本地 JSON-LD graph 验证与 Google 富媒体结果问题。",
+    structuredExport: "导出结构化数据诊断", structuredAll: "全部标记页面",
+    structuredErrors: "必填字段或 graph 错误", structuredRecommendations: "建议完善项",
+    structuredGoogle: "Google 富媒体结果问题", structuredNodes: "个节点", structuredTypes: "类型",
+    structuredLocalIssues: "本地问题", structuredGoogleVerdict: "Google 结果", structuredNoIssues: "未发现问题",
     noIssue: "没有明显索引问题", noIssueDetail: "Google 报告该网址通过了网址检查。",
     noIssueAction: "继续监控表现数据和 canonical 一致性。",
     inspectPropertyFirst: "运行网址检查前，请先输入 Search Console Property URL。",
@@ -2109,6 +2119,11 @@ const gscDataText = {
     googleMissingReferrer: "Google 未回報來源網址", urlVariant: "存在衝突的網址變體",
     sourceInternal: "站內連結", sourceGsc: "Search Analytics", sourceSitemap: "Sitemap",
     sourceGoogle: "Google 網址檢查", sourceVariants: "多個來源", inboundLinks: "條已掃描入鏈",
+    structuredTitle: "結構化資料診斷", structuredHelp: "合併本地 JSON-LD graph 驗證與 Google 複合式搜尋結果問題。",
+    structuredExport: "匯出結構化資料診斷", structuredAll: "全部標記頁面",
+    structuredErrors: "必填欄位或 graph 錯誤", structuredRecommendations: "建議完善項",
+    structuredGoogle: "Google 複合式搜尋結果問題", structuredNodes: "個節點", structuredTypes: "類型",
+    structuredLocalIssues: "本地問題", structuredGoogleVerdict: "Google 結果", structuredNoIssues: "未發現問題",
     noIssue: "沒有明顯索引問題", noIssueDetail: "Google 回報該網址通過網址檢查。",
     noIssueAction: "繼續監控成效資料和 canonical 一致性。",
     inspectPropertyFirst: "執行網址檢查前，請先輸入 Search Console Property URL。",
@@ -3379,6 +3394,134 @@ function UrlSetComparison({ report, gscRows, inspectionResults, copy }) {
   );
 }
 
+function googleRichIssues(inspection) {
+  const issues = [];
+  for (const detected of inspection?.richResultsDetectedItems || []) {
+    const richType = detected.richResultType || detected.type || "Rich result";
+    const items = detected.items || [];
+    for (const item of items) {
+      for (const issue of item.issues || []) {
+        issues.push({
+          type: richType,
+          severity: String(issue.severity || "WARNING").toLowerCase(),
+          detail: issue.issueMessage || issue.message || JSON.stringify(issue),
+        });
+      }
+    }
+  }
+  return issues;
+}
+
+function StructuredDataDiagnostics({ report, inspectionResults, copy }) {
+  const [filter, setFilter] = useState("all");
+  const inspectionByUrl = useMemo(
+    () => new Map((inspectionResults || []).map((item) => [normalizeReportUrl(item.url), item])),
+    [inspectionResults],
+  );
+  const rows = useMemo(
+    () => (report?.pages || [])
+      .map((page) => {
+        const local = page.structuredData;
+        const inspection = inspectionByUrl.get(normalizeReportUrl(page.url));
+        const googleIssues = googleRichIssues(inspection);
+        const localErrors = (local?.diagnostics || []).filter((item) => item.severity === "warning");
+        const recommendations = (local?.diagnostics || []).filter((item) => item.severity === "notice");
+        return {
+          url: page.url,
+          nodeCount: local?.nodeCount || 0,
+          types: local?.types || [],
+          localErrors,
+          recommendations,
+          googleIssues,
+          googleVerdict: inspection?.richResultsVerdict || "",
+          hasMarkup: Boolean(local?.count || local?.nodeCount || inspection?.richResultsDetectedItems?.length),
+        };
+      })
+      .filter((row) => row.hasMarkup),
+    [inspectionByUrl, report],
+  );
+  if (!rows.length) return null;
+
+  const filteredRows = rows.filter((row) => {
+    if (filter === "errors") return row.localErrors.length > 0;
+    if (filter === "recommendations") return row.recommendations.length > 0;
+    if (filter === "google") return row.googleIssues.length > 0 || (row.googleVerdict && row.googleVerdict !== "PASS");
+    return true;
+  });
+  const totals = rows.reduce(
+    (sum, row) => ({
+      errors: sum.errors + row.localErrors.length,
+      recommendations: sum.recommendations + row.recommendations.length,
+      google: sum.google + row.googleIssues.length,
+    }),
+    { errors: 0, recommendations: 0, google: 0 },
+  );
+
+  function exportDiagnostics() {
+    const exportRows = [["url", "source", "severity", "schema_type", "property", "detail"]];
+    for (const row of rows) {
+      for (const item of [...row.localErrors, ...row.recommendations]) {
+        exportRows.push([row.url, "local", item.severity, item.type, item.property, item.detail]);
+      }
+      for (const item of row.googleIssues) {
+        exportRows.push([row.url, "google", item.severity, item.type, "", item.detail]);
+      }
+      if (!row.localErrors.length && !row.recommendations.length && !row.googleIssues.length) {
+        exportRows.push([row.url, "local", "ok", row.types.join(" | "), "", copy.structuredNoIssues]);
+      }
+    }
+    downloadCsvFile("soos-structured-data-diagnosis.csv", exportRows);
+  }
+
+  return (
+    <section className="structured-data-diagnostics">
+      <div className="url-alignment-head">
+        <div>
+          <strong>{copy.structuredTitle}</strong>
+          <small>{copy.structuredHelp}</small>
+        </div>
+        <div className="url-alignment-actions">
+          <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+            <option value="all">{copy.structuredAll} ({rows.length})</option>
+            <option value="errors">{copy.structuredErrors} ({totals.errors})</option>
+            <option value="recommendations">{copy.structuredRecommendations} ({totals.recommendations})</option>
+            <option value="google">{copy.structuredGoogle} ({totals.google})</option>
+          </select>
+          <button className="export-button" type="button" onClick={exportDiagnostics}>{copy.structuredExport}</button>
+        </div>
+      </div>
+      <div className="coverage-disposition-summary">
+        <span>{copy.structuredErrors}: {totals.errors}</span>
+        <span>{copy.structuredRecommendations}: {totals.recommendations}</span>
+        <span>{copy.structuredGoogle}: {totals.google}</span>
+      </div>
+      <div className="structured-data-list">
+        {filteredRows.map((row) => (
+          <div className="structured-data-row" key={row.url}>
+            <div>
+              <strong title={row.url}>{row.url}</strong>
+              <small>{copy.structuredTypes}: {row.types.join(", ") || "Unknown"} / {row.nodeCount} {copy.structuredNodes}</small>
+            </div>
+            <span>{copy.structuredLocalIssues}: {row.localErrors.length} / {row.recommendations.length}</span>
+            <span>{copy.structuredGoogleVerdict}: {row.googleVerdict || "-"}</span>
+            <div className="structured-data-issues">
+              {[...row.localErrors, ...row.recommendations].slice(0, 4).map((item, index) => (
+                <small key={`${item.code}-${item.property}-${index}`}>
+                  {item.type}.{item.property || item.code}: {item.detail}
+                </small>
+              ))}
+              {row.googleIssues.slice(0, 3).map((item, index) => (
+                <small key={`google-${item.type}-${index}`}>Google {item.type}: {item.detail}</small>
+              ))}
+              {!row.localErrors.length && !row.recommendations.length && !row.googleIssues.length ? <small>{copy.structuredNoIssues}</small> : null}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
   const copy = gscDataText[language] || gscDataText.en;
   const [loading, setLoading] = useState(false);
@@ -3457,6 +3600,7 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
       </div>
       {result && pendingUrls.length ? <small className="inspection-remaining">{pendingUrls.length} {copy.remaining}</small> : null}
       {error ? <div className="url-inspection-error">{error}</div> : null}
+      <StructuredDataDiagnostics report={report} inspectionResults={result?.results || []} copy={copy} />
       <UrlSetComparison report={report} gscRows={gscRows} inspectionResults={result?.results || []} copy={copy} />
       {result ? (
         <>

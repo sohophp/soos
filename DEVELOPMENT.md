@@ -97,6 +97,10 @@ soos 不只是检查孤立的 HTML 标签，而是回答一个更重要的问题
 - 对比 sitemap、站内发现 URL、Search Analytics 页面和 Google 发现信号。
 - 识别 sitemap 孤立页、未进入 sitemap 的可见页和规范化 URL 变体。
 - URL 集合问题支持分类筛选和 CSV 导出。
+- 解析完整 JSON-LD 脚本和 `@graph` 节点。
+- 检查 JSON 语法、`@context`、本地 `@id` 引用和常见 Google 类型字段。
+- 对照结构化数据 URL、名称、图片与页面信号。
+- 合并本地 JSON-LD 诊断和 URL Inspection rich results issue。
 
 ### 多语言与部署
 
@@ -170,14 +174,16 @@ soos 的目标关系链是：
 
 ### Milestone D：结构化数据
 
-状态：计划中
+状态：进行中
 
-- [ ] 解析全部 JSON-LD graph，而不只是检查是否存在。
-- [ ] 报告 JSON 语法错误和 graph 引用错误。
+- [x] 解析全部 JSON-LD graph，而不只是检查是否存在。
+- [x] 报告 JSON 语法错误和 graph 引用错误。
 - [ ] 验证 Google 支持的类型和必填字段。
-- [ ] 根据页面类型推荐有价值的字段。
-- [ ] 对比结构化数据中的 URL、图片、名称和页面可见内容。
-- [ ] 合并本地验证结果与 Google rich results issue。
+- [x] 根据页面类型推荐有价值的字段。
+- [x] 对比结构化数据中的 URL、图片、名称和页面可见内容。
+- [x] 合并本地验证结果与 Google rich results issue。
+
+当前已覆盖的首批类型：Article、NewsArticle、BlogPosting、Product、Offer、BreadcrumbList、FAQPage、LocalBusiness 常见子类型、VideoObject、Recipe、Event、JobPosting、Organization 和 WebSite。后续仍需扩充 Google Search Gallery 中的其它类型和更深层嵌套对象规则。
 
 ### Milestone E：Googlebot 日志
 
@@ -227,6 +233,14 @@ soos 的目标关系链是：
 - 增加三语言分类筛选、问题统计、范围提示和 CSV 导出。
 - 兼容旧历史报告：没有站内链接字段时不生成孤立页误报。
 - `npm run check` 和 `git diff --check` 通过。
+- 开始 Milestone D：结构化数据深度诊断。
+- JSON-LD 解析从“统计脚本是否有效”升级为完整脚本、数组和 `@graph` 节点解析。
+- 增加 JSON 语法、缺少 `@context`、断裂本地 `@id` 引用和无效 URL 检查。
+- 首批加入 Product、Breadcrumb、FAQ、LocalBusiness、Video、Recipe、Event、JobPosting 等 Google 字段规则。
+- 对 Article、Organization 和 WebSite 等无硬性必填字段的类型仅给出推荐项，不误报为富媒体资格错误。
+- 对比结构化数据页面 URL、名称、图片与页面 title、可见文本、图片和 Open Graph 信号。
+- 增加三语言结构化数据总览、类别筛选、本地/Google 合并结果和 CSV 导出。
+- 增加 `tests/structured-data.test.js`，并纳入 `npm run check`。
 
 ## 9. 当前完成度
 
@@ -241,7 +255,7 @@ soos 的目标关系链是：
 | URL Inspection 诊断 | 95% |
 | Google URL 对照矩阵 | 85% |
 | URL 集合对比 | 100% |
-| 结构化数据验证 | 20% |
+| 结构化数据验证 | 70% |
 | Googlebot 日志分析 | 0% |
 | 定时监控 | 0% |
 

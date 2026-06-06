@@ -17,6 +17,7 @@ Detailed architecture, implementation status and the active roadmap are maintain
 - Google Search Console API integration for Search Analytics dimensions and URL Inspection.
 - URL set comparison across sitemap, scanned internal links, Search Analytics, and Google sitemap/referrer signals.
 - Sitemap orphan detection and HTTP/HTTPS, www, trailing-slash, and query URL variant diagnosis.
+- JSON-LD graph parsing, common Google field rules, page-signal consistency checks, and rich results issue comparison.
 - OAuth refresh token support so access tokens can refresh automatically.
 
 ## Requirements
@@ -176,6 +177,14 @@ URL Inspection notes:
 - The diagnosis cards highlight not-indexed states, discovered-not-crawled URLs, duplicate/alternate pages, soft 404s, canonical mismatches, mobile issues, and missing discovery signals.
 - URL set comparison uses the URLs included in the current audit, so configured scan limits and truncation also define its sitemap scope.
 - Internal-link orphan findings cover only pages completed in the current audit; older saved reports without link data suppress those findings.
+
+Structured data notes:
+
+- Enable Page content checks to parse JSON-LD and run local structured data validation.
+- soos parses top-level objects, arrays, and `@graph` nodes, then checks syntax, local `@id` references, common Google-required fields, and recommended enhancements.
+- The first rule set covers common Article, Product, Breadcrumb, FAQ, LocalBusiness, Video, Recipe, Event, JobPosting, Organization, and WebSite markup.
+- Name, URL, and image consistency checks are diagnostic hints. Confirm warnings with Google's Rich Results Test because lazy-loaded images and rendered content may not appear in the fetched HTML.
+- Current rules follow the Google Search Central structured data documentation: https://developers.google.com/search/docs/appearance/structured-data/search-gallery
 
 ## Release Checklist
 

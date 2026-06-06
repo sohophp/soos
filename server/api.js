@@ -680,27 +680,280 @@ function extractHtmlLang(html) {
   return attrs.lang || "";
 }
 
-function inspectJsonLd(html) {
-  const headAndBodyStart = html.slice(0, 250000);
+const STRUCTURED_DATA_RULES = {
+  Product: {
+    required: [["name"]],
+    requiredAny: [["offers", "review", "aggregateRating"]],
+    recommended: ["image", "description", "sku", "brand"],
+  },
+  BreadcrumbList: {
+    required: [["itemListElement"]],
+  },
+  FAQPage: {
+    required: [["mainEntity"]],
+  },
+  LocalBusiness: {
+    required: [["name"], ["address"]],
+    recommended: ["url", "telephone", "image", "openingHoursSpecification"],
+  },
+  VideoObject: {
+    required: [["name"], ["description"], ["thumbnailUrl"], ["uploadDate"]],
+    recommended: ["contentUrl", "embedUrl", "duration"],
+  },
+  Recipe: {
+    required: [["name"], ["image"]],
+    recommended: ["author", "datePublished", "description", "prepTime", "cookTime", "recipeIngredient", "recipeInstructions"],
+  },
+  Event: {
+    required: [["name"], ["startDate"], ["location"]],
+    recommended: ["description", "image", "endDate", "offers", "performer"],
+  },
+  JobPosting: {
+    required: [["title"], ["description"], ["datePosted"], ["hiringOrganization"]],
+    requiredAny: [["jobLocation", "applicantLocationRequirements"]],
+    recommended: ["validThrough", "employmentType", "baseSalary", "identifier"],
+  },
+};
+
+const ARTICLE_TYPES = new Set(["Article", "NewsArticle", "BlogPosting"]);
+const LOCAL_BUSINESS_TYPES = new Set([
+  "LocalBusiness", "Restaurant", "Store", "Hotel", "LodgingBusiness", "MedicalBusiness",
+  "ProfessionalService", "FoodEstablishment", "HealthAndBeautyBusiness", "HomeAndConstructionBusiness",
+]);
+
+function structuredTypes(node) {
+  const value = node?.["@type"];
+  return (Array.isArray(value) ? value : value ? [value] : []).map(String);
+}
+
+function hasStructuredValue(node, property) {
+  const value = node?.[property];
+  return value !== undefined && value !== null && value !== "" && (!Array.isArray(value) || value.length > 0);
+}
+
+function graphUrl(value, baseUrl) {
+  try {
+    return new URL(String(value), baseUrl).toString();
+  } catch {
+    return "";
+  }
+}
+
+export function inspectJsonLd(html, baseUrl, pageTitle = "") {
   const re = /<script\b([^>]*?)>([\s\S]*?)<\/script>/gi;
   const blocks = [];
+  const nodes = [];
+  const diagnostics = [];
+  const visibleText = textContent(html).toLowerCase();
+  const visibleImages = new Set();
+  const imageRe = /<img\b([^>]*?)>/gi;
+  let imageMatch;
+  while ((imageMatch = imageRe.exec(html))) {
+    const attrs = attrMap(imageMatch[1]);
+    for (const value of [attrs.src, attrs["data-src"], attrs["data-lazy-src"]]) {
+      const imageUrl = value ? graphUrl(value, baseUrl) : "";
+      if (imageUrl) visibleImages.add(imageUrl);
+    }
+    const srcset = attrs.srcset || attrs["data-srcset"];
+    for (const candidate of String(srcset || "").split(",")) {
+      const imageUrl = graphUrl(candidate.trim().split(/\s+/)[0], baseUrl);
+      if (imageUrl) visibleImages.add(imageUrl);
+    }
+  }
+  const openGraphImage = extractMetaContent(html, "og:image");
+  if (openGraphImage) visibleImages.add(graphUrl(openGraphImage, baseUrl));
   let invalidCount = 0;
   let match;
-  while ((match = re.exec(headAndBodyStart))) {
+  while ((match = re.exec(html))) {
     const attrs = attrMap(match[1]);
     if ((attrs.type || "").toLowerCase() !== "application/ld+json") continue;
     try {
       const parsed = JSON.parse(match[2].trim());
       const values = Array.isArray(parsed) ? parsed : [parsed];
       for (const value of values) {
-        const type = value?.["@type"] || value?.["@graph"]?.map((item) => item?.["@type"]).filter(Boolean).join(", ");
-        blocks.push({ type: Array.isArray(type) ? type.join(", ") : type || "unknown" });
+        if (!value?.["@context"]) {
+          diagnostics.push({
+            severity: "warning",
+            code: "missing_context",
+            type: "JSON-LD",
+            property: "@context",
+            detail: "Missing @context on the top-level JSON-LD object",
+          });
+        }
+        const graphNodes = Array.isArray(value?.["@graph"]) ? value["@graph"] : [value];
+        blocks.push({ nodeCount: graphNodes.length });
+        for (const node of graphNodes) {
+          if (node && typeof node === "object" && !Array.isArray(node)) nodes.push(node);
+        }
       }
-    } catch {
+    } catch (error) {
       invalidCount += 1;
+      diagnostics.push({
+        severity: "warning",
+        code: "json_syntax",
+        type: "JSON-LD",
+        property: "",
+        detail: String(error.message || error),
+      });
     }
   }
-  return { count: blocks.length + invalidCount, validCount: blocks.length, invalidCount, types: blocks.map((block) => block.type) };
+
+  const ids = new Set();
+  const references = [];
+  const visit = (value, property = "", isRoot = false) => {
+    if (Array.isArray(value)) {
+      value.forEach((item) => visit(item, property));
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    if (value["@id"]) {
+      const id = graphUrl(value["@id"], baseUrl);
+      if (isRoot || value["@type"] || Object.keys(value).length > 1) ids.add(id);
+      else references.push({ id, property });
+    }
+    for (const [key, child] of Object.entries(value)) {
+      if (key !== "@id") visit(child, key);
+    }
+  };
+  nodes.forEach((node) => visit(node, "", true));
+  let baseDocument = "";
+  try {
+    const parsedBase = new URL(baseUrl);
+    parsedBase.hash = "";
+    baseDocument = parsedBase.toString();
+  } catch {
+    baseDocument = baseUrl;
+  }
+  for (const reference of references) {
+    try {
+      const target = new URL(reference.id);
+      const documentUrl = new URL(target);
+      documentUrl.hash = "";
+      if (target.hash && documentUrl.toString() === baseDocument && !ids.has(target.toString())) {
+        diagnostics.push({
+          severity: "warning",
+          code: "unresolved_reference",
+          type: "JSON-LD",
+          property: reference.property,
+          detail: reference.id,
+        });
+      }
+    } catch {
+      // Invalid URLs are reported by the property validation below.
+    }
+  }
+
+  const summaries = [];
+  const addDiagnostic = (severity, code, type, property, detail) => {
+    diagnostics.push({ severity, code, type, property, detail });
+  };
+  for (const node of nodes) {
+    const types = structuredTypes(node);
+    const primaryType = types[0] || "Unknown";
+    summaries.push({
+      id: node["@id"] || "",
+      types,
+      name: node.name || node.headline || "",
+    });
+
+    let rule = STRUCTURED_DATA_RULES[primaryType];
+    if (!rule && types.some((type) => LOCAL_BUSINESS_TYPES.has(type))) rule = STRUCTURED_DATA_RULES.LocalBusiness;
+    if (rule) {
+      for (const [property] of rule.required || []) {
+        if (!hasStructuredValue(node, property)) addDiagnostic("warning", "missing_required", primaryType, property, `Missing ${property}`);
+      }
+      for (const properties of rule.requiredAny || []) {
+        if (!properties.some((property) => hasStructuredValue(node, property))) {
+          addDiagnostic("warning", "missing_required_any", primaryType, properties.join(" / "), `Include one of: ${properties.join(", ")}`);
+        }
+      }
+      for (const property of rule.recommended || []) {
+        if (!hasStructuredValue(node, property)) addDiagnostic("notice", "missing_recommended", primaryType, property, `Consider adding ${property}`);
+      }
+    }
+
+    if (types.some((type) => ARTICLE_TYPES.has(type))) {
+      for (const property of ["headline", "image", "datePublished", "author"]) {
+        if (!hasStructuredValue(node, property)) addDiagnostic("notice", "missing_recommended", primaryType, property, `Consider adding ${property}`);
+      }
+    }
+    if (types.includes("Organization") || types.includes("WebSite")) {
+      for (const property of types.includes("WebSite") ? ["name", "url"] : ["name", "url", "logo"]) {
+        if (!hasStructuredValue(node, property)) addDiagnostic("notice", "missing_recommended", primaryType, property, `Consider adding ${property}`);
+      }
+    }
+
+    if (types.includes("BreadcrumbList") && Array.isArray(node.itemListElement)) {
+      if (node.itemListElement.length < 2) {
+        addDiagnostic("warning", "invalid_breadcrumb", primaryType, "itemListElement", "Google expects at least two breadcrumb items");
+      }
+      node.itemListElement.forEach((item, index) => {
+        if (!hasStructuredValue(item, "position")) addDiagnostic("warning", "missing_required", "ListItem", "position", `Breadcrumb item ${index + 1}`);
+        if (!hasStructuredValue(item, "name")) addDiagnostic("warning", "missing_required", "ListItem", "name", `Breadcrumb item ${index + 1}`);
+        if (index < node.itemListElement.length - 1 && !hasStructuredValue(item, "item")) {
+          addDiagnostic("warning", "missing_required", "ListItem", "item", `Breadcrumb item ${index + 1}`);
+        }
+      });
+    }
+
+    if (types.includes("FAQPage") && Array.isArray(node.mainEntity)) {
+      node.mainEntity.forEach((question, index) => {
+        if (!hasStructuredValue(question, "name")) addDiagnostic("warning", "missing_required", "Question", "name", `Question ${index + 1}`);
+        if (!hasStructuredValue(question, "acceptedAnswer")) {
+          addDiagnostic("warning", "missing_required", "Question", "acceptedAnswer", `Question ${index + 1}`);
+        } else if (!hasStructuredValue(question.acceptedAnswer, "text")) {
+          addDiagnostic("warning", "missing_required", "Answer", "text", `Question ${index + 1}`);
+        }
+      });
+    }
+
+    if (types.includes("Product")) {
+      const offers = Array.isArray(node.offers) ? node.offers : node.offers ? [node.offers] : [];
+      offers.forEach((offer, index) => {
+        const price = offer?.price ?? offer?.priceSpecification?.price;
+        if (price === undefined || price === null || price === "") {
+          addDiagnostic("warning", "missing_required", "Offer", "price", `Offer ${index + 1}`);
+        }
+        const currency = offer?.priceCurrency ?? offer?.priceSpecification?.priceCurrency;
+        if (!currency) addDiagnostic("notice", "missing_recommended", "Offer", "priceCurrency", `Offer ${index + 1}`);
+      });
+    }
+
+    const pageUrlValue = node.url || node.mainEntityOfPage?.["@id"] || node.mainEntityOfPage;
+    const structuredPageUrl = typeof pageUrlValue === "string" ? graphUrl(pageUrlValue, baseUrl) : "";
+    if (structuredPageUrl && normalizeUrl(structuredPageUrl) !== normalizeUrl(baseUrl)) {
+      addDiagnostic("notice", "page_url_mismatch", primaryType, "url", structuredPageUrl);
+    }
+    const structuredName = String(node.headline || node.name || "").trim();
+    if (structuredName && pageTitle && !pageTitle.toLowerCase().includes(structuredName.toLowerCase()) && !structuredName.toLowerCase().includes(pageTitle.toLowerCase())) {
+      addDiagnostic("notice", "name_mismatch", primaryType, node.headline ? "headline" : "name", `Structured data: ${structuredName} | Page title: ${pageTitle}`);
+    }
+    if (structuredName && !visibleText.includes(structuredName.toLowerCase())) {
+      addDiagnostic("notice", "name_not_visible", primaryType, node.headline ? "headline" : "name", structuredName);
+    }
+    for (const property of ["url", "image", "logo", "thumbnailUrl", "contentUrl", "embedUrl"]) {
+      const values = Array.isArray(node[property]) ? node[property] : node[property] != null ? [node[property]] : [];
+      for (const value of values) {
+        const rawUrl = typeof value === "string" ? value : value?.url || value?.["@id"];
+        const resolvedUrl = rawUrl ? graphUrl(rawUrl, baseUrl) : "";
+        if (rawUrl && !resolvedUrl) addDiagnostic("warning", "invalid_url", primaryType, property, String(rawUrl));
+        if (resolvedUrl && ["image", "thumbnailUrl"].includes(property) && !visibleImages.has(resolvedUrl)) {
+          addDiagnostic("notice", "image_not_visible", primaryType, property, resolvedUrl);
+        }
+      }
+    }
+  }
+
+  const types = [...new Set(summaries.flatMap((node) => node.types))];
+  return {
+    count: blocks.length + invalidCount,
+    validCount: blocks.length,
+    invalidCount,
+    nodeCount: nodes.length,
+    types,
+    nodes: summaries.slice(0, 100),
+    diagnostics: diagnostics.slice(0, 100),
+  };
 }
 
 function extractAlternates(html, baseUrl) {
@@ -1176,9 +1429,29 @@ async function inspectPage(url, robots, sitemapUrlSet, options, fetchContext, jo
     viewport = extractMetaContent(response.text, "viewport");
     if (!viewport) addIssue(issues, "warning", "viewport_missing", "Missing viewport meta tag");
 
-    structuredData = inspectJsonLd(response.text);
+    structuredData = inspectJsonLd(response.text, response.finalUrl || url, title);
     if (structuredData.invalidCount > 0) {
       addIssue(issues, "warning", "structured_data_invalid", "Invalid JSON-LD structured data", `${structuredData.invalidCount} invalid block(s)`);
+    }
+    const structuredWarnings = structuredData.diagnostics.filter((item) => item.severity === "warning");
+    const structuredNotices = structuredData.diagnostics.filter((item) => item.severity === "notice");
+    if (structuredWarnings.length) {
+      addIssue(
+        issues,
+        "warning",
+        "structured_data_validation",
+        "Structured data has required-field or graph errors",
+        `${structuredWarnings.length} issue(s): ${structuredWarnings.slice(0, 3).map((item) => `${item.type}.${item.property || item.code}`).join(", ")}`,
+      );
+    }
+    if (structuredNotices.length) {
+      addIssue(
+        issues,
+        "notice",
+        "structured_data_recommended",
+        "Structured data can be improved",
+        `${structuredNotices.length} recommendation(s): ${structuredNotices.slice(0, 3).map((item) => `${item.type}.${item.property || item.code}`).join(", ")}`,
+      );
     }
   }
 

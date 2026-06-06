@@ -15,6 +15,10 @@ All notable changes to soos will be documented in this file.
 - Internal-link extraction and scanned inbound-link counts for sitemap orphan detection.
 - HTTP/HTTPS, www/non-www, trailing-slash, and query-string URL variant groups.
 - Three-language URL set filters, finding summaries, and CSV export.
+- Full JSON-LD script, array, and `@graph` node parsing.
+- Structured data syntax, local reference, required-field, recommendation, URL, name, and image consistency diagnostics.
+- Combined local structured data and Google rich results findings with filters and CSV export.
+- Structured data regression tests included in `npm run check`.
 - Neon-backed audit job records scoped to each browser session.
 - Automatic active-job restoration after a page refresh.
 - Interrupted worker detection and recoverable audit restart after a server cold start.
