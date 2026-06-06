@@ -4,6 +4,16 @@ soos is a local-first React + Node SEO audit tool for sitemap, robots.txt, index
 
 Detailed architecture, implementation status and the active roadmap are maintained in [DEVELOPMENT.md](DEVELOPMENT.md).
 
+The roadmap is organized by release:
+
+- `v0.3`: modularization, automated tests, consistent errors, observability, and three-language QA.
+- `v0.4`: internal crawl discovery, link graphs, URL normalization, and stronger indexability evidence.
+- `v0.5`: deeper Search Console analysis and prioritized URL Inspection.
+- `v0.6`: report navigation, filtering, history, and regression explanations.
+- `v1.0`: security, privacy, migrations, accessibility, and operational readiness.
+
+Paid scheduled scans such as Vercel Cron are intentionally excluded.
+
 ## Features
 
 - Accepts a website URL, sitemap URL, or robots.txt URL and detects the best audit target.

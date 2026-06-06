@@ -4,6 +4,11 @@ All notable changes to soos will be documented in this file.
 
 ## [Unreleased]
 
+### Documentation
+
+- Reorganized the whole-site roadmap around product experience, crawl accuracy, Google integrations, reporting, platform hardening, and engineering quality.
+- Added version targets, acceptance criteria, technical-debt priorities, and explicit non-goals including paid scheduled scans.
+
 ### Added
 
 - A living development guide with project goals, architecture, completion tracking and milestone roadmap.
