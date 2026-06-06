@@ -10,6 +10,7 @@ All notable changes to soos will be documented in this file.
 - A three-language Google URL alignment matrix with state filters and CSV export.
 - Cumulative, user-controlled URL Inspection batches for sites with more than 25 scanned URLs.
 - Index coverage reason groups, expected-exclusion detection and Search Analytics-based repair priorities.
+- Important indexed-page crawl freshness analysis with demand/risk sorting and CSV export.
 - Neon-backed audit job records scoped to each browser session.
 - Automatic active-job restoration after a page refresh.
 - Interrupted worker detection and recoverable audit restart after a server cold start.

@@ -1997,6 +1997,12 @@ const gscDataText = {
     reasonDiscovered: "Discovered, not crawled", reasonCrawled: "Crawled, not indexed", reasonDuplicate: "Duplicate or alternate",
     reasonCanonical: "Canonical conflict", reasonBlocked: "Blocked from indexing", reasonSoft404: "Soft 404",
     reasonFetch: "Fetch or server problem", reasonOther: "Other indexing reason",
+    freshnessTitle: "Important page crawl freshness", freshnessHelp: "Shows indexed pages with Search Analytics demand and how long ago Google last crawled them.",
+    freshnessExport: "Export crawl freshness", freshnessSortRisk: "Sort by risk", freshnessSortDemand: "Sort by demand",
+    freshnessSortAge: "Sort by crawl age", freshnessFresh: "Recently crawled", freshnessWatch: "Watch",
+    freshnessStale: "Stale", freshnessCritical: "Very stale", freshnessUnknown: "Unknown crawl time",
+    demandHigh: "High demand", demandMedium: "Medium demand", demandLow: "Low demand",
+    crawlAge: "Crawl age", days: "days", indexedWithDemand: "Indexed pages with demand",
     noIssue: "No immediate index issue", noIssueDetail: "Google reports this URL as passing URL Inspection checks.",
     noIssueAction: "Keep monitoring performance data and canonical consistency.",
     inspectPropertyFirst: "Enter the Search Console Property URL before running URL Inspection.",
@@ -2032,6 +2038,12 @@ const gscDataText = {
     reasonDiscovered: "已发现但尚未抓取", reasonCrawled: "已抓取但尚未收录", reasonDuplicate: "重复页或替代页",
     reasonCanonical: "Canonical 冲突", reasonBlocked: "被阻止收录", reasonSoft404: "软 404",
     reasonFetch: "抓取或服务器问题", reasonOther: "其它收录原因",
+    freshnessTitle: "重要页面抓取时效", freshnessHelp: "显示已有 Search Analytics 需求的已收录页面，以及 Google 距离上次抓取的时间。",
+    freshnessExport: "导出抓取时效", freshnessSortRisk: "按风险排序", freshnessSortDemand: "按需求排序",
+    freshnessSortAge: "按抓取时间排序", freshnessFresh: "近期已抓取", freshnessWatch: "需要关注",
+    freshnessStale: "长期未抓取", freshnessCritical: "严重过期", freshnessUnknown: "抓取时间未知",
+    demandHigh: "高搜索需求", demandMedium: "中搜索需求", demandLow: "低搜索需求",
+    crawlAge: "距上次抓取", days: "天", indexedWithDemand: "有搜索需求的已收录页面",
     noIssue: "没有明显索引问题", noIssueDetail: "Google 报告该网址通过了网址检查。",
     noIssueAction: "继续监控表现数据和 canonical 一致性。",
     inspectPropertyFirst: "运行网址检查前，请先输入 Search Console Property URL。",
@@ -2067,6 +2079,12 @@ const gscDataText = {
     reasonDiscovered: "已發現但尚未檢索", reasonCrawled: "已檢索但尚未收錄", reasonDuplicate: "重複頁或替代頁",
     reasonCanonical: "Canonical 衝突", reasonBlocked: "被阻止收錄", reasonSoft404: "軟 404",
     reasonFetch: "檢索或伺服器問題", reasonOther: "其它收錄原因",
+    freshnessTitle: "重要頁面檢索時效", freshnessHelp: "顯示已有 Search Analytics 需求的已收錄頁面，以及 Google 距離上次檢索的時間。",
+    freshnessExport: "匯出檢索時效", freshnessSortRisk: "依風險排序", freshnessSortDemand: "依需求排序",
+    freshnessSortAge: "依檢索時間排序", freshnessFresh: "近期已檢索", freshnessWatch: "需要關注",
+    freshnessStale: "長期未檢索", freshnessCritical: "嚴重過期", freshnessUnknown: "檢索時間未知",
+    demandHigh: "高搜尋需求", demandMedium: "中搜尋需求", demandLow: "低搜尋需求",
+    crawlAge: "距上次檢索", days: "天", indexedWithDemand: "有搜尋需求的已收錄頁面",
     noIssue: "沒有明顯索引問題", noIssueDetail: "Google 回報該網址通過網址檢查。",
     noIssueAction: "繼續監控成效資料和 canonical 一致性。",
     inspectPropertyFirst: "執行網址檢查前，請先輸入 Search Console Property URL。",
@@ -3030,6 +3048,117 @@ function IndexCoveragePriorities({ report, inspectionResults, gscRows, copy }) {
   );
 }
 
+function ImportantPageFreshness({ inspectionResults, gscRows, copy }) {
+  const [sortBy, setSortBy] = useState("risk");
+  const gscByUrl = buildGscRowMap(uniqueGscRows(gscRows || []));
+  const riskRank = { critical: 4, stale: 3, unknown: 2, watch: 1, fresh: 0 };
+  const rows = (inspectionResults || [])
+    .filter((item) => item.ok && String(item.verdict || "").toUpperCase() === "PASS")
+    .map((inspection) => {
+      const gsc = gscByUrl.get(normalizeReportUrl(inspection.url))
+        || gscByUrl.get(normalizeReportUrl(inspection.googleCanonical || ""));
+      const impressions = gsc?.impressions || 0;
+      const clicks = gsc?.clicks || 0;
+      if (!impressions && !clicks) return null;
+      const lastCrawlMs = inspection.lastCrawlTime ? new Date(inspection.lastCrawlTime).getTime() : NaN;
+      const crawlAgeDays = Number.isFinite(lastCrawlMs) ? Math.max(0, Math.floor((Date.now() - lastCrawlMs) / 86400000)) : null;
+      const demand = clicks > 0 || impressions >= 1000 ? "high" : impressions >= 100 ? "medium" : "low";
+      const demandScore = clicks * 1000 + impressions;
+      let freshness = "fresh";
+      if (crawlAgeDays == null) freshness = "unknown";
+      else if (crawlAgeDays > 180) freshness = "critical";
+      else if (crawlAgeDays > 90) freshness = "stale";
+      else if (crawlAgeDays > 30) freshness = "watch";
+      return {
+        url: inspection.url,
+        googleCanonical: inspection.googleCanonical || "",
+        lastCrawlTime: inspection.lastCrawlTime || "",
+        crawlAgeDays,
+        freshness,
+        demand,
+        demandScore,
+        impressions,
+        clicks,
+        position: gsc?.position ?? null,
+      };
+    })
+    .filter(Boolean);
+  const sortedRows = [...rows].sort((a, b) => {
+    if (sortBy === "demand") return b.demandScore - a.demandScore || (b.crawlAgeDays || 0) - (a.crawlAgeDays || 0);
+    if (sortBy === "age") return (b.crawlAgeDays ?? -1) - (a.crawlAgeDays ?? -1) || b.demandScore - a.demandScore;
+    return riskRank[b.freshness] - riskRank[a.freshness] || b.demandScore - a.demandScore;
+  });
+  if (!rows.length) return null;
+
+  function freshnessLabel(value) {
+    if (value === "critical") return copy.freshnessCritical;
+    if (value === "stale") return copy.freshnessStale;
+    if (value === "watch") return copy.freshnessWatch;
+    if (value === "unknown") return copy.freshnessUnknown;
+    return copy.freshnessFresh;
+  }
+
+  function demandLabel(value) {
+    if (value === "high") return copy.demandHigh;
+    if (value === "medium") return copy.demandMedium;
+    return copy.demandLow;
+  }
+
+  function exportFreshness() {
+    downloadCsvFile("soos-google-crawl-freshness.csv", [
+      ["url", "freshness", "demand", "last_crawl", "crawl_age_days", "clicks", "impressions", "position", "google_canonical"],
+      ...sortedRows.map((row) => [
+        row.url,
+        row.freshness,
+        row.demand,
+        row.lastCrawlTime,
+        row.crawlAgeDays ?? "",
+        row.clicks,
+        row.impressions,
+        row.position ?? "",
+        row.googleCanonical,
+      ]),
+    ]);
+  }
+
+  return (
+    <section className="crawl-freshness">
+      <div className="url-alignment-head">
+        <div>
+          <strong>{copy.freshnessTitle}</strong>
+          <small>{copy.freshnessHelp}</small>
+        </div>
+        <div className="url-alignment-actions">
+          <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+            <option value="risk">{copy.freshnessSortRisk}</option>
+            <option value="demand">{copy.freshnessSortDemand}</option>
+            <option value="age">{copy.freshnessSortAge}</option>
+          </select>
+          <button className="export-button" type="button" onClick={exportFreshness}>{copy.freshnessExport}</button>
+        </div>
+      </div>
+      <div className="coverage-disposition-summary">
+        <span>{copy.indexedWithDemand}: {rows.length}</span>
+        <span>{copy.freshnessCritical}: {rows.filter((row) => row.freshness === "critical").length}</span>
+        <span>{copy.freshnessStale}: {rows.filter((row) => row.freshness === "stale").length}</span>
+      </div>
+      <div className="crawl-freshness-list">
+        {sortedRows.map((row) => (
+          <div className="crawl-freshness-row" key={row.url}>
+            <Badge severity={row.freshness === "critical" ? "critical" : row.freshness === "stale" ? "warning" : row.freshness === "watch" || row.freshness === "unknown" ? "notice" : "ok"}>
+              {freshnessLabel(row.freshness)}
+            </Badge>
+            <strong title={row.url}>{row.url}</strong>
+            <span>{demandLabel(row.demand)}</span>
+            <small>{row.crawlAgeDays == null ? copy.freshnessUnknown : `${copy.crawlAge}: ${row.crawlAgeDays} ${copy.days}`}</small>
+            <small>{row.clicks} {copy.clicks} / {row.impressions} {copy.impressions}</small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
   const copy = gscDataText[language] || gscDataText.en;
   const [loading, setLoading] = useState(false);
@@ -3121,6 +3250,7 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
             <span>{diagnosisSummary.notice} {copy.notices}</span>
           </div>
           <IndexCoveragePriorities report={report} inspectionResults={result.results} gscRows={gscRows} copy={copy} />
+          <ImportantPageFreshness inspectionResults={result.results} gscRows={gscRows} copy={copy} />
           <UrlAlignmentMatrix report={report} inspectionResults={result.results} copy={copy} />
           <div className="inspection-list">
             {diagnosedResults.map((item) => (
