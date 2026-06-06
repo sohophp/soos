@@ -33,6 +33,15 @@ const dictionaries = {
     priorityActions: "Priority actions",
     statusFlags: "Status flags",
     history: "Recent audits",
+    retainedJobs: "Retained Neon tasks",
+    retainedJobsHelp: "Tasks and completed reports retained for this browser session.",
+    refreshJobs: "Refresh tasks",
+    openReport: "Open report",
+    continueJob: "Continue",
+    noRetainedJobs: "No retained tasks are available.",
+    jobCreated: "Created",
+    jobUpdated: "Updated",
+    jobProgress: "Progress",
     clearHistory: "Clear history",
     keepRecent: "Keep recent",
     rerun: "Rerun",
@@ -52,6 +61,9 @@ const dictionaries = {
     worsenedIssues: "Worsened issues",
     noDelta: "No material issue changes detected.",
     categoryDelta: "Category delta",
+    regressions: "New regressions",
+    resolvedIssues: "Resolved URL issues",
+    noRegressions: "No new URL-level regressions.",
     cleanSignals: "Clean crawl signals",
     needsCleanup: "Needs focused cleanup",
     likelyBlockers: "Likely crawl/indexing blockers",
@@ -157,6 +169,15 @@ const dictionaries = {
     priorityActions: "\u4f18\u5148\u52a8\u4f5c",
     statusFlags: "\u72b6\u6001\u6807\u7b7e",
     history: "\u6700\u8fd1\u68c0\u67e5",
+    retainedJobs: "Neon \u4fdd\u7559\u4efb\u52a1",
+    retainedJobsHelp: "\u5f53\u524d\u6d4f\u89c8\u5668\u4f1a\u8bdd\u4fdd\u7559\u7684\u4efb\u52a1\u548c\u5df2\u5b8c\u6210\u62a5\u544a\u3002",
+    refreshJobs: "\u5237\u65b0\u4efb\u52a1",
+    openReport: "\u6253\u5f00\u62a5\u544a",
+    continueJob: "\u7ee7\u7eed\u4efb\u52a1",
+    noRetainedJobs: "\u6ca1\u6709\u53ef\u7528\u7684\u4fdd\u7559\u4efb\u52a1\u3002",
+    jobCreated: "\u521b\u5efa\u65f6\u95f4",
+    jobUpdated: "\u66f4\u65b0\u65f6\u95f4",
+    jobProgress: "\u8fdb\u5ea6",
     clearHistory: "\u6e05\u7a7a\u5386\u53f2",
     keepRecent: "\u4fdd\u7559\u6700\u8fd1",
     rerun: "\u91cd\u65b0\u68c0\u67e5",
@@ -176,6 +197,9 @@ const dictionaries = {
     worsenedIssues: "\u53d8\u5dee\u7684\u95ee\u9898",
     noDelta: "\u6ca1\u6709\u53d1\u73b0\u660e\u663e\u7684\u95ee\u9898\u53d8\u5316\u3002",
     categoryDelta: "\u4e13\u9898\u53d8\u5316",
+    regressions: "\u65b0\u589e\u56de\u5f52\u95ee\u9898",
+    resolvedIssues: "\u5df2\u89e3\u51b3\u7684 URL \u95ee\u9898",
+    noRegressions: "\u6ca1\u6709\u65b0\u589e URL \u7ea7\u56de\u5f52\u95ee\u9898\u3002",
     cleanSignals: "\u6293\u53d6\u4fe1\u53f7\u826f\u597d",
     needsCleanup: "\u9700\u8981\u91cd\u70b9\u6e05\u7406",
     likelyBlockers: "\u53ef\u80fd\u5b58\u5728\u6293\u53d6/\u7d22\u5f15\u963b\u585e",
@@ -281,6 +305,15 @@ const dictionaries = {
     priorityActions: "\u512a\u5148\u52d5\u4f5c",
     statusFlags: "\u72c0\u614b\u6a19\u7c64",
     history: "\u6700\u8fd1\u6aa2\u67e5",
+    retainedJobs: "Neon \u4fdd\u7559\u4efb\u52d9",
+    retainedJobsHelp: "\u76ee\u524d\u700f\u89bd\u5668\u6703\u8a71\u4fdd\u7559\u7684\u4efb\u52d9\u548c\u5df2\u5b8c\u6210\u5831\u544a\u3002",
+    refreshJobs: "\u91cd\u65b0\u6574\u7406\u4efb\u52d9",
+    openReport: "\u958b\u555f\u5831\u544a",
+    continueJob: "\u7e7c\u7e8c\u4efb\u52d9",
+    noRetainedJobs: "\u6c92\u6709\u53ef\u7528\u7684\u4fdd\u7559\u4efb\u52d9\u3002",
+    jobCreated: "\u5efa\u7acb\u6642\u9593",
+    jobUpdated: "\u66f4\u65b0\u6642\u9593",
+    jobProgress: "\u9032\u5ea6",
     clearHistory: "\u6e05\u7a7a\u6b77\u53f2",
     keepRecent: "\u4fdd\u7559\u6700\u8fd1",
     rerun: "\u91cd\u65b0\u6aa2\u67e5",
@@ -300,6 +333,9 @@ const dictionaries = {
     worsenedIssues: "\u8b8a\u5dee\u7684\u554f\u984c",
     noDelta: "\u6c92\u6709\u767c\u73fe\u660e\u986f\u7684\u554f\u984c\u8b8a\u5316\u3002",
     categoryDelta: "\u5c08\u984c\u8b8a\u5316",
+    regressions: "\u65b0\u589e\u56de\u6b78\u554f\u984c",
+    resolvedIssues: "\u5df2\u89e3\u6c7a\u7684 URL \u554f\u984c",
+    noRegressions: "\u6c92\u6709\u65b0\u589e URL \u5c64\u7d1a\u56de\u6b78\u554f\u984c\u3002",
     cleanSignals: "\u6293\u53d6\u8a0a\u865f\u826f\u597d",
     needsCleanup: "\u9700\u8981\u91cd\u9ede\u6e05\u7406",
     likelyBlockers: "\u53ef\u80fd\u5b58\u5728\u6293\u53d6/\u7d22\u5f15\u963b\u585e",
@@ -1240,6 +1276,14 @@ function toHistoryEntry(report) {
     summary: report.summary,
     executiveSummary: report.executiveSummary,
     statusFlags: report.statusFlags,
+    issueFingerprints: (report.pages || []).flatMap((page) =>
+      (page.issues || []).map((issue) => ({
+        key: `${normalizeReportUrl(page.url)}|${issue.type}`,
+        url: page.url,
+        type: issue.type,
+        severity: issue.severity,
+      })),
+    ).slice(0, 10000),
   };
 }
 
@@ -1252,7 +1296,7 @@ function trendLabel(current, previous, t) {
 
 function buildIssueDelta(previousEntry, currentReport) {
   if (!previousEntry || !currentReport) {
-    return { improved: [], worsened: [] };
+    return { improved: [], worsened: [], regressions: [], resolved: [] };
   }
 
   const previousCounts = previousEntry.summary?.issueCounts || {};
@@ -1272,7 +1316,20 @@ function buildIssueDelta(previousEntry, currentReport) {
     }
   }
 
-  return { improved, worsened };
+  const previousIssues = new Map((previousEntry.issueFingerprints || []).map((item) => [item.key, item]));
+  const currentIssues = new Map(
+    (currentReport.pages || []).flatMap((page) =>
+      (page.issues || []).map((issue) => ({
+        key: `${normalizeReportUrl(page.url)}|${issue.type}`,
+        url: page.url,
+        type: issue.type,
+        severity: issue.severity,
+      })),
+    ).map((item) => [item.key, item]),
+  );
+  const regressions = [...currentIssues].filter(([key]) => !previousIssues.has(key)).map(([, item]) => item);
+  const resolved = [...previousIssues].filter(([key]) => !currentIssues.has(key)).map(([, item]) => item);
+  return { improved, worsened, regressions, resolved };
 }
 
 function summarizeCategoryCountsFromReportLike(reportLike) {
@@ -1410,6 +1467,61 @@ function HistoryPanel({ history, currentReport, historyLimit, t, onRerun, onComp
   );
 }
 
+function RetainedJobsPanel({ jobs, loading, t, onRefresh, onOpen, onContinue, onDelete }) {
+  return (
+    <section className="panel retained-jobs">
+      <div className="panel-head">
+        <div>
+          <h2>{t.retainedJobs}</h2>
+          <small>{t.retainedJobsHelp}</small>
+        </div>
+        <div className="history-head-actions">
+          <button className="export-button" type="button" onClick={onRefresh} disabled={loading}>
+            {t.refreshJobs}
+          </button>
+          <span>{jobs.length}</span>
+        </div>
+      </div>
+      {!jobs.length ? (
+        <p className="none">{t.noRetainedJobs}</p>
+      ) : (
+        <div className="retained-job-list">
+          {jobs.map((job) => {
+            const canContinue = ["queued", "paused", "stopped", "error", "interrupted"].includes(job.status);
+            return (
+              <article className="retained-job-row" key={job.id}>
+                <div>
+                  <strong>{job.request?.sitemapUrl || job.id}</strong>
+                  <small>{job.id}</small>
+                </div>
+                <Badge severity={job.status === "done" ? "ok" : job.status === "error" || job.status === "interrupted" ? "warning" : "notice"}>
+                  {job.status}
+                </Badge>
+                <div className="retained-job-meta">
+                  <small>{t.jobProgress}: {job.progress?.percent || 0}%</small>
+                  <small>{t.jobUpdated}: {new Date(job.updatedAt).toLocaleString()}</small>
+                  {job.summary ? <small>{t.historyScore}: {job.summary.healthScore ?? "-"} / {t.historyUrls}: {job.summary.urlCount ?? 0}</small> : null}
+                </div>
+                <div className="history-actions">
+                  {job.status === "done" ? (
+                    <button className="export-button" type="button" onClick={() => onOpen(job.id)}>{t.openReport}</button>
+                  ) : null}
+                  {canContinue ? (
+                    <button className="export-button" type="button" onClick={() => onContinue(job)}>{t.continueJob}</button>
+                  ) : null}
+                  {!["running", "queued"].includes(job.status) ? (
+                    <button className="export-button" type="button" onClick={() => onDelete(job.id)}>{t.deleteHistory}</button>
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ComparisonPanel({ comparisonEntry, report, t }) {
   if (!comparisonEntry || !report) return null;
   const delta = buildIssueDelta(comparisonEntry, report);
@@ -1458,6 +1570,20 @@ function ComparisonPanel({ comparisonEntry, report, t }) {
                   {item.key}: {item.before} {"->"} {item.after}
                 </small>
               ))}
+            </div>
+          </div>
+        ) : null}
+        {comparisonEntry.issueFingerprints ? (
+          <div className="delta-grid">
+            <div className="delta-card delta-bad">
+              <strong>{t.regressions}: {delta.regressions.length}</strong>
+              {delta.regressions.length
+                ? delta.regressions.slice(0, 20).map((item) => <small key={`regression-${item.key}`}>{item.severity} · {item.type} · {item.url}</small>)
+                : <small>{t.noRegressions}</small>}
+            </div>
+            <div className="delta-card delta-good">
+              <strong>{t.resolvedIssues}: {delta.resolved.length}</strong>
+              {delta.resolved.slice(0, 20).map((item) => <small key={`resolved-${item.key}`}>{item.severity} · {item.type} · {item.url}</small>)}
             </div>
           </div>
         ) : null}
@@ -4268,6 +4394,8 @@ function App() {
   const [report, setReport] = useState(null);
   const [history, setHistory] = useState(() => loadHistory());
   const [historyLimit, setHistoryLimit] = useState(() => loadHistoryLimit());
+  const [retainedJobs, setRetainedJobs] = useState([]);
+  const [retainedJobsLoading, setRetainedJobsLoading] = useState(false);
   const [comparisonEntry, setComparisonEntry] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -4312,6 +4440,9 @@ useEffect(() => {
       window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
     }
   }, []);
+  useEffect(() => {
+    loadRetainedJobs().catch(() => {});
+  }, []);
 
   function resetJobUi() {
     window.setTimeout(() => {
@@ -4329,12 +4460,80 @@ useEffect(() => {
     setHistory((currentHistory) => {
       const nextHistory = [
         toHistoryEntry(result),
-        ...currentHistory.filter((item) => item.input?.originalUrl !== result.input?.originalUrl),
+        ...currentHistory.filter((item) => item.scannedAt !== result.scannedAt),
       ].slice(0, historyLimit);
       saveHistory(nextHistory);
       return nextHistory;
     });
     setComparisonEntry(null);
+    loadRetainedJobs().catch(() => {});
+  }
+
+  async function loadRetainedJobs() {
+    setRetainedJobsLoading(true);
+    try {
+      const response = await fetch("/api/audit-jobs?limit=20");
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Could not load retained tasks");
+      setRetainedJobs(body.items || []);
+    } finally {
+      setRetainedJobsLoading(false);
+    }
+  }
+
+  async function openRetainedReport(jobId) {
+    const response = await fetch(`/api/audit-jobs/${jobId}`);
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "Could not open retained report");
+    if (!body.result) throw new Error("This task does not have a completed report.");
+    saveCompletedReport(body.result);
+  }
+
+  async function continueRetainedJob(job) {
+    setLoading(true);
+    setError("");
+    setCurrentJobId(job.id);
+    setJobStatus(job.status);
+    const startedAt = Number(job.createdAt) || Date.now();
+    setCurrentJobStartedAt(startedAt);
+    setElapsedNow(Date.now() - startedAt);
+    window.localStorage.setItem(ACTIVE_AUDIT_JOB_KEY, JSON.stringify({ id: job.id, startedAt }));
+    try {
+      if (["stopped", "error", "interrupted"].includes(job.status)) {
+        const response = await fetch(`/api/audit-jobs/${job.id}/control`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "restart" }),
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || "Could not restart retained task");
+      } else if (job.status === "paused") {
+        await controlRetainedJob(job.id, "resume");
+      }
+      await pollAuditJob(job.id);
+    } finally {
+      resetJobUi();
+      loadRetainedJobs().catch(() => {});
+    }
+  }
+
+  async function controlRetainedJob(jobId, action) {
+    const response = await fetch(`/api/audit-jobs/${jobId}/control`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "Could not control retained task");
+    return body;
+  }
+
+  async function deleteRetainedJob(jobId) {
+    const response = await fetch(`/api/audit-jobs/${jobId}`, { method: "DELETE" });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "Could not delete retained task");
+    setRetainedJobs((items) => items.filter((item) => item.id !== jobId));
+    if (currentJobId === jobId) window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
   }
 
   async function controlJob(action) {
@@ -4533,6 +4732,15 @@ useEffect(() => {
       <SearchAnalyticsPanel status={gscStatus} siteUrl={gscSiteUrl} onRows={setGscRows} language={language} />
       <SearchConsoleImport rows={gscRows} onImport={setGscRows} onClear={() => setGscRows([])} language={language} />
 
+      <RetainedJobsPanel
+        jobs={retainedJobs}
+        loading={retainedJobsLoading}
+        t={t}
+        onRefresh={() => loadRetainedJobs().catch((err) => setError(err.message || String(err)))}
+        onOpen={(id) => openRetainedReport(id).catch((err) => setError(err.message || String(err)))}
+        onContinue={(job) => continueRetainedJob(job).catch((err) => setError(err.message || String(err)))}
+        onDelete={(id) => deleteRetainedJob(id).catch((err) => setError(err.message || String(err)))}
+      />
 
       <HistoryPanel
         history={history}

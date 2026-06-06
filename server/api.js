@@ -102,7 +102,7 @@ function sendJson(res, status, body) {
   const headers = {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
   if (res.soosSessionCookie) headers["Set-Cookie"] = res.soosSessionCookie;
@@ -141,6 +141,9 @@ function jobSnapshot(job) {
       processedUrls: job.checkpoint.pages?.length || 0,
       totalUrls: job.checkpoint.pageUrls?.length || 0,
     } : null,
+    request: job.request || null,
+    summary: job.summary || job.result?.summary || null,
+    scannedAt: job.scannedAt || job.result?.scannedAt || null,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
   };
@@ -2416,6 +2419,8 @@ function storedAuditJob(job) {
     status: job.status,
     progress: job.progress,
     result: job.result || null,
+    summary: job.result?.summary || job.summary || null,
+    scannedAt: job.result?.scannedAt || job.scannedAt || null,
     error: job.error || null,
     recoverable: Boolean(job.recoverable),
     checkpoint,
@@ -2454,7 +2459,7 @@ async function persistAuditJobBatch(jobId, batchIndex, pages) {
 async function readAuditJobBatches(sql, jobId) {
   const prefix = `${auditJobBatchPrefix(jobId)}%`;
   const rows = await sql`
-    SELECT value
+    SELECT value - 'result' AS value
     FROM soos_config
     WHERE key LIKE ${prefix}
     ORDER BY key
@@ -2471,6 +2476,51 @@ async function clearAuditJobBatches(jobId) {
   await ensureNeonConfigTable(sql);
   const prefix = `${auditJobBatchPrefix(jobId)}%`;
   await sql`DELETE FROM soos_config WHERE key LIKE ${prefix}`;
+  return true;
+}
+
+async function listAuditJobs(sessionId, limit = 20) {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 50));
+  const sql = await getNeonSql();
+  if (!sql) {
+    return [...jobs.values()]
+      .filter((job) => job.sessionId === sessionId)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, safeLimit)
+      .map(jobSnapshot);
+  }
+  await ensureNeonConfigTable(sql);
+  const prefix = "audit_job:%";
+  const rows = await sql`
+    SELECT value
+    FROM soos_config
+    WHERE key LIKE ${prefix}
+      AND value->>'sessionId' = ${sessionId}
+    ORDER BY updated_at DESC
+    LIMIT ${safeLimit}
+  `;
+  return rows.map((row) => {
+    const value = typeof row.value === "string" ? JSON.parse(row.value || "{}") : row.value || {};
+    return jobSnapshot(value);
+  });
+}
+
+async function deleteAuditJob(jobId, sessionId) {
+  const job = await findAuditJob(jobId, sessionId);
+  if (!job) return false;
+  if (["running", "queued"].includes(job.status)) {
+    throw new Error("Stop the active task before deleting it.");
+  }
+  jobs.delete(jobId);
+  const timer = jobPersistTimers.get(jobId);
+  if (timer) clearTimeout(timer);
+  jobPersistTimers.delete(jobId);
+  const sql = await getNeonSql();
+  if (!sql) return true;
+  await ensureNeonConfigTable(sql);
+  const batchPrefix = `${auditJobBatchPrefix(jobId)}%`;
+  await sql`DELETE FROM soos_config WHERE key = ${auditJobKey(jobId)} OR key LIKE ${batchPrefix}`;
+  await sql`DELETE FROM soos_job_lease WHERE job_id = ${jobId}`;
   return true;
 }
 
@@ -3262,6 +3312,20 @@ export function handleRequest(req, res) {
       .then((body) => inspectGscUrls(body.urls || [], { siteUrl: body.siteUrl, sessionId }))
       .then((result) => sendJson(res, 200, result))
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
+    return;
+  }
+  if (req.method === "GET" && requestPath === "/api/audit-jobs") {
+    const requestUrl = new URL(req.url || "/api/audit-jobs", "http://localhost");
+    listAuditJobs(sessionId, requestUrl.searchParams.get("limit"))
+      .then((items) => sendJson(res, 200, { items }))
+      .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
+    return;
+  }
+  if (req.method === "DELETE" && /^\/api\/audit-jobs\/[^/]+$/.test(requestPath)) {
+    const id = requestPath.split("/").pop();
+    deleteAuditJob(id, sessionId)
+      .then((deleted) => deleted ? sendJson(res, 200, { deleted: true }) : sendJson(res, 404, { error: "Job not found" }))
+      .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
     return;
   }
   if (req.method === "GET" && /^\/api\/audit-jobs\/[^/]+$/.test(requestPath)) {

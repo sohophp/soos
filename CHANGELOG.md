@@ -31,6 +31,10 @@ All notable changes to soos will be documented in this file.
 - Googlebot log diagnostics for HTTP errors, sitemap gaps, query URLs, static assets, robots-blocked crawling, and spoofed user agents.
 - Three-language Googlebot log filters, summaries, and CSV export.
 - Googlebot log parser and DNS safety regression tests included in `npm run check`.
+- Session-scoped Neon retained-task list with completed-report loading, recovery, and deletion.
+- Lightweight retained-task list responses that omit full report payloads until opened.
+- URL-level issue fingerprints for new-regression and resolved-issue comparisons.
+- Multiple historical versions of the same site instead of replacing the previous scan.
 - Neon-backed audit job records scoped to each browser session.
 - Automatic active-job restoration after a page refresh.
 - Interrupted worker detection and recoverable audit restart after a server cold start.

@@ -314,6 +314,48 @@ main {
   margin-top: 12px;
 }
 
+.retained-jobs {
+  margin-top: 12px;
+}
+
+.retained-jobs .panel-head > div:first-child small {
+  display: block;
+  margin-top: 3px;
+  color: #687169;
+  font-size: 12px;
+}
+
+.retained-job-list {
+  display: grid;
+}
+
+.retained-job-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) minmax(90px, 0.4fr) minmax(210px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  border-top: 1px solid #edf1eb;
+}
+
+.retained-job-row > div:first-child,
+.retained-job-meta {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.retained-job-row strong {
+  overflow: hidden;
+  color: #172018;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.retained-job-row small {
+  color: #687169;
+}
+
 .history-list {
   display: grid;
   gap: 10px;
@@ -2153,6 +2195,14 @@ main {
 }
 
 @media (max-width: 780px) {
+  .retained-job-row {
+    grid-template-columns: 1fr;
+  }
+
+  .retained-job-row strong {
+    white-space: normal;
+  }
+
   .url-set-row,
   .structured-data-row,
   .googlebot-log-row {

@@ -19,6 +19,7 @@ Detailed architecture, implementation status and the active roadmap are maintain
 - Sitemap orphan detection and HTTP/HTTPS, www, trailing-slash, and query URL variant diagnosis.
 - JSON-LD graph parsing, common Google field rules, page-signal consistency checks, and rich results issue comparison.
 - Local access-log analysis with verified Googlebot IPs and sitemap crawl comparison.
+- Neon retained-task management and URL-level regression comparisons across repeated scans.
 - OAuth refresh token support so access tokens can refresh automatically.
 
 ## Requirements
@@ -163,6 +164,8 @@ Notes:
 - Sitemap discovery is checkpointed before page inspection, so a resumed task does not re-fetch completed sitemap files or already saved page results.
 - The browser drives the worker through `/api/audit-jobs/:id/run`. Each request claims an atomic Neon lease and processes at most one 10-URL batch, preventing duplicate work when Vercel routes requests to different instances.
 - Pause and stop take effect between checkpoint batches; an in-flight batch is allowed to finish before the saved task state changes.
+- The Retained Neon Tasks panel lists tasks owned by the current browser session. Completed reports can be opened, recoverable jobs can continue, and deletion also removes checkpoint batches.
+- Repeated scans of the same site are retained as separate browser-history versions. Comparison reports identify newly introduced URL issue types and resolved URL issue types.
 - If `/api/gsc/status` returns `Not Found`, confirm the deployed branch includes `api/index.js` and `vercel.json`, then redeploy. The Vercel rewrite maps `/api/:path*` to `api/index.js`.
 
 Search Analytics notes:
