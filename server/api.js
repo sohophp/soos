@@ -2335,6 +2335,10 @@ function auditJobBatchKey(jobId, batchIndex) {
   return `${auditJobBatchPrefix(jobId)}${String(batchIndex).padStart(6, "0")}`;
 }
 
+function auditScheduleKey(scheduleId) {
+  return `audit_schedule:${scheduleId}`;
+}
+
 let neonSql = null;
 let neonReady = false;
 
@@ -2522,6 +2526,154 @@ async function deleteAuditJob(jobId, sessionId) {
   await sql`DELETE FROM soos_config WHERE key = ${auditJobKey(jobId)} OR key LIKE ${batchPrefix}`;
   await sql`DELETE FROM soos_job_lease WHERE job_id = ${jobId}`;
   return true;
+}
+
+function scheduleSnapshot(schedule) {
+  return {
+    id: schedule.id,
+    sitemapUrl: schedule.sitemapUrl,
+    frequencyDays: schedule.frequencyDays,
+    enabled: schedule.enabled !== false,
+    nextRunAt: schedule.nextRunAt,
+    lastRunAt: schedule.lastRunAt || null,
+    lastJobId: schedule.lastJobId || null,
+    activeJobId: schedule.activeJobId || null,
+    createdAt: schedule.createdAt,
+    updatedAt: schedule.updatedAt,
+  };
+}
+
+async function saveAuditSchedule(schedule) {
+  const sql = await getNeonSql();
+  if (!sql) throw new Error("DATABASE_URL is required for scheduled audits.");
+  await ensureNeonConfigTable(sql);
+  await sql`
+    INSERT INTO soos_config (key, value, updated_at)
+    VALUES (${auditScheduleKey(schedule.id)}, ${JSON.stringify(schedule)}::jsonb, now())
+    ON CONFLICT (key)
+    DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+  `;
+  return schedule;
+}
+
+async function listAuditSchedules(sessionId) {
+  const sql = await getNeonSql();
+  if (!sql) return [];
+  await ensureNeonConfigTable(sql);
+  const prefix = "audit_schedule:%";
+  const rows = await sql`
+    SELECT value
+    FROM soos_config
+    WHERE key LIKE ${prefix}
+      AND value->>'sessionId' = ${sessionId}
+    ORDER BY updated_at DESC
+  `;
+  return rows.map((row) => scheduleSnapshot(typeof row.value === "string" ? JSON.parse(row.value || "{}") : row.value || {}));
+}
+
+async function createAuditSchedule(sessionId, body) {
+  if (!process.env.CRON_SECRET) throw new Error("CRON_SECRET is required before creating scheduled audits.");
+  const sitemapUrl = String(body.sitemapUrl || "").trim();
+  if (!normalizeUrl(sitemapUrl) || !/^https?:\/\//i.test(sitemapUrl)) throw new Error("A valid http(s) URL is required.");
+  const frequencyDays = [1, 7, 30].includes(Number(body.frequencyDays)) ? Number(body.frequencyDays) : 7;
+  const now = Date.now();
+  const schedule = {
+    id: `${now.toString(36)}-${crypto.randomBytes(3).toString("hex")}`,
+    sessionId,
+    sitemapUrl,
+    frequencyDays,
+    enabled: true,
+    options: {
+      contentChecks: Boolean(body.options?.contentChecks),
+      performanceChecks: false,
+      backgroundMode: false,
+      robotsSource: body.options?.robotsSource === "sitemap-directory" ? "sitemap-directory" : "root",
+      proxyEnabled: false,
+    },
+    nextRunAt: new Date(now + frequencyDays * 24 * 60 * 60 * 1000).toISOString(),
+    lastRunAt: null,
+    lastJobId: null,
+    activeJobId: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await saveAuditSchedule(schedule);
+  return scheduleSnapshot(schedule);
+}
+
+async function deleteAuditSchedule(scheduleId, sessionId) {
+  const sql = await getNeonSql();
+  if (!sql) return false;
+  await ensureNeonConfigTable(sql);
+  const rows = await sql`
+    DELETE FROM soos_config
+    WHERE key = ${auditScheduleKey(scheduleId)}
+      AND value->>'sessionId' = ${sessionId}
+    RETURNING key
+  `;
+  return Boolean(rows.length);
+}
+
+async function processScheduledAudits() {
+  const sql = await getNeonSql();
+  if (!sql) throw new Error("DATABASE_URL is required for scheduled audits.");
+  await ensureNeonConfigTable(sql);
+  const prefix = "audit_schedule:%";
+  const rows = await sql`
+    SELECT value
+    FROM soos_config
+    WHERE key LIKE ${prefix}
+      AND COALESCE((value->>'enabled')::boolean, true) = true
+      AND (
+        value->>'activeJobId' IS NOT NULL
+        OR (value->>'nextRunAt')::timestamptz <= now()
+      )
+    ORDER BY COALESCE((value->>'nextRunAt')::timestamptz, now())
+    LIMIT 3
+  `;
+  const processed = [];
+  for (const row of rows) {
+    const schedule = typeof row.value === "string" ? JSON.parse(row.value || "{}") : row.value || {};
+    let job = schedule.activeJobId ? await readPersistedAuditJob(schedule.activeJobId, schedule.sessionId, { cache: false }) : null;
+    if (job?.status === "done") {
+      schedule.lastJobId = job.id;
+      schedule.activeJobId = null;
+      schedule.lastRunAt = job.result?.scannedAt || new Date().toISOString();
+      schedule.nextRunAt = new Date(Date.now() + schedule.frequencyDays * 24 * 60 * 60 * 1000).toISOString();
+      schedule.updatedAt = Date.now();
+      await saveAuditSchedule(schedule);
+      processed.push({ scheduleId: schedule.id, jobId: job.id, status: "done" });
+      continue;
+    }
+    if (job && ["stopped", "error", "interrupted"].includes(job.status)) {
+      updateJob(job, { status: "queued", error: null, recoverable: true });
+      await flushAuditJob(job);
+    }
+    if (!job) {
+      job = createJob(schedule.sessionId, { sitemapUrl: schedule.sitemapUrl, options: schedule.options });
+      schedule.activeJobId = job.id;
+      schedule.updatedAt = Date.now();
+      await flushAuditJob(job);
+      await saveAuditSchedule(schedule);
+    }
+    const leaseToken = await claimAuditJobLease(job.id);
+    if (!leaseToken) continue;
+    try {
+      await runAuditJob(job, { maxBatches: 20 });
+      if (job.status === "done") {
+        schedule.lastJobId = job.id;
+        schedule.activeJobId = null;
+        schedule.lastRunAt = job.result?.scannedAt || new Date().toISOString();
+        schedule.nextRunAt = new Date(Date.now() + schedule.frequencyDays * 24 * 60 * 60 * 1000).toISOString();
+        schedule.updatedAt = Date.now();
+        await saveAuditSchedule(schedule);
+      }
+      processed.push({ scheduleId: schedule.id, jobId: job.id, status: job.status });
+    } finally {
+      await releaseAuditJobLease(job.id, leaseToken);
+    }
+  }
+  return { processedAt: new Date().toISOString(), processed };
 }
 
 function scheduleJobPersistence(job, immediate = false) {
@@ -3175,6 +3327,15 @@ export function handleRequest(req, res) {
   cleanupJobs();
   const requestPath = (req.url || "").split("?")[0];
   if (req.method === "OPTIONS") return sendJson(res, 200, {});
+  if ((req.method === "GET" || req.method === "POST") && requestPath === "/api/cron/audits") {
+    const secret = process.env.CRON_SECRET || "";
+    const authorization = String(req.headers?.authorization || "");
+    if (!secret || authorization !== `Bearer ${secret}`) return sendJson(res, 401, { error: "Unauthorized" });
+    processScheduledAudits()
+      .then((result) => sendJson(res, 200, result))
+      .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
+    return;
+  }
   const sessionId = ensureGscSession(req, res);
   if (req.method === "POST" && requestPath === "/api/googlebot/verify") {
     readJsonBody(req, 50000)
@@ -3318,6 +3479,26 @@ export function handleRequest(req, res) {
     const requestUrl = new URL(req.url || "/api/audit-jobs", "http://localhost");
     listAuditJobs(sessionId, requestUrl.searchParams.get("limit"))
       .then((items) => sendJson(res, 200, { items }))
+      .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
+    return;
+  }
+  if (req.method === "GET" && requestPath === "/api/audit-schedules") {
+    listAuditSchedules(sessionId)
+      .then((items) => sendJson(res, 200, { items }))
+      .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
+    return;
+  }
+  if (req.method === "POST" && requestPath === "/api/audit-schedules") {
+    readJsonBody(req, 50000)
+      .then((body) => createAuditSchedule(sessionId, body))
+      .then((schedule) => sendJson(res, 201, schedule))
+      .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
+    return;
+  }
+  if (req.method === "DELETE" && /^\/api\/audit-schedules\/[^/]+$/.test(requestPath)) {
+    const id = requestPath.split("/").pop();
+    deleteAuditSchedule(id, sessionId)
+      .then((deleted) => deleted ? sendJson(res, 200, { deleted: true }) : sendJson(res, 404, { error: "Schedule not found" }))
       .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
     return;
   }

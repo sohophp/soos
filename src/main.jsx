@@ -42,6 +42,15 @@ const dictionaries = {
     jobCreated: "Created",
     jobUpdated: "Updated",
     jobProgress: "Progress",
+    schedules: "Scheduled audits",
+    schedulesHelp: "Create lightweight recurring scans stored in Neon.",
+    scheduleDaily: "Daily",
+    scheduleWeekly: "Weekly",
+    scheduleMonthly: "Every 30 days",
+    createSchedule: "Create schedule",
+    noSchedules: "No scheduled audits.",
+    nextRun: "Next run",
+    lastRun: "Last run",
     clearHistory: "Clear history",
     keepRecent: "Keep recent",
     rerun: "Rerun",
@@ -178,6 +187,15 @@ const dictionaries = {
     jobCreated: "\u521b\u5efa\u65f6\u95f4",
     jobUpdated: "\u66f4\u65b0\u65f6\u95f4",
     jobProgress: "\u8fdb\u5ea6",
+    schedules: "\u5b9a\u65f6\u68c0\u67e5",
+    schedulesHelp: "\u521b\u5efa\u4fdd\u5b58\u5728 Neon \u7684\u8f7b\u91cf\u91cd\u590d\u626b\u63cf\u3002",
+    scheduleDaily: "\u6bcf\u5929",
+    scheduleWeekly: "\u6bcf\u5468",
+    scheduleMonthly: "\u6bcf 30 \u5929",
+    createSchedule: "\u521b\u5efa\u8ba1\u5212",
+    noSchedules: "\u6ca1\u6709\u5b9a\u65f6\u68c0\u67e5\u8ba1\u5212\u3002",
+    nextRun: "\u4e0b\u6b21\u8fd0\u884c",
+    lastRun: "\u4e0a\u6b21\u8fd0\u884c",
     clearHistory: "\u6e05\u7a7a\u5386\u53f2",
     keepRecent: "\u4fdd\u7559\u6700\u8fd1",
     rerun: "\u91cd\u65b0\u68c0\u67e5",
@@ -314,6 +332,15 @@ const dictionaries = {
     jobCreated: "\u5efa\u7acb\u6642\u9593",
     jobUpdated: "\u66f4\u65b0\u6642\u9593",
     jobProgress: "\u9032\u5ea6",
+    schedules: "\u5b9a\u6642\u6aa2\u67e5",
+    schedulesHelp: "\u5efa\u7acb\u5132\u5b58\u5728 Neon \u7684\u8f15\u91cf\u91cd\u8907\u6383\u63cf\u3002",
+    scheduleDaily: "\u6bcf\u5929",
+    scheduleWeekly: "\u6bcf\u9031",
+    scheduleMonthly: "\u6bcf 30 \u5929",
+    createSchedule: "\u5efa\u7acb\u8a08\u756b",
+    noSchedules: "\u6c92\u6709\u5b9a\u6642\u6aa2\u67e5\u8a08\u756b\u3002",
+    nextRun: "\u4e0b\u6b21\u57f7\u884c",
+    lastRun: "\u4e0a\u6b21\u57f7\u884c",
     clearHistory: "\u6e05\u7a7a\u6b77\u53f2",
     keepRecent: "\u4fdd\u7559\u6700\u8fd1",
     rerun: "\u91cd\u65b0\u6aa2\u67e5",
@@ -1516,6 +1543,47 @@ function RetainedJobsPanel({ jobs, loading, t, onRefresh, onOpen, onContinue, on
               </article>
             );
           })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ScheduledAuditsPanel({ schedules, sitemapUrl, t, onCreate, onDelete }) {
+  const [frequencyDays, setFrequencyDays] = useState(7);
+  return (
+    <section className="panel scheduled-audits">
+      <div className="panel-head">
+        <div>
+          <h2>{t.schedules}</h2>
+          <small>{t.schedulesHelp}</small>
+        </div>
+        <span>{schedules.length}</span>
+      </div>
+      <div className="schedule-create">
+        <strong title={sitemapUrl}>{sitemapUrl || t.placeholder}</strong>
+        <select value={frequencyDays} onChange={(event) => setFrequencyDays(Number(event.target.value))}>
+          <option value={1}>{t.scheduleDaily}</option>
+          <option value={7}>{t.scheduleWeekly}</option>
+          <option value={30}>{t.scheduleMonthly}</option>
+        </select>
+        <button className="export-button" type="button" disabled={!sitemapUrl} onClick={() => onCreate(frequencyDays)}>
+          {t.createSchedule}
+        </button>
+      </div>
+      {!schedules.length ? (
+        <p className="none">{t.noSchedules}</p>
+      ) : (
+        <div className="schedule-list">
+          {schedules.map((schedule) => (
+            <div className="schedule-row" key={schedule.id}>
+              <strong>{schedule.sitemapUrl}</strong>
+              <span>{schedule.frequencyDays === 1 ? t.scheduleDaily : schedule.frequencyDays === 7 ? t.scheduleWeekly : t.scheduleMonthly}</span>
+              <small>{t.nextRun}: {new Date(schedule.nextRunAt).toLocaleString()}</small>
+              <small>{t.lastRun}: {schedule.lastRunAt ? new Date(schedule.lastRunAt).toLocaleString() : "-"}</small>
+              <button className="export-button" type="button" onClick={() => onDelete(schedule.id)}>{t.deleteHistory}</button>
+            </div>
+          ))}
         </div>
       )}
     </section>
@@ -4396,6 +4464,7 @@ function App() {
   const [historyLimit, setHistoryLimit] = useState(() => loadHistoryLimit());
   const [retainedJobs, setRetainedJobs] = useState([]);
   const [retainedJobsLoading, setRetainedJobsLoading] = useState(false);
+  const [auditSchedules, setAuditSchedules] = useState([]);
   const [comparisonEntry, setComparisonEntry] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -4442,6 +4511,7 @@ useEffect(() => {
   }, []);
   useEffect(() => {
     loadRetainedJobs().catch(() => {});
+    loadAuditSchedules().catch(() => {});
   }, []);
 
   function resetJobUi() {
@@ -4534,6 +4604,38 @@ useEffect(() => {
     if (!response.ok) throw new Error(body.error || "Could not delete retained task");
     setRetainedJobs((items) => items.filter((item) => item.id !== jobId));
     if (currentJobId === jobId) window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
+  }
+
+  async function loadAuditSchedules() {
+    const response = await fetch("/api/audit-schedules");
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "Could not load audit schedules");
+    setAuditSchedules(body.items || []);
+  }
+
+  async function createAuditSchedule(frequencyDays) {
+    const response = await fetch("/api/audit-schedules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sitemapUrl,
+        frequencyDays,
+        options: {
+          contentChecks,
+          robotsSource: directoryRobots ? "sitemap-directory" : "root",
+        },
+      }),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "Could not create audit schedule");
+    await loadAuditSchedules();
+  }
+
+  async function deleteAuditSchedule(scheduleId) {
+    const response = await fetch(`/api/audit-schedules/${scheduleId}`, { method: "DELETE" });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "Could not delete audit schedule");
+    setAuditSchedules((items) => items.filter((item) => item.id !== scheduleId));
   }
 
   async function controlJob(action) {
@@ -4740,6 +4842,13 @@ useEffect(() => {
         onOpen={(id) => openRetainedReport(id).catch((err) => setError(err.message || String(err)))}
         onContinue={(job) => continueRetainedJob(job).catch((err) => setError(err.message || String(err)))}
         onDelete={(id) => deleteRetainedJob(id).catch((err) => setError(err.message || String(err)))}
+      />
+      <ScheduledAuditsPanel
+        schedules={auditSchedules}
+        sitemapUrl={sitemapUrl}
+        t={t}
+        onCreate={(frequencyDays) => createAuditSchedule(frequencyDays).catch((err) => setError(err.message || String(err)))}
+        onDelete={(id) => deleteAuditSchedule(id).catch((err) => setError(err.message || String(err)))}
       />
 
       <HistoryPanel
