@@ -8,6 +8,7 @@ All notable changes to soos will be documented in this file.
 
 - Connected Google account display in the Search Console API panel.
 - Three-language pre-connection guidance for the complete Google authorization flow.
+- English, Simplified Chinese, and Traditional Chinese UI text for Search Analytics and URL Inspection diagnostics.
 - OAuth callback auto-refresh for the opener window and token revoke on disconnect.
 - Vercel deployment support with `api/index.js` and `vercel.json`.
 - Three-language OAuth setup help in the Search Console API panel.

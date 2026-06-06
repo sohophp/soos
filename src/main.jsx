@@ -1935,7 +1935,123 @@ function defaultGscDateRange() {
   };
 }
 
-function buildSearchAnalyticsInsights(rows, dimension) {
+const gscDataText = {
+  en: {
+    analyticsTitle: "Search Analytics API", ready: "ready", configureFirst: "configure GSC first",
+    startDate: "Start date", endDate: "End date", dimension: "Dimension", page: "Page", query: "Query",
+    pageQuery: "Page + Query", country: "Country", device: "Device", load: "Load Search Analytics",
+    loading: "Loading...", export: "Export keyword opportunities", rowsLoaded: "rows loaded", clicks: "clicks",
+    impressions: "impressions", analyticsHelp: "Loads clicks, impressions, CTR, and average position for GSC opportunity analysis.",
+    pageOnly: "Only Page rows update GSC opportunities. Other dimensions are shown below for exploration.",
+    noOpportunities: "No high-confidence Page + Query opportunities found with the current thresholds.",
+    position: "Position", connectFirst: "Connect Google Search Console first, then load Search Analytics.",
+    propertyFirst: "Enter the Search Console Property URL before loading Search Analytics.",
+    inspectionTitle: "URL Inspection", inspectStatus: "Inspect real Google index status",
+    inspectionHelp: "Checks up to 25 scanned sitemap URLs with the connected Search Console property.",
+    inspect: "Inspect URLs", inspecting: "Inspecting...", inspected: "Inspected", review: "Needs review",
+    critical: "critical", warnings: "warnings", notices: "notices", noCoverage: "No coverage state",
+    indexing: "Indexing", robots: "Robots", fetch: "Fetch", crawledAs: "Crawled as", lastCrawl: "Last crawl",
+    sitemap: "Seen in sitemap", referrers: "Referrers", googleCanonical: "Google canonical",
+    userCanonical: "User canonical", mobile: "Mobile", richResults: "Rich results",
+    noIssue: "No immediate index issue", noIssueDetail: "Google reports this URL as passing URL Inspection checks.",
+    noIssueAction: "Keep monitoring performance data and canonical consistency.",
+    inspectPropertyFirst: "Enter the Search Console Property URL before running URL Inspection.",
+  },
+  "zh-CN": {
+    analyticsTitle: "Search Analytics API", ready: "已就绪", configureFirst: "请先连接 GSC",
+    startDate: "开始日期", endDate: "结束日期", dimension: "维度", page: "网页", query: "查询词",
+    pageQuery: "网页 + 查询词", country: "国家/地区", device: "设备", load: "加载 Search Analytics",
+    loading: "加载中...", export: "导出关键词机会", rowsLoaded: "行已加载", clicks: "点击", impressions: "展示",
+    analyticsHelp: "加载点击、展示、CTR 和平均排名，用于 GSC 机会分析。",
+    pageOnly: "只有“网页”维度会更新 GSC 机会；其他维度仅在下方用于分析。",
+    noOpportunities: "按当前阈值未发现高置信度的“网页 + 查询词”机会。",
+    position: "排名", connectFirst: "请先连接 Google Search Console，再加载 Search Analytics。",
+    propertyFirst: "加载 Search Analytics 前，请先输入 Search Console Property URL。",
+    inspectionTitle: "网址检查", inspectStatus: "检查 Google 中的真实收录状态",
+    inspectionHelp: "使用已连接的 Search Console property 检查最多 25 个 sitemap 网址。",
+    inspect: "检查网址", inspecting: "检查中...", inspected: "已检查", review: "需要处理",
+    critical: "严重", warnings: "警告", notices: "提示", noCoverage: "没有覆盖状态",
+    indexing: "索引", robots: "Robots", fetch: "抓取", crawledAs: "抓取类型", lastCrawl: "最后抓取",
+    sitemap: "所在 sitemap", referrers: "来源网址", googleCanonical: "Google 规范网址",
+    userCanonical: "用户规范网址", mobile: "移动端", richResults: "富媒体结果",
+    noIssue: "没有明显索引问题", noIssueDetail: "Google 报告该网址通过了网址检查。",
+    noIssueAction: "继续监控表现数据和 canonical 一致性。",
+    inspectPropertyFirst: "运行网址检查前，请先输入 Search Console Property URL。",
+  },
+  "zh-TW": {
+    analyticsTitle: "Search Analytics API", ready: "已就緒", configureFirst: "請先連接 GSC",
+    startDate: "開始日期", endDate: "結束日期", dimension: "維度", page: "網頁", query: "查詢字詞",
+    pageQuery: "網頁 + 查詢字詞", country: "國家/地區", device: "裝置", load: "載入 Search Analytics",
+    loading: "載入中...", export: "匯出關鍵字機會", rowsLoaded: "列已載入", clicks: "點擊", impressions: "曝光",
+    analyticsHelp: "載入點擊、曝光、CTR 和平均排名，用於 GSC 機會分析。",
+    pageOnly: "只有「網頁」維度會更新 GSC 機會；其他維度僅在下方用於分析。",
+    noOpportunities: "依目前門檻未發現高可信度的「網頁 + 查詢字詞」機會。",
+    position: "排名", connectFirst: "請先連接 Google Search Console，再載入 Search Analytics。",
+    propertyFirst: "載入 Search Analytics 前，請先輸入 Search Console Property URL。",
+    inspectionTitle: "網址檢查", inspectStatus: "檢查 Google 中的真實收錄狀態",
+    inspectionHelp: "使用已連接的 Search Console property 檢查最多 25 個 sitemap 網址。",
+    inspect: "檢查網址", inspecting: "檢查中...", inspected: "已檢查", review: "需要處理",
+    critical: "嚴重", warnings: "警告", notices: "提示", noCoverage: "沒有涵蓋狀態",
+    indexing: "索引", robots: "Robots", fetch: "擷取", crawledAs: "檢索類型", lastCrawl: "最後檢索",
+    sitemap: "所在 sitemap", referrers: "來源網址", googleCanonical: "Google 標準網址",
+    userCanonical: "使用者標準網址", mobile: "行動裝置", richResults: "複合式搜尋結果",
+    noIssue: "沒有明顯索引問題", noIssueDetail: "Google 回報該網址通過網址檢查。",
+    noIssueAction: "繼續監控成效資料和 canonical 一致性。",
+    inspectPropertyFirst: "執行網址檢查前，請先輸入 Search Console Property URL。",
+  },
+};
+
+const inspectionDiagnosisText = {
+  "zh-CN": {
+    inspection_error: ["检查请求失败", "检查 API 连接、property 权限，并确认该网址属于已配置的 property。"],
+    not_indexed: ["Google 尚未收录", "检查可抓取性、canonical、内容质量、内部链接和 sitemap 收录情况。"],
+    discovered_not_crawled: ["已发现但尚未抓取", "加强内部链接和抓取预算信号，保留在 sitemap 中，并确保服务器响应快速。"],
+    duplicate_or_alternate: ["Google 将其视为重复或替代页面", "确认 canonical 目标是否正确；若该网址需要排名，请统一 canonical、sitemap 和内部链接信号。"],
+    soft_404: ["检测到软 404", "补充有价值的实质内容；如果页面不应存在，请返回真正的 404 或 410。"],
+    robots_blocked: ["被 robots.txt 阻挡", "如果页面应被收录，请删除对应的 robots.txt 阻挡规则。"],
+    fetch_problem: ["Google 抓取存在问题", "检查服务器可用性、跳转、状态码、防火墙和渲染稳定性。"],
+    canonical_mismatch: ["Google 选择了不同的 canonical", "围绕首选 canonical 统一标签、内部链接、跳转和 sitemap URL。"],
+    not_seen_in_sitemap: ["Google 未报告 sitemap 来源", "将规范网址保留在已提交的 sitemap，并确保 robots.txt 可发现 sitemap。"],
+    no_referrers: ["未报告来源网址", "从相关且已收录的页面增加内部链接，帮助 Google 发现并优先抓取。"],
+    mobile_usability: ["移动端可用性问题", "在 Search Console 中查看移动端问题，并修复布局、点击目标和 viewport。"],
+    rich_results: ["富媒体结果需要检查", "使用 Google 富媒体结果工具验证结构化数据，并修复无效项目。"],
+    indexing_state: ["索引状态需要检查", "结合 meta robots、canonical 和抓取诊断分析该状态。"],
+  },
+  "zh-TW": {
+    inspection_error: ["檢查請求失敗", "檢查 API 連線、property 權限，並確認該網址屬於已設定的 property。"],
+    not_indexed: ["Google 尚未收錄", "檢查可檢索性、canonical、內容品質、內部連結和 sitemap 收錄情況。"],
+    discovered_not_crawled: ["已發現但尚未檢索", "加強內部連結和檢索預算訊號，保留在 sitemap 中，並確保伺服器快速回應。"],
+    duplicate_or_alternate: ["Google 將其視為重複或替代頁面", "確認 canonical 目標是否正確；若該網址需要排名，請統一 canonical、sitemap 和內部連結訊號。"],
+    soft_404: ["偵測到軟 404", "補充有價值的實質內容；如果頁面不應存在，請回傳真正的 404 或 410。"],
+    robots_blocked: ["被 robots.txt 阻擋", "如果頁面應被收錄，請移除對應的 robots.txt 阻擋規則。"],
+    fetch_problem: ["Google 擷取存在問題", "檢查伺服器可用性、重新導向、狀態碼、防火牆和轉譯穩定性。"],
+    canonical_mismatch: ["Google 選擇了不同的 canonical", "圍繞首選 canonical 統一標籤、內部連結、重新導向和 sitemap URL。"],
+    not_seen_in_sitemap: ["Google 未回報 sitemap 來源", "將標準網址保留在已提交的 sitemap，並確保 robots.txt 可發現 sitemap。"],
+    no_referrers: ["未回報來源網址", "從相關且已收錄的頁面增加內部連結，協助 Google 發現並優先檢索。"],
+    mobile_usability: ["行動裝置可用性問題", "在 Search Console 中查看行動裝置問題，並修正版面、點擊目標和 viewport。"],
+    rich_results: ["複合式搜尋結果需要檢查", "使用 Google 複合式搜尋結果工具驗證結構化資料，並修正無效項目。"],
+    indexing_state: ["索引狀態需要檢查", "結合 meta robots、canonical 和檢索診斷分析該狀態。"],
+  },
+};
+
+function buildSearchAnalyticsInsights(rows, dimension, language = "en") {
+  const locale = language === "zh-CN" ? "zh-CN" : language === "zh-TW" ? "zh-TW" : "en";
+  const insightText = {
+    "zh-CN": {
+      low_ctr: ["高展示、低点击率", "重写标题和 meta description，使摘要更符合查询意图并提高点击吸引力。"],
+      snippet_gap: ["排名靠前但几乎没有点击", "检查页面是否匹配查询意图，并改进标题、描述和首屏答案。"],
+      striking_distance: ["接近首页顶部的排名机会", "加强回答该查询的内容段落，增加内部链接并提高摘要相关性。"],
+      page_two: ["第二页排名机会", "扩展内容深度，从更强的相关页面增加内部链接，并对比首页结果的内容差距。"],
+      intent_spread: ["页面覆盖多个查询意图", "围绕最强的搜索意图重新组织页面，并检查是否需要拆分内容。"],
+    },
+    "zh-TW": {
+      low_ctr: ["高曝光、低點閱率", "重寫標題和 meta description，使摘要更符合查詢意圖並提高點擊吸引力。"],
+      snippet_gap: ["排名靠前但幾乎沒有點擊", "檢查頁面是否符合查詢意圖，並改善標題、描述和首屏答案。"],
+      striking_distance: ["接近首頁頂部的排名機會", "加強回答該查詢的內容段落，增加內部連結並提高摘要相關性。"],
+      page_two: ["第二頁排名機會", "擴充內容深度，從更強的相關頁面增加內部連結，並比較首頁結果的內容差距。"],
+      intent_spread: ["頁面涵蓋多個查詢意圖", "圍繞最強的搜尋意圖重新組織頁面，並檢查是否需要拆分內容。"],
+    },
+  };
   if (dimension !== "page_query") return [];
   const pageQueryRows = (rows || []).filter((row) => row.page && row.query);
   const insights = [];
@@ -2027,7 +2143,10 @@ function buildSearchAnalyticsInsights(rows, dimension) {
       metrics: `${queryCount} queries, ${impressions} impressions`,
     });
   }
-  return insights.slice(0, 12);
+  return insights.slice(0, 12).map((insight) => {
+    const localized = insightText[locale]?.[insight.type];
+    return localized ? { ...insight, title: localized[0], action: localized[1] } : insight;
+  });
 }
 
 function classifySearchQueryOpportunity(row) {
@@ -2067,7 +2186,8 @@ function downloadKeywordOpportunitiesCsv(rows, insights) {
   downloadCsvFile(`soos-keyword-opportunities-${new Date().toISOString().slice(0, 19).replaceAll(":", "-")}.csv`, csvRows);
 }
 
-function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
+function SearchAnalyticsPanel({ status, siteUrl, onRows, language }) {
+  const copy = gscDataText[language] || gscDataText.en;
   const defaults = useMemo(() => defaultGscDateRange(), []);
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [endDate, setEndDate] = useState(defaults.endDate);
@@ -2075,17 +2195,17 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
   const [rows, setRows] = useState([]);
-  const insights = useMemo(() => buildSearchAnalyticsInsights(rows, summary?.dimension || dimension), [dimension, rows, summary?.dimension]);
+  const insights = useMemo(() => buildSearchAnalyticsInsights(rows, summary?.dimension || dimension, language), [dimension, language, rows, summary?.dimension]);
   const [error, setError] = useState("");
 
   async function loadAnalytics(event) {
     event.preventDefault();
     if (!status?.configured) {
-      setError("Connect Google Search Console first, then load Search Analytics.");
+      setError(copy.connectFirst);
       return;
     }
     if (!siteUrl.trim()) {
-      setError("Enter the Search Console Property URL in the Search Console API panel before loading Search Analytics.");
+      setError(copy.propertyFirst);
       return;
     }
     setLoading(true);
@@ -2116,46 +2236,46 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
   return (
     <section className="panel search-analytics-panel">
       <div className="panel-head">
-        <h2>Search Analytics API</h2>
-        <span>{status?.configured ? "ready" : "configure GSC first"}</span>
+        <h2>{copy.analyticsTitle}</h2>
+        <span>{status?.configured ? copy.ready : copy.configureFirst}</span>
       </div>
       <form className="search-analytics-body" onSubmit={loadAnalytics}>
         <div className="search-analytics-fields">
           <label>
-            <strong>Start date</strong>
+            <strong>{copy.startDate}</strong>
             <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
           </label>
           <label>
-            <strong>End date</strong>
+            <strong>{copy.endDate}</strong>
             <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
           </label>
           <label>
-            <strong>Dimension</strong>
+            <strong>{copy.dimension}</strong>
             <select value={dimension} onChange={(event) => setDimension(event.target.value)}>
-              <option value="page">Page</option>
-              <option value="query">Query</option>
-              <option value="page_query">Page + Query</option>
-              <option value="country">Country</option>
-              <option value="device">Device</option>
+              <option value="page">{copy.page}</option>
+              <option value="query">{copy.query}</option>
+              <option value="page_query">{copy.pageQuery}</option>
+              <option value="country">{copy.country}</option>
+              <option value="device">{copy.device}</option>
             </select>
           </label>
         </div>
         <div className="gsc-api-actions">
           <button className="export-button" type="submit" disabled={loading}>
-            {loading ? "Loading..." : "Load Search Analytics"}
+            {loading ? copy.loading : copy.load}
           </button>
           {dimension === "page_query" && rows.length ? (
             <button className="export-button" type="button" onClick={() => downloadKeywordOpportunitiesCsv(rows, insights)}>
-              Export keyword opportunities
+              {copy.export}
             </button>
           ) : null}
         </div>
         {summary ? (
-          <small>{summary.rows} {summary.dimension} rows loaded, {summary.clicks} clicks, {summary.impressions} impressions</small>
+          <small>{summary.rows} {copy.rowsLoaded}, {summary.clicks} {copy.clicks}, {summary.impressions} {copy.impressions}</small>
         ) : (
-          <small>Loads page-level clicks, impressions, CTR, and average position into the same GSC opportunity analysis.</small>
+          <small>{copy.analyticsHelp}</small>
         )}
-        {dimension !== "page" ? <small>Only Page rows update GSC opportunities. Other dimensions are shown below for exploration.</small> : null}
+        {dimension !== "page" ? <small>{copy.pageOnly}</small> : null}
         {insights.length ? (
           <div className="search-analytics-insights">
             {insights.map((insight, index) => (
@@ -2168,16 +2288,16 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows }) {
             ))}
           </div>
         ) : dimension === "page_query" && rows.length ? (
-          <small>No high-confidence Page + Query opportunities found with the current thresholds.</small>
+          <small>{copy.noOpportunities}</small>
         ) : null}
         {rows.length ? (
           <div className="search-analytics-results">
             <div className="search-analytics-result head">
-              <span>Dimension</span>
-              <span>Clicks</span>
-              <span>Impressions</span>
+              <span>{copy.dimension}</span>
+              <span>{copy.clicks}</span>
+              <span>{copy.impressions}</span>
               <span>CTR</span>
-              <span>Position</span>
+              <span>{copy.position}</span>
             </div>
             {rows.slice(0, 12).map((row, index) => (
               <div className="search-analytics-result" key={`${row.label || row.page || index}-${index}`}>
@@ -2443,7 +2563,8 @@ function SearchVisibility({ report, t, gscRows }) {
     </section>
   );
 }
-function UrlInspectionPanel({ report, gscStatus, siteUrl }) {
+function UrlInspectionPanel({ report, gscStatus, siteUrl, language }) {
+  const copy = gscDataText[language] || gscDataText.en;
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
@@ -2454,7 +2575,10 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl }) {
   const failedCount = (result?.results || []).filter((item) => !item.ok || item.verdict === "FAIL").length;
   const diagnosedResults = (result?.results || []).map((item) => ({
     ...item,
-    diagnoses: diagnoseInspectionResult(item),
+    diagnoses: diagnoseInspectionResult(item).map((diagnosis) => {
+      const localized = inspectionDiagnosisText[language]?.[diagnosis.type];
+      return localized ? { ...diagnosis, title: localized[0], action: localized[1] } : diagnosis;
+    }),
   }));
   const diagnosisSummary = diagnosedResults.reduce(
     (summary, item) => {
@@ -2468,7 +2592,7 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl }) {
 
   async function runInspection() {
     if (!siteUrl.trim()) {
-      setError("Enter the Search Console Property URL in the Search Console API panel before running URL Inspection.");
+      setError(copy.inspectPropertyFirst);
       return;
     }
     setLoading(true);
@@ -2492,30 +2616,30 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl }) {
   return (
     <section className="panel url-inspection">
       <div className="panel-head">
-        <h2>URL Inspection</h2>
-        <span>{gscStatus?.configured ? "GSC API" : "configure GSC first"}</span>
+        <h2>{copy.inspectionTitle}</h2>
+        <span>{gscStatus?.configured ? "GSC API" : copy.configureFirst}</span>
       </div>
       <div className="url-inspection-body">
         <div className="url-inspection-copy">
-          <strong>Inspect real Google index status</strong>
-          <small>Checks up to 25 scanned sitemap URLs with the configured Search Console property.</small>
+          <strong>{copy.inspectStatus}</strong>
+          <small>{copy.inspectionHelp}</small>
         </div>
         <button className="export-button" type="button" disabled={!gscStatus?.configured || loading} onClick={runInspection}>
-          {loading ? "Inspecting..." : "Inspect URLs"}
+          {loading ? copy.inspecting : copy.inspect}
         </button>
       </div>
       {error ? <div className="url-inspection-error">{error}</div> : null}
       {result ? (
         <>
           <div className="inspection-summary">
-            <Stat label="Inspected" value={result.inspected} />
+            <Stat label={copy.inspected} value={result.inspected} />
             <Stat label="PASS" value={indexedCount} tone="good" />
-            <Stat label="Needs review" value={failedCount} tone="warn" />
+            <Stat label={copy.review} value={failedCount} tone="warn" />
           </div>
           <div className="inspection-diagnosis-summary">
-            <span>{diagnosisSummary.critical} critical</span>
-            <span>{diagnosisSummary.warning} warnings</span>
-            <span>{diagnosisSummary.notice} notices</span>
+            <span>{diagnosisSummary.critical} {copy.critical}</span>
+            <span>{diagnosisSummary.warning} {copy.warnings}</span>
+            <span>{diagnosisSummary.notice} {copy.notices}</span>
           </div>
           <div className="inspection-list">
             {diagnosedResults.map((item) => (
@@ -2523,20 +2647,20 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl }) {
                 <div className="impact-top">
                   <Badge severity={item.ok && item.verdict === "PASS" ? "ok" : item.ok ? "warning" : "critical"}>{item.verdict || (item.ok ? "UNKNOWN" : "ERROR")}</Badge>
                   <strong>{item.url}</strong>
-                  <span>{item.coverageState || item.error || "No coverage state"}</span>
+                  <span>{item.coverageState || item.error || copy.noCoverage}</span>
                 </div>
                 <div className="impact-details">
-                  {item.indexingState ? <small>Indexing: {item.indexingState}</small> : null}
-                  {item.robotsTxtState ? <small>Robots: {item.robotsTxtState}</small> : null}
-                  {item.pageFetchState ? <small>Fetch: {item.pageFetchState}</small> : null}
-                  {item.crawledAs ? <small>Crawled as: {item.crawledAs}</small> : null}
-                  {item.lastCrawlTime ? <small>Last crawl: {item.lastCrawlTime}</small> : null}
-                  {item.sitemap?.length ? <small>Seen in sitemap: {item.sitemap.slice(0, 2).join(", ")}</small> : null}
-                  {item.referringUrls?.length ? <small>Referrers: {item.referringUrls.length}</small> : null}
-                  {item.googleCanonical ? <small>Google canonical: {item.googleCanonical}</small> : null}
-                  {item.userCanonical ? <small>User canonical: {item.userCanonical}</small> : null}
-                  {item.mobileVerdict ? <small>Mobile: {item.mobileVerdict}</small> : null}
-                  {item.richResultsVerdict ? <small>Rich results: {item.richResultsVerdict}</small> : null}
+                  {item.indexingState ? <small>{copy.indexing}: {item.indexingState}</small> : null}
+                  {item.robotsTxtState ? <small>{copy.robots}: {item.robotsTxtState}</small> : null}
+                  {item.pageFetchState ? <small>{copy.fetch}: {item.pageFetchState}</small> : null}
+                  {item.crawledAs ? <small>{copy.crawledAs}: {item.crawledAs}</small> : null}
+                  {item.lastCrawlTime ? <small>{copy.lastCrawl}: {item.lastCrawlTime}</small> : null}
+                  {item.sitemap?.length ? <small>{copy.sitemap}: {item.sitemap.slice(0, 2).join(", ")}</small> : null}
+                  {item.referringUrls?.length ? <small>{copy.referrers}: {item.referringUrls.length}</small> : null}
+                  {item.googleCanonical ? <small>{copy.googleCanonical}: {item.googleCanonical}</small> : null}
+                  {item.userCanonical ? <small>{copy.userCanonical}: {item.userCanonical}</small> : null}
+                  {item.mobileVerdict ? <small>{copy.mobile}: {item.mobileVerdict}</small> : null}
+                  {item.richResultsVerdict ? <small>{copy.richResults}: {item.richResultsVerdict}</small> : null}
                 </div>
                 {item.diagnoses.length ? (
                   <div className="inspection-diagnoses">
@@ -2551,9 +2675,9 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl }) {
                 ) : (
                   <div className="inspection-diagnoses">
                     <div className="inspection-diagnosis good">
-                      <strong>No immediate index issue</strong>
-                      <small>Google reports this URL as passing URL Inspection checks.</small>
-                      <span>Keep monitoring performance data and canonical consistency.</span>
+                      <strong>{copy.noIssue}</strong>
+                      <small>{copy.noIssueDetail}</small>
+                      <span>{copy.noIssueAction}</span>
                     </div>
                   </div>
                 )}
@@ -2695,7 +2819,7 @@ function diagnoseInspectionResult(item) {
   }
   return diagnoses;
 }
-function Report({ report, t, gscRows, gscStatus, gscSiteUrl }) {
+function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [issueFilter, setIssueFilter] = useState(null);
@@ -2741,7 +2865,7 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl }) {
       <ScoreCard score={report.summary.healthScore} t={t} />
       <SearchVisibility report={report} t={t} gscRows={gscRows} />
       <GscOpportunities report={report} rows={gscRows} />
-      <UrlInspectionPanel report={report} gscStatus={gscStatus} siteUrl={gscSiteUrl} />
+      <UrlInspectionPanel report={report} gscStatus={gscStatus} siteUrl={gscSiteUrl} language={language} />
       <section className="summary">
         <Stat label={t.urls} value={report.summary.urlCount} />
         <Stat label={t.affected} value={report.summary.affectedUrlCount} tone="warn" />
@@ -3084,7 +3208,7 @@ useEffect(() => {
         </span>
       </label>
       <SearchConsoleApiConfig status={gscStatus} onStatus={setGscStatus} siteUrl={gscSiteUrl} onSiteUrlChange={setGscSiteUrl} language={language} />
-      <SearchAnalyticsPanel status={gscStatus} siteUrl={gscSiteUrl} onRows={setGscRows} />
+      <SearchAnalyticsPanel status={gscStatus} siteUrl={gscSiteUrl} onRows={setGscRows} language={language} />
       <SearchConsoleImport rows={gscRows} onImport={setGscRows} onClear={() => setGscRows([])} />
 
 
@@ -3126,7 +3250,7 @@ useEffect(() => {
       <ComparisonPanel comparisonEntry={comparisonEntry} report={report} t={t} />
 
       {error ? <div className="error">{error}</div> : null}
-      <Report report={report} t={t} gscRows={gscRows} gscStatus={gscStatus} gscSiteUrl={gscSiteUrl} />
+      <Report report={report} t={t} gscRows={gscRows} gscStatus={gscStatus} gscSiteUrl={gscSiteUrl} language={language} />
     </main>
   );
 }
