@@ -1221,6 +1221,15 @@ main {
     white-space: normal;
   }
 
+  .url-set-row {
+    grid-template-columns: 1fr;
+  }
+
+  .url-set-row strong,
+  .url-set-row small {
+    white-space: normal;
+  }
+
   .robots-metrics {
     grid-template-columns: 1fr;
   }
@@ -1796,6 +1805,54 @@ main {
 
 .crawl-freshness-row span,
 .crawl-freshness-row small {
+  color: #687169;
+}
+
+.url-set-comparison {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+.url-set-scope {
+  color: #687169;
+}
+
+.url-set-findings {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #dfe6dd;
+  border-radius: 6px;
+}
+
+.url-set-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(220px, 1.5fr) minmax(120px, 0.6fr) minmax(220px, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  border-top: 1px solid #edf1eb;
+  font-size: 12px;
+}
+
+.url-set-row:first-child {
+  border-top: 0;
+}
+
+.url-set-row strong,
+.url-set-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.url-set-row strong {
+  color: #172018;
+}
+
+.url-set-row span,
+.url-set-row small {
   color: #687169;
 }
 

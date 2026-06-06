@@ -15,6 +15,8 @@ Detailed architecture, implementation status and the active roadmap are maintain
 - Request-driven serverless workers with Neon leases, so scan work completes inside each API request instead of relying on background promises.
 - Google Search Console CSV import with English and Chinese column support.
 - Google Search Console API integration for Search Analytics dimensions and URL Inspection.
+- URL set comparison across sitemap, scanned internal links, Search Analytics, and Google sitemap/referrer signals.
+- Sitemap orphan detection and HTTP/HTTPS, www, trailing-slash, and query URL variant diagnosis.
 - OAuth refresh token support so access tokens can refresh automatically.
 
 ## Requirements
@@ -153,7 +155,7 @@ Notes:
 - OAuth Client ID and Client Secret are deployment secrets. Visitors never enter them in the UI.
 - Each visitor's encrypted refresh token is scoped to the browser session cookie and saved separately in Neon.
 - Browser sessions and inactive Neon GSC records expire after 90 days. Disconnect rotates the session cookie, removes the saved connection, and attempts to revoke Google access.
-- Background audit jobs use in-memory state and are best-effort on serverless platforms. Direct scans through `/api/audit` are more reliable for Vercel.
+- Without `DATABASE_URL`, background audit jobs use in-memory state and are best-effort on serverless platforms.
 - With `DATABASE_URL`, background job ownership, progress, request settings, and completed reports are retained in Neon for 7 days. Refreshing the page restores the active task.
 - Page inspection results are checkpointed to Neon every 10 URLs. If a serverless worker stops mid-scan, soos marks the task as interrupted and automatically resumes from the last completed batch. At most the unfinished batch is repeated.
 - Sitemap discovery is checkpointed before page inspection, so a resumed task does not re-fetch completed sitemap files or already saved page results.
@@ -172,6 +174,8 @@ URL Inspection notes:
 
 - URL Inspection imports Google coverage, robots, fetch, canonical, sitemap/referrer, mobile usability, and rich results signals when available.
 - The diagnosis cards highlight not-indexed states, discovered-not-crawled URLs, duplicate/alternate pages, soft 404s, canonical mismatches, mobile issues, and missing discovery signals.
+- URL set comparison uses the URLs included in the current audit, so configured scan limits and truncation also define its sitemap scope.
+- Internal-link orphan findings cover only pages completed in the current audit; older saved reports without link data suppress those findings.
 
 ## Release Checklist
 

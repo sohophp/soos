@@ -11,6 +11,10 @@ All notable changes to soos will be documented in this file.
 - Cumulative, user-controlled URL Inspection batches for sites with more than 25 scanned URLs.
 - Index coverage reason groups, expected-exclusion detection and Search Analytics-based repair priorities.
 - Important indexed-page crawl freshness analysis with demand/risk sorting and CSV export.
+- URL set comparison across sitemap, scanned internal links, Search Analytics pages, and Google discovery signals.
+- Internal-link extraction and scanned inbound-link counts for sitemap orphan detection.
+- HTTP/HTTPS, www/non-www, trailing-slash, and query-string URL variant groups.
+- Three-language URL set filters, finding summaries, and CSV export.
 - Neon-backed audit job records scoped to each browser session.
 - Automatic active-job restoration after a page refresh.
 - Interrupted worker detection and recoverable audit restart after a server cold start.
@@ -25,6 +29,7 @@ All notable changes to soos will be documented in this file.
 - Creating an audit now only queues it; `/api/audit-jobs/:id/run` synchronously processes one leased batch per request.
 - Removed reliance on post-response background promises for Vercel audit jobs.
 - Updated the crawler user agent to `soos/0.2 SEO audit`.
+- Historical reports without internal-link data no longer produce false orphan-page findings.
 
 ## [0.2.0] - 2026-06-06
 

@@ -2003,6 +2003,14 @@ const gscDataText = {
     freshnessStale: "Stale", freshnessCritical: "Very stale", freshnessUnknown: "Unknown crawl time",
     demandHigh: "High demand", demandMedium: "Medium demand", demandLow: "Low demand",
     crawlAge: "Crawl age", days: "days", indexedWithDemand: "Indexed pages with demand",
+    urlSetsTitle: "URL set comparison", urlSetsHelp: "Compares sitemap URLs with links found on scanned pages, Search Analytics pages, and Google discovery signals.",
+    urlSetsExport: "Export URL set diagnosis", urlSetsAll: "All findings", urlSetsFindings: "findings",
+    urlSetsPartial: "Internal-link results only cover pages completed in this audit.",
+    internalMissingSitemap: "Internal URL missing from sitemap", gscMissingSitemap: "GSC page missing from sitemap",
+    sitemapOrphan: "Sitemap page with no scanned inbound links", googleMissingSitemap: "Google reports no sitemap source",
+    googleMissingReferrer: "Google reports no referring URL", urlVariant: "Conflicting URL variants",
+    sourceInternal: "Internal links", sourceGsc: "Search Analytics", sourceSitemap: "Sitemap",
+    sourceGoogle: "Google Inspection", sourceVariants: "Multiple sources", inboundLinks: "scanned inbound links",
     noIssue: "No immediate index issue", noIssueDetail: "Google reports this URL as passing URL Inspection checks.",
     noIssueAction: "Keep monitoring performance data and canonical consistency.",
     inspectPropertyFirst: "Enter the Search Console Property URL before running URL Inspection.",
@@ -2044,6 +2052,14 @@ const gscDataText = {
     freshnessStale: "长期未抓取", freshnessCritical: "严重过期", freshnessUnknown: "抓取时间未知",
     demandHigh: "高搜索需求", demandMedium: "中搜索需求", demandLow: "低搜索需求",
     crawlAge: "距上次抓取", days: "天", indexedWithDemand: "有搜索需求的已收录页面",
+    urlSetsTitle: "网址集合对比", urlSetsHelp: "对比 sitemap、已扫描页面发现的站内链接、Search Analytics 页面和 Google 发现信号。",
+    urlSetsExport: "导出网址集合诊断", urlSetsAll: "全部问题", urlSetsFindings: "项问题",
+    urlSetsPartial: "站内链接结果仅覆盖本次检查中已完成扫描的页面。",
+    internalMissingSitemap: "站内发现网址未进入 sitemap", gscMissingSitemap: "GSC 网页未进入 sitemap",
+    sitemapOrphan: "Sitemap 页面没有已扫描入链", googleMissingSitemap: "Google 未报告 sitemap 来源",
+    googleMissingReferrer: "Google 未报告来源网址", urlVariant: "存在冲突的网址变体",
+    sourceInternal: "站内链接", sourceGsc: "Search Analytics", sourceSitemap: "Sitemap",
+    sourceGoogle: "Google 网址检查", sourceVariants: "多个来源", inboundLinks: "条已扫描入链",
     noIssue: "没有明显索引问题", noIssueDetail: "Google 报告该网址通过了网址检查。",
     noIssueAction: "继续监控表现数据和 canonical 一致性。",
     inspectPropertyFirst: "运行网址检查前，请先输入 Search Console Property URL。",
@@ -2085,6 +2101,14 @@ const gscDataText = {
     freshnessStale: "長期未檢索", freshnessCritical: "嚴重過期", freshnessUnknown: "檢索時間未知",
     demandHigh: "高搜尋需求", demandMedium: "中搜尋需求", demandLow: "低搜尋需求",
     crawlAge: "距上次檢索", days: "天", indexedWithDemand: "有搜尋需求的已收錄頁面",
+    urlSetsTitle: "網址集合對比", urlSetsHelp: "對比 sitemap、已掃描頁面發現的站內連結、Search Analytics 頁面和 Google 發現訊號。",
+    urlSetsExport: "匯出網址集合診斷", urlSetsAll: "全部問題", urlSetsFindings: "項問題",
+    urlSetsPartial: "站內連結結果僅涵蓋本次檢查中已完成掃描的頁面。",
+    internalMissingSitemap: "站內發現網址未進入 sitemap", gscMissingSitemap: "GSC 網頁未進入 sitemap",
+    sitemapOrphan: "Sitemap 頁面沒有已掃描入鏈", googleMissingSitemap: "Google 未回報 sitemap 來源",
+    googleMissingReferrer: "Google 未回報來源網址", urlVariant: "存在衝突的網址變體",
+    sourceInternal: "站內連結", sourceGsc: "Search Analytics", sourceSitemap: "Sitemap",
+    sourceGoogle: "Google 網址檢查", sourceVariants: "多個來源", inboundLinks: "條已掃描入鏈",
     noIssue: "沒有明顯索引問題", noIssueDetail: "Google 回報該網址通過網址檢查。",
     noIssueAction: "繼續監控成效資料和 canonical 一致性。",
     inspectPropertyFirst: "執行網址檢查前，請先輸入 Search Console Property URL。",
@@ -3159,6 +3183,202 @@ function ImportantPageFreshness({ inspectionResults, gscRows, copy }) {
   );
 }
 
+function normalizeSetUrl(value) {
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    if (url.pathname !== "/") url.pathname = url.pathname.replace(/\/+$/, "");
+    return url.toString();
+  } catch {
+    return String(value || "").trim();
+  }
+}
+
+function normalizeVariantUrl(value) {
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return String(value || "").trim();
+  }
+}
+
+function urlVariantFamily(value) {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+    const pathname = url.pathname === "/" ? "/" : url.pathname.replace(/\/+$/, "");
+    return `${hostname}${url.port ? `:${url.port}` : ""}${pathname}`;
+  } catch {
+    return "";
+  }
+}
+
+function buildUrlSetFindings(report, gscRows, inspectionResults, copy) {
+  const pages = report?.pages || [];
+  const hasInternalLinkData = pages.some((page) => Array.isArray(page.internalLinks));
+  const sitemapUrls = new Map();
+  const internalUrls = new Map();
+  const inboundSources = new Map();
+  const sourceUrls = new Map();
+  const addSourceUrl = (value, source) => {
+    const url = normalizeVariantUrl(value);
+    if (!url) return;
+    if (!sourceUrls.has(url)) sourceUrls.set(url, new Set());
+    sourceUrls.get(url).add(source);
+  };
+
+  for (const page of pages) {
+    const pageUrl = normalizeSetUrl(page.url);
+    if (pageUrl) sitemapUrls.set(pageUrl, page.url);
+    addSourceUrl(page.url, copy.sourceSitemap);
+    for (const link of page.internalLinks || []) {
+      const linkUrl = normalizeSetUrl(link);
+      if (!linkUrl) continue;
+      internalUrls.set(linkUrl, link);
+      addSourceUrl(link, copy.sourceInternal);
+      if (pageUrl !== linkUrl) {
+        if (!inboundSources.has(linkUrl)) inboundSources.set(linkUrl, new Set());
+        inboundSources.get(linkUrl).add(pageUrl);
+      }
+    }
+  }
+
+  const findings = [];
+  const addFinding = (type, url, source, detail, severity = "warning") => {
+    findings.push({ type, url, source, detail, severity });
+  };
+
+  if (hasInternalLinkData) {
+    for (const [key, url] of internalUrls) {
+      if (!sitemapUrls.has(key)) addFinding("internal_missing_sitemap", url, copy.sourceInternal, copy.internalMissingSitemap);
+    }
+  }
+
+  for (const row of uniqueGscRows(gscRows)) {
+    const url = row.page || row.key;
+    const key = normalizeSetUrl(url);
+    if (!key) continue;
+    addSourceUrl(url, copy.sourceGsc);
+    if (!sitemapUrls.has(key)) {
+      addFinding(
+        "gsc_missing_sitemap",
+        url,
+        copy.sourceGsc,
+        `${row.clicks || 0} ${copy.clicks} / ${row.impressions || 0} ${copy.impressions}`,
+        (row.impressions || 0) > 0 ? "warning" : "notice",
+      );
+    }
+  }
+
+  if (hasInternalLinkData) {
+    for (const [key, url] of sitemapUrls) {
+      const inboundCount = inboundSources.get(key)?.size || 0;
+      if (!inboundCount) addFinding("sitemap_orphan", url, copy.sourceSitemap, `0 ${copy.inboundLinks}`);
+    }
+  }
+
+  for (const item of inspectionResults || []) {
+    addSourceUrl(item.url, copy.sourceGoogle);
+    if (item.ok && !item.sitemap?.length) {
+      addFinding("google_missing_sitemap", item.url, copy.sourceGoogle, copy.googleMissingSitemap, "notice");
+    }
+    if (item.ok && !item.referringUrls?.length) {
+      addFinding("google_missing_referrer", item.url, copy.sourceGoogle, copy.googleMissingReferrer, "notice");
+    }
+  }
+
+  const variantGroups = new Map();
+  for (const [url, sources] of sourceUrls) {
+    const family = urlVariantFamily(url);
+    if (!family) continue;
+    if (!variantGroups.has(family)) variantGroups.set(family, []);
+    variantGroups.get(family).push({ url, sources: [...sources] });
+  }
+  for (const variants of variantGroups.values()) {
+    if (variants.length < 2) continue;
+    const detail = variants
+      .slice(0, 6)
+      .map((variant) => variant.url)
+      .join(" | ");
+    addFinding("url_variant", variants[0].url, copy.sourceVariants, detail);
+  }
+
+  return findings.sort((a, b) => {
+    const severityOrder = { critical: 0, warning: 1, notice: 2 };
+    return (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3) || a.url.localeCompare(b.url);
+  });
+}
+
+function UrlSetComparison({ report, gscRows, inspectionResults, copy }) {
+  const [filter, setFilter] = useState("all");
+  const findings = useMemo(
+    () => buildUrlSetFindings(report, gscRows, inspectionResults, copy),
+    [report, gscRows, inspectionResults, copy],
+  );
+  const typeLabels = {
+    internal_missing_sitemap: copy.internalMissingSitemap,
+    gsc_missing_sitemap: copy.gscMissingSitemap,
+    sitemap_orphan: copy.sitemapOrphan,
+    google_missing_sitemap: copy.googleMissingSitemap,
+    google_missing_referrer: copy.googleMissingReferrer,
+    url_variant: copy.urlVariant,
+  };
+  const counts = findings.reduce((result, item) => {
+    result[item.type] = (result[item.type] || 0) + 1;
+    return result;
+  }, {});
+  const visibleFindings = filter === "all" ? findings : findings.filter((item) => item.type === filter);
+
+  function exportFindings() {
+    downloadCsvFile("soos-url-set-diagnosis.csv", [
+      ["type", "severity", "url", "source", "detail"],
+      ...findings.map((item) => [typeLabels[item.type] || item.type, item.severity, item.url, item.source, item.detail]),
+    ]);
+  }
+
+  return (
+    <section className="url-set-comparison">
+      <div className="url-alignment-head">
+        <div>
+          <strong>{copy.urlSetsTitle}</strong>
+          <small>{copy.urlSetsHelp}</small>
+        </div>
+        <div className="url-alignment-actions">
+          <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+            <option value="all">{copy.urlSetsAll} ({findings.length})</option>
+            {Object.entries(typeLabels).map(([type, label]) => (
+              <option value={type} key={type}>{label} ({counts[type] || 0})</option>
+            ))}
+          </select>
+          <button className="export-button" type="button" disabled={!findings.length} onClick={exportFindings}>
+            {copy.urlSetsExport}
+          </button>
+        </div>
+      </div>
+      <small className="url-set-scope">{copy.urlSetsPartial}</small>
+      <div className="coverage-disposition-summary">
+        {Object.entries(typeLabels).map(([type, label]) => (
+          <span key={type}>{label}: {counts[type] || 0}</span>
+        ))}
+      </div>
+      {visibleFindings.length ? (
+        <div className="url-set-findings">
+          {visibleFindings.map((item, index) => (
+            <div className="url-set-row" key={`${item.type}-${item.url}-${index}`}>
+              <Badge severity={item.severity}>{typeLabels[item.type] || item.type}</Badge>
+              <strong title={item.url}>{item.url}</strong>
+              <span>{item.source}</span>
+              <small title={item.detail}>{item.detail}</small>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
   const copy = gscDataText[language] || gscDataText.en;
   const [loading, setLoading] = useState(false);
@@ -3237,6 +3457,7 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
       </div>
       {result && pendingUrls.length ? <small className="inspection-remaining">{pendingUrls.length} {copy.remaining}</small> : null}
       {error ? <div className="url-inspection-error">{error}</div> : null}
+      <UrlSetComparison report={report} gscRows={gscRows} inspectionResults={result?.results || []} copy={copy} />
       {result ? (
         <>
           <div className="inspection-summary">

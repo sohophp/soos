@@ -716,6 +716,30 @@ function extractAlternates(html, baseUrl) {
   return alternates;
 }
 
+function extractInternalLinks(html, baseUrl) {
+  let base;
+  try {
+    base = new URL(baseUrl);
+  } catch {
+    return [];
+  }
+  const links = new Set();
+  const re = /<a\b([^>]*?)>/gi;
+  let match;
+  while ((match = re.exec(html)) && links.size < 500) {
+    const href = attrMap(match[1]).href;
+    if (!href) continue;
+    const normalized = normalizeUrl(href, base);
+    if (!normalized) continue;
+    const target = new URL(normalized);
+    const targetHost = target.hostname.toLowerCase().replace(/^www\./, "");
+    const baseHost = base.hostname.toLowerCase().replace(/^www\./, "");
+    if (!["http:", "https:"].includes(target.protocol) || targetHost !== baseHost) continue;
+    links.add(target.toString());
+  }
+  return [...links];
+}
+
 function hasNoindex(html) {
   const re = /<meta\b([^>]*?)>/gi;
   const head = extractHead(html);
@@ -1169,6 +1193,7 @@ async function inspectPage(url, robots, sitemapUrlSet, options, fetchContext, jo
   }
 
   const alternates = extractAlternates(response.text, response.finalUrl || url);
+  const internalLinks = extractInternalLinks(response.text, response.finalUrl || url);
   for (const alternate of alternates) {
     if (!alternate.href) addIssue(issues, "warning", "alternate_invalid", "Alternate hreflang has invalid href", alternate.rawHref);
     else if (robots && !robotsDecision(robots.groups, alternate.href).allowed) {
@@ -1191,6 +1216,7 @@ async function inspectPage(url, robots, sitemapUrlSet, options, fetchContext, jo
     structuredData,
     canonical,
     alternates,
+    internalLinks,
     issues,
   };
 }

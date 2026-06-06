@@ -93,6 +93,10 @@ soos 不只是检查孤立的 HTML 标签，而是回答一个更重要的问题
 - Google canonical 和 user canonical。
 - Google 已知 sitemap 与 referring URLs。
 - Google 返回时显示移动端和富媒体结果状态。
+- 提取已扫描 HTML 页面的站内链接并统计入链。
+- 对比 sitemap、站内发现 URL、Search Analytics 页面和 Google 发现信号。
+- 识别 sitemap 孤立页、未进入 sitemap 的可见页和规范化 URL 变体。
+- URL 集合问题支持分类筛选和 CSV 导出。
 
 ### 多语言与部署
 
@@ -156,13 +160,13 @@ soos 的目标关系链是：
 
 ### Milestone C：URL 集合对比
 
-状态：计划中
+状态：已完成
 
-- [ ] 对比 sitemap URL 和本地爬虫发现的内部链接。
-- [ ] 对比 sitemap URL 和 Search Analytics 页面。
-- [ ] 对比 sitemap URL 和 Google 报告的 sitemap/referrer 数据。
-- [ ] 检测 HTTP/HTTPS、www/non-www、尾斜杠和参数 URL 变体。
-- [ ] 识别 sitemap 孤立页面和未包含在 sitemap 的 Google 可见页面。
+- [x] 对比 sitemap URL 和本地爬虫发现的内部链接。
+- [x] 对比 sitemap URL 和 Search Analytics 页面。
+- [x] 对比 sitemap URL 和 Google 报告的 sitemap/referrer 数据。
+- [x] 检测 HTTP/HTTPS、www/non-www、尾斜杠和参数 URL 变体。
+- [x] 识别 sitemap 孤立页面和未包含在 sitemap 的 Google 可见页面。
 
 ### Milestone D：结构化数据
 
@@ -214,19 +218,29 @@ soos 的目标关系链是：
 - 使用 30、90、180 天抓取年龄阈值区分近期、关注、长期未抓取和严重过期。
 - 支持按风险、搜索需求和抓取年龄排序，并导出抓取时效 CSV。
 - 完成 Milestone B：收录覆盖诊断。
+- 开始并完成 Milestone C：URL 集合对比。
+- 扫描 HTML 页面时提取最多 500 个同站链接，支持识别 HTTP/HTTPS 和 www/non-www 变体。
+- 统计已扫描页面之间的入链，识别 sitemap 孤立页和站内发现但未进入 sitemap 的网址。
+- 对比 Search Analytics 页面与 sitemap，保留点击和展示数据作为问题上下文。
+- 合并 URL Inspection 的 sitemap 和 referring URLs 信号。
+- 检测协议、主机、尾斜杠和参数形成的 URL 变体组。
+- 增加三语言分类筛选、问题统计、范围提示和 CSV 导出。
+- 兼容旧历史报告：没有站内链接字段时不生成孤立页误报。
+- `npm run check` 和 `git diff --check` 通过。
 
 ## 9. 当前完成度
 
 | 模块 | 完成度 |
 | --- | ---: |
-| Sitemap 技术检查 | 85% |
+| Sitemap 技术检查 | 90% |
 | robots.txt 诊断 | 80% |
 | Canonical 与 hreflang | 75% |
 | 后台与 Serverless 执行 | 85% |
 | Search Console OAuth | 90% |
 | Search Analytics 诊断 | 70% |
 | URL Inspection 诊断 | 95% |
-| Google URL 对照矩阵 | 70% |
+| Google URL 对照矩阵 | 85% |
+| URL 集合对比 | 100% |
 | 结构化数据验证 | 20% |
 | Googlebot 日志分析 | 0% |
 | 定时监控 | 0% |
