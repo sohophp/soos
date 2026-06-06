@@ -1180,6 +1180,19 @@ main {
     grid-template-columns: 1fr;
   }
 
+  .search-analytics-result {
+    min-width: 620px;
+  }
+
+  .gsc-api-actions {
+    align-items: stretch;
+  }
+
+  .gsc-api-actions .export-button {
+    width: 100%;
+    white-space: normal;
+  }
+
   .robots-metrics {
     grid-template-columns: 1fr;
   }
@@ -1618,6 +1631,8 @@ main {
 .search-analytics-results {
   display: grid;
   gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .search-analytics-insights {

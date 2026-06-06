@@ -22,6 +22,7 @@ All notable changes to soos will be documented in this file.
 - Copy-all blocked URL actions on grouped robots.txt impact cards.
 - GSC opportunity deduplication, severity sorting, and suppression of ranking/CTR hints for technically blocked URLs.
 - Keyword opportunities CSV export from Page + Query Search Analytics rows.
+- Localized Search Console connection status messages and improved mobile Search Analytics/API controls.
 
 ### Changed
 

@@ -1606,6 +1606,15 @@ const gscUiText = {
     ],
     docsLabel: "Search Console users and permissions",
     connect: "Connect Google Search Console",
+    apiTitle: "Search Console API",
+    connected: "OAuth connected",
+    tokenExpired: "Token likely expired",
+    tokenSaved: "Token saved",
+    noToken: "No token saved",
+    notConfigured: "not configured",
+    connectedRefreshed: "OAuth connected. Search Console status refreshed.",
+    oauthRefreshed: "OAuth status refreshed. Automatic token refresh is ready.",
+    statusRefreshed: "Status refreshed.",
     connectedAs: "Connected as",
     connectedAccountFallback: "Google account connected",
     reconnect: "Reconnect",
@@ -1638,6 +1647,15 @@ const gscUiText = {
     ],
     docsLabel: "Search Console 用户和权限说明",
     connect: "连接 Google Search Console",
+    apiTitle: "Search Console API",
+    connected: "OAuth 已连接",
+    tokenExpired: "Token 可能已过期",
+    tokenSaved: "Token 已保存",
+    noToken: "尚未保存 token",
+    notConfigured: "未配置",
+    connectedRefreshed: "OAuth 已连接，Search Console 状态已刷新。",
+    oauthRefreshed: "OAuth 状态已刷新，可自动更新 access token。",
+    statusRefreshed: "状态已刷新。",
     connectedAs: "已连接账号",
     connectedAccountFallback: "Google 账号已连接",
     reconnect: "重新连接",
@@ -1670,6 +1688,15 @@ const gscUiText = {
     ],
     docsLabel: "Search Console 使用者和權限說明",
     connect: "連接 Google Search Console",
+    apiTitle: "Search Console API",
+    connected: "OAuth 已連接",
+    tokenExpired: "Token 可能已過期",
+    tokenSaved: "Token 已儲存",
+    noToken: "尚未儲存 token",
+    notConfigured: "未設定",
+    connectedRefreshed: "OAuth 已連接，Search Console 狀態已重新整理。",
+    oauthRefreshed: "OAuth 狀態已重新整理，可自動更新 access token。",
+    statusRefreshed: "狀態已重新整理。",
     connectedAs: "已連接帳號",
     connectedAccountFallback: "Google 帳號已連接",
     reconnect: "重新連接",
@@ -1722,12 +1749,12 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
   }, []);
 
   const tokenState = status?.refreshToken
-    ? "OAuth connected"
+    ? copy.connected
     : status?.token
       ? status.tokenLikelyExpired
-      ? "Token likely expired"
-      : "Token saved"
-      : "No token saved";
+      ? copy.tokenExpired
+      : copy.tokenSaved
+      : copy.noToken;
   const connectedAccount = status?.googleAccountEmail || status?.googleAccountName || "";
 
   async function clearConfig() {
@@ -1792,7 +1819,7 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not refresh Search Console API status");
       onStatus(body);
-      setMessage(reason === "oauth-connected" ? "OAuth connected. Search Console status refreshed." : body.refreshToken ? "OAuth status refreshed. Automatic token refresh is ready." : "Status refreshed.");
+      setMessage(reason === "oauth-connected" ? copy.connectedRefreshed : body.refreshToken ? copy.oauthRefreshed : copy.statusRefreshed);
     } catch (err) {
       setError(err.message || String(err));
     }
@@ -1852,8 +1879,8 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
   return (
     <section className="panel gsc-api-config">
       <div className="panel-head">
-        <h2>Search Console API</h2>
-        <span>{status?.configured ? tokenState : "not configured"}</span>
+        <h2>{copy.apiTitle}</h2>
+        <span>{status?.configured ? tokenState : copy.notConfigured}</span>
       </div>
       <form className="gsc-api-body" onSubmit={(event) => event.preventDefault()}>
         <div className="gsc-api-fields">
