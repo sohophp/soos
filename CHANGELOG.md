@@ -26,6 +26,11 @@ All notable changes to soos will be documented in this file.
 - Video clip, speakable, paywall, vacation occupancy, claim rating, and math action validation.
 - Per-type validation coverage showing Google-specific validation versus parse-only types.
 - Updated VideoObject validation to treat `description` as recommended under current Google guidance.
+- Local browser parsing for Nginx, Apache, Cloudflare, Vercel, JSON/NDJSON, CSV, and TSV access logs.
+- Google crawler IP verification using reverse DNS, trusted Google hostnames, and matching forward DNS.
+- Googlebot log diagnostics for HTTP errors, sitemap gaps, query URLs, static assets, robots-blocked crawling, and spoofed user agents.
+- Three-language Googlebot log filters, summaries, and CSV export.
+- Googlebot log parser and DNS safety regression tests included in `npm run check`.
 - Neon-backed audit job records scoped to each browser session.
 - Automatic active-job restoration after a page refresh.
 - Interrupted worker detection and recoverable audit restart after a server cold start.

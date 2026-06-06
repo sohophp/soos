@@ -3,6 +3,8 @@ import { URL, pathToFileURL } from "node:url";
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import dns from "node:dns/promises";
+import net from "node:net";
 import { ProxyAgent } from "undici";
 import { neon } from "@neondatabase/serverless";
 
@@ -32,9 +34,62 @@ const GOOGLE_OAUTH_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const SESSION_COOKIE = "soos_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 90;
 const ENCRYPTED_TOKEN_PREFIX = "enc:v1";
+const googlebotDnsCache = new Map();
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function isPublicIp(value) {
+  if (!net.isIP(value)) return false;
+  const ip = String(value).toLowerCase();
+  if (ip.startsWith("::ffff:")) return isPublicIp(ip.slice(7));
+  if (ip === "::" || ip === "::1" || ip.startsWith("fe80:") || ip.startsWith("fc") || ip.startsWith("fd") || ip.startsWith("ff")) return false;
+  if (net.isIPv4(ip)) {
+    const [a, b] = ip.split(".").map(Number);
+    if (a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return false;
+  }
+  return true;
+}
+
+export function trustedGoogleHostname(hostname) {
+  const value = String(hostname || "").toLowerCase().replace(/\.$/, "");
+  return value.endsWith(".googlebot.com") || value.endsWith(".google.com") || value.endsWith(".googleusercontent.com");
+}
+
+async function verifyGooglebotIp(ip) {
+  const cached = googlebotDnsCache.get(ip);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const result = { ip, verified: false, hostname: "", category: "unverified" };
+  try {
+    const hostnames = await dns.reverse(ip);
+    const hostname = hostnames.find(trustedGoogleHostname) || "";
+    if (hostname) {
+      const addresses = await dns.lookup(hostname, { all: true });
+      if (addresses.some((entry) => entry.address === ip)) {
+        result.verified = true;
+        result.hostname = hostname.replace(/\.$/, "");
+        result.category = hostname.includes("googlebot.com")
+          ? "common"
+          : hostname.includes("gae.googleusercontent.com") || hostname.includes("google-proxy-")
+            ? "user_triggered"
+            : "special";
+      }
+    }
+  } catch {
+    // DNS failures are returned as unverified instead of failing the whole batch.
+  }
+  googlebotDnsCache.set(ip, { value: result, expiresAt: Date.now() + 6 * 60 * 60 * 1000 });
+  return result;
+}
+
+async function verifyGooglebotIps(values) {
+  const ips = unique((values || []).map(String).filter(isPublicIp)).slice(0, 100);
+  const results = [];
+  for (let offset = 0; offset < ips.length; offset += 10) {
+    results.push(...await Promise.all(ips.slice(offset, offset + 10).map(verifyGooglebotIp)));
+  }
+  return { verifiedAt: new Date().toISOString(), results };
 }
 
 function createJobError(code, message) {
@@ -3071,6 +3126,12 @@ export function handleRequest(req, res) {
   const requestPath = (req.url || "").split("?")[0];
   if (req.method === "OPTIONS") return sendJson(res, 200, {});
   const sessionId = ensureGscSession(req, res);
+  if (req.method === "POST" && requestPath === "/api/googlebot/verify") {
+    readJsonBody(req, 50000)
+      .then(async (body) => sendJson(res, 200, await verifyGooglebotIps(body.ips)))
+      .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
+    return;
+  }
   if (req.method === "GET" && requestPath === "/api/gsc/status") {
     readGscConfigWithEnv(sessionId)
       .then((config) => sendJson(res, 200, gscStatusFromConfig(config)))

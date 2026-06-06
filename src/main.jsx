@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   XCircle,
 } from "lucide-react";
+import { absoluteLogUrl, parseAccessLog, STATIC_ASSET_PATH } from "./googlebot-log.js";
 import "./styles.css";
 
 const severityLabels = { critical: "Critical", warning: "Warning", notice: "Notice" };
@@ -2199,6 +2200,60 @@ const structuredDiagnosticText = {
   },
 };
 
+const googlebotLogText = {
+  en: {
+    title: "Googlebot log analysis", optional: "optional", import: "Import access log", clear: "Clear log",
+    help: "Parses Nginx, Apache, Cloudflare, Vercel, JSON/NDJSON, CSV, and TSV logs locally. Only candidate crawler IPs are sent for DNS verification.",
+    privacy: "Raw log lines stay in this browser and are not saved to Neon.",
+    reading: "Reading log...", verifying: "Verifying crawler IPs...", failed: "Could not analyze log",
+    requests: "candidate requests", verified: "verified Google requests", fake: "unverified requests",
+    uniqueUrls: "unique URLs", serverErrors: "server errors", outsideSitemap: "outside sitemap",
+    waste: "crawl waste candidates", missingCrawl: "sitemap URLs not crawled in this log period",
+    firstRequest: "First request", lastRequest: "Last request", format: "Detected format",
+    all: "All findings", errors: "HTTP errors", nonSitemap: "Outside sitemap", parameters: "Query URLs",
+    assets: "Static assets", unverified: "Unverified crawler", missing: "Not crawled",
+    blocked: "Robots-blocked crawl",
+    export: "Export Googlebot log diagnosis", noFindings: "No findings for this filter.",
+    truncated: "Only the first 200,000 log lines were processed.", verificationHelp: "Verified using reverse DNS and matching forward DNS.",
+    sourceUrl: "URL", status: "Status", hits: "Hits", lastSeen: "Last seen", detail: "Detail",
+    noCandidates: "No Google crawler user agents were found in this file.",
+  },
+  "zh-CN": {
+    title: "Googlebot 日志分析", optional: "可选", import: "导入访问日志", clear: "清除日志",
+    help: "在浏览器本地解析 Nginx、Apache、Cloudflare、Vercel、JSON/NDJSON、CSV 和 TSV 日志，仅发送疑似爬虫 IP 做 DNS 验证。",
+    privacy: "日志原文只保留在当前浏览器，不会保存到 Neon。",
+    reading: "正在读取日志...", verifying: "正在验证爬虫 IP...", failed: "无法分析日志",
+    requests: "条疑似请求", verified: "条已验证 Google 请求", fake: "条未验证请求",
+    uniqueUrls: "个唯一网址", serverErrors: "个服务器错误", outsideSitemap: "个 sitemap 外网址",
+    waste: "个抓取浪费候选", missingCrawl: "个 sitemap 网址在日志周期内未抓取",
+    firstRequest: "最早请求", lastRequest: "最后请求", format: "识别格式",
+    all: "全部问题", errors: "HTTP 错误", nonSitemap: "Sitemap 外网址", parameters: "参数网址",
+    assets: "静态资源", unverified: "未验证爬虫", missing: "未抓取",
+    blocked: "抓取了 Robots 阻挡网址",
+    export: "导出 Googlebot 日志诊断", noFindings: "当前筛选没有问题。",
+    truncated: "仅处理日志中的前 200,000 行。", verificationHelp: "使用反向 DNS，并通过正向 DNS 匹配原始 IP。",
+    sourceUrl: "网址", status: "状态", hits: "次数", lastSeen: "最后出现", detail: "详情",
+    noCandidates: "文件中没有发现 Google crawler User-Agent。",
+  },
+  "zh-TW": {
+    title: "Googlebot 日誌分析", optional: "選用", import: "匯入存取日誌", clear: "清除日誌",
+    help: "在瀏覽器本機解析 Nginx、Apache、Cloudflare、Vercel、JSON/NDJSON、CSV 和 TSV 日誌，只傳送疑似檢索器 IP 進行 DNS 驗證。",
+    privacy: "日誌原文只保留在目前瀏覽器，不會儲存到 Neon。",
+    reading: "正在讀取日誌...", verifying: "正在驗證檢索器 IP...", failed: "無法分析日誌",
+    requests: "筆疑似請求", verified: "筆已驗證 Google 請求", fake: "筆未驗證請求",
+    uniqueUrls: "個唯一網址", serverErrors: "個伺服器錯誤", outsideSitemap: "個 sitemap 外網址",
+    waste: "個檢索浪費候選", missingCrawl: "個 sitemap 網址在日誌期間內未檢索",
+    firstRequest: "最早請求", lastRequest: "最後請求", format: "辨識格式",
+    all: "全部問題", errors: "HTTP 錯誤", nonSitemap: "Sitemap 外網址", parameters: "參數網址",
+    assets: "靜態資源", unverified: "未驗證檢索器", missing: "未檢索",
+    blocked: "檢索了 Robots 阻擋網址",
+    export: "匯出 Googlebot 日誌診斷", noFindings: "目前篩選沒有問題。",
+    truncated: "僅處理日誌中的前 200,000 列。", verificationHelp: "使用反向 DNS，並透過正向 DNS 比對原始 IP。",
+    sourceUrl: "網址", status: "狀態", hits: "次數", lastSeen: "最後出現", detail: "詳細資料",
+    noCandidates: "檔案中沒有發現 Google crawler User-Agent。",
+  },
+};
+
 const gscSupportingText = {
   en: {
     csvTitle: "Search Console CSV", optional: "optional", rowsLoaded: "rows loaded",
@@ -3853,6 +3908,191 @@ function diagnoseInspectionResult(item) {
   }
   return diagnoses;
 }
+
+function GooglebotLogAnalysis({ report, language, gscRows }) {
+  const copy = googlebotLogText[language] || googlebotLogText.en;
+  const [analysis, setAnalysis] = useState(null);
+  const [filter, setFilter] = useState("all");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  async function handleLogFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError("");
+    setMessage(copy.reading);
+    try {
+      const parsed = parseAccessLog(await file.text());
+      if (!parsed.records.length) {
+        setAnalysis({ fileName: file.name, ...parsed, verifications: [], findings: [] });
+        setMessage(copy.noCandidates);
+        return;
+      }
+      setMessage(copy.verifying);
+      const ips = [...new Set(parsed.records.map((record) => record.ip).filter(Boolean))];
+      const response = await fetch("/api/googlebot/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ips }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Googlebot verification failed");
+      setAnalysis({ fileName: file.name, ...parsed, verifications: body.results || [], verifiedAt: body.verifiedAt });
+      setMessage("");
+    } catch (err) {
+      setError(err.message || String(err));
+      setMessage("");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  const diagnosis = useMemo(() => {
+    if (!analysis?.records?.length) return null;
+    const verificationByIp = new Map((analysis.verifications || []).map((item) => [item.ip, item]));
+    const sitemapUrls = new Map(report.pages.map((page) => [normalizeReportUrl(page.url), page.url]));
+    const pageByUrl = new Map(report.pages.map((page) => [normalizeReportUrl(page.url), page]));
+    const verifiedRecords = [];
+    const unverifiedRecords = [];
+    for (const record of analysis.records) {
+      const item = { ...record, url: absoluteLogUrl(record, report.input.siteRootUrl) };
+      if (verificationByIp.get(record.ip)?.verified) verifiedRecords.push(item);
+      else unverifiedRecords.push(item);
+    }
+    const byUrl = new Map();
+    for (const record of verifiedRecords) {
+      const key = record.url;
+      const current = byUrl.get(key) || { url: key, hits: 0, statuses: new Map(), lastSeen: "", records: [] };
+      current.hits += 1;
+      current.statuses.set(record.status, (current.statuses.get(record.status) || 0) + 1);
+      if (record.timestamp && (!current.lastSeen || record.timestamp > current.lastSeen)) current.lastSeen = record.timestamp;
+      current.records.push(record);
+      byUrl.set(key, current);
+    }
+    const findings = [];
+    const addFinding = (type, severity, url, status, hits, lastSeen, detail) => findings.push({ type, severity, url, status, hits, lastSeen, detail });
+    for (const item of byUrl.values()) {
+      const path = (() => { try { return new URL(item.url).pathname; } catch { return item.url; } })();
+      const normalized = normalizeReportUrl(item.url);
+      const statuses = [...item.statuses.keys()];
+      if (statuses.some((status) => status >= 400)) addFinding("errors", statuses.some((status) => status >= 500) ? "critical" : "warning", item.url, statuses.join(" / "), item.hits, item.lastSeen, "Google received an HTTP error");
+      if (!sitemapUrls.has(normalized)) addFinding("nonSitemap", "notice", item.url, statuses.join(" / "), item.hits, item.lastSeen, copy.nonSitemap);
+      if (String(item.url).includes("?")) addFinding("parameters", "notice", item.url, statuses.join(" / "), item.hits, item.lastSeen, copy.parameters);
+      if (STATIC_ASSET_PATH.test(path)) addFinding("assets", "notice", item.url, statuses.join(" / "), item.hits, item.lastSeen, copy.assets);
+      if ((pageByUrl.get(normalized)?.issues || []).some((issue) => issue.type === "robots_disallow")) {
+        addFinding("blocked", "warning", item.url, statuses.join(" / "), item.hits, item.lastSeen, copy.blocked);
+      }
+    }
+    const unverifiedByIp = new Map();
+    for (const record of unverifiedRecords) {
+      const current = unverifiedByIp.get(record.ip || "unknown") || { hits: 0, lastSeen: "", url: record.url };
+      current.hits += 1;
+      if (record.timestamp && (!current.lastSeen || record.timestamp > current.lastSeen)) current.lastSeen = record.timestamp;
+      unverifiedByIp.set(record.ip || "unknown", current);
+    }
+    for (const [ip, item] of unverifiedByIp) addFinding("unverified", "warning", item.url, "-", item.hits, item.lastSeen, `${copy.unverified}: ${ip}`);
+
+    const crawledKeys = new Set(verifiedRecords.map((record) => normalizeReportUrl(record.url)));
+    const gscByUrl = buildGscRowMap(uniqueGscRows(gscRows));
+    if (verifiedRecords.length) {
+      for (const [key, url] of sitemapUrls) {
+        if (crawledKeys.has(key)) continue;
+        const gsc = gscByUrl.get(key);
+        addFinding("missing", (gsc?.impressions || 0) > 0 ? "warning" : "notice", url, "-", 0, "", gsc ? `GSC: ${gsc.clicks || 0} clicks / ${gsc.impressions || 0} impressions` : copy.missing);
+      }
+    }
+    const timestamps = analysis.records.map((record) => record.timestamp).filter(Boolean).sort();
+    return {
+      verifiedRecords,
+      unverifiedRecords,
+      uniqueUrls: byUrl.size,
+      findings,
+      firstRequest: timestamps[0] || "",
+      lastRequest: timestamps.at(-1) || "",
+    };
+  }, [analysis, copy, gscRows, report]);
+
+  const visibleFindings = diagnosis?.findings?.filter((item) => filter === "all" || item.type === filter) || [];
+  const counts = diagnosis?.findings?.reduce((result, item) => {
+    result[item.type] = (result[item.type] || 0) + 1;
+    return result;
+  }, {}) || {};
+
+  function exportDiagnosis() {
+    downloadCsvFile("soos-googlebot-log-diagnosis.csv", [
+      ["type", "severity", "url", "status", "hits", "last_seen", "detail"],
+      ...(diagnosis?.findings || []).map((item) => [item.type, item.severity, item.url, item.status, item.hits, item.lastSeen, item.detail]),
+    ]);
+  }
+
+  return (
+    <section className="panel googlebot-log">
+      <div className="panel-head">
+        <h2>{copy.title}</h2>
+        <span>{analysis?.fileName || copy.optional}</span>
+      </div>
+      <div className="googlebot-log-import">
+        <div>
+          <strong>{copy.help}</strong>
+          <small>{copy.privacy}</small>
+          {message ? <small>{message}</small> : null}
+          {error ? <small className="gsc-import-error">{copy.failed}: {error}</small> : null}
+        </div>
+        <div className="gsc-import-actions">
+          <label className="export-button file-button">
+            {copy.import}
+            <input type="file" accept=".log,.txt,.json,.ndjson,.csv,.tsv,text/plain,application/json,text/csv" onChange={handleLogFile} />
+          </label>
+          {analysis ? <button className="export-button" type="button" onClick={() => { setAnalysis(null); setMessage(""); setError(""); }}>{copy.clear}</button> : null}
+        </div>
+      </div>
+      {analysis?.truncated ? <small className="googlebot-log-note">{copy.truncated}</small> : null}
+      {diagnosis ? (
+        <>
+          <div className="coverage-disposition-summary googlebot-log-summary">
+            <span>{analysis.records.length} {copy.requests}</span>
+            <span>{diagnosis.verifiedRecords.length} {copy.verified}</span>
+            <span>{diagnosis.unverifiedRecords.length} {copy.fake}</span>
+            <span>{diagnosis.uniqueUrls} {copy.uniqueUrls}</span>
+            <span>{counts.errors || 0} {copy.serverErrors}</span>
+            <span>{counts.nonSitemap || 0} {copy.outsideSitemap}</span>
+            <span>{(counts.parameters || 0) + (counts.assets || 0) + (counts.blocked || 0)} {copy.waste}</span>
+            <span>{counts.missing || 0} {copy.missingCrawl}</span>
+          </div>
+          <div className="googlebot-log-meta">
+            <small>{copy.format}: {analysis.formats.join(", ") || "-"}</small>
+            <small>{copy.firstRequest}: {diagnosis.firstRequest || "-"}</small>
+            <small>{copy.lastRequest}: {diagnosis.lastRequest || "-"}</small>
+            <small>{copy.verificationHelp}</small>
+          </div>
+          <div className="url-alignment-actions googlebot-log-actions">
+            <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+              <option value="all">{copy.all} ({diagnosis.findings.length})</option>
+              {["errors", "nonSitemap", "parameters", "assets", "blocked", "unverified", "missing"].map((type) => (
+                <option value={type} key={type}>{copy[type]} ({counts[type] || 0})</option>
+              ))}
+            </select>
+            <button className="export-button" type="button" disabled={!diagnosis.findings.length} onClick={exportDiagnosis}>{copy.export}</button>
+          </div>
+          {visibleFindings.length ? (
+            <div className="googlebot-log-findings">
+              {visibleFindings.map((item, index) => (
+                <div className="googlebot-log-row" key={`${item.type}-${item.url}-${index}`}>
+                  <Badge severity={item.severity}>{copy[item.type]}</Badge>
+                  <strong title={item.url}>{item.url}</strong>
+                  <span>{copy.status}: {item.status}</span>
+                  <span>{copy.hits}: {item.hits}</span>
+                  <small>{item.lastSeen || item.detail}</small>
+                </div>
+              ))}
+            </div>
+          ) : <p className="none">{copy.noFindings}</p>}
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
@@ -3899,6 +4139,7 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
       <ScoreCard score={report.summary.healthScore} t={t} />
       <SearchVisibility report={report} t={t} gscRows={gscRows} language={language} />
       <GscOpportunities report={report} rows={gscRows} language={language} />
+      <GooglebotLogAnalysis report={report} language={language} gscRows={gscRows} />
       <UrlInspectionPanel report={report} gscStatus={gscStatus} siteUrl={gscSiteUrl} language={language} gscRows={gscRows} />
       <section className="summary">
         <Stat label={t.urls} value={report.summary.urlCount} />

@@ -189,12 +189,14 @@ soos 的目标关系链是：
 
 ### Milestone E：Googlebot 日志
 
-状态：计划中
+状态：已完成
 
-- [ ] 导入 Nginx、Apache、Cloudflare 和 Vercel 日志。
-- [ ] 验证真实 Googlebot 请求。
-- [ ] 对比 Googlebot 抓取 URL 和 sitemap URL。
-- [ ] 发现抓取浪费、长期未抓取的重要页面和重复服务器错误。
+- [x] 导入 Nginx、Apache、Cloudflare 和 Vercel 日志。
+- [x] 验证真实 Googlebot 请求。
+- [x] 对比 Googlebot 抓取 URL 和 sitemap URL。
+- [x] 发现抓取浪费、长期未抓取的重要页面和重复服务器错误。
+
+日志原文只在浏览器本地解析，不上传也不写入 Neon。前端只将疑似 Google crawler User-Agent 对应的唯一公网 IP 发送到 `/api/googlebot/verify`。服务端按照 Google 官方流程执行反向 DNS，再对可信 Google 主机名执行正向 DNS 并确认原始 IP；私网和本机 IP 会被拒绝。
 
 ### Milestone F：运营能力
 
@@ -254,6 +256,17 @@ soos 的目标关系链是：
 - 增加类型规则覆盖矩阵；自定义或未覆盖类型显示“仅解析”状态。
 - 明确排除独立 Book Actions DataFeed 和 Google 已于 2026 年 1 月停止支持的 Vehicle Listing。
 - 扩展回归样例到 72 个预期诊断，完成 Milestone D。
+- 开始并完成 Milestone E：Googlebot 日志分析。
+- 增加 Nginx/Apache Combined、Cloudflare、Vercel、JSON/NDJSON、CSV 和 TSV 日志自动识别。
+- 日志原文在浏览器本地解析，最多处理前 200,000 行，只发送唯一疑似 Google crawler IP 做验证。
+- 根据 Google 官方建议执行反向 DNS、可信域名后缀检查和正向 DNS 原始 IP 匹配。
+- 增加私网 IP 拒绝、100 IP 批次上限、10 IP 并发和 6 小时 DNS 验证缓存。
+- 对比已验证 Google 请求与 sitemap URL，识别 sitemap 外 URL、参数 URL、静态资源、robots 阻挡 URL 和未抓取页面。
+- 汇总唯一 URL、HTTP 4xx/5xx、重复服务器错误、最早/最后请求和疑似伪装 Googlebot。
+- 结合 Search Analytics 需求提高“日志周期内未抓取”页面优先级。
+- 增加三语言筛选、统计和 CSV 导出。
+- 增加 `tests/googlebot-log.test.js` 并纳入 `npm run check`。
+- 当前 Windows 浏览器沙箱无法启动，因此本阶段完成构建与响应式 CSS 检查，但未完成自动截图验证。
 
 ## 9. 当前完成度
 
@@ -269,7 +282,7 @@ soos 的目标关系链是：
 | Google URL 对照矩阵 | 85% |
 | URL 集合对比 | 100% |
 | 结构化数据验证 | 100% |
-| Googlebot 日志分析 | 0% |
+| Googlebot 日志分析 | 100% |
 | 定时监控 | 0% |
 
 每次里程碑范围变化、开始实现、测试通过或功能完成时，都必须更新本文件。

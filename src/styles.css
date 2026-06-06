@@ -2066,15 +2066,118 @@ main {
   color: #9f1f17 !important;
 }
 
+.googlebot-log {
+  margin-top: 12px;
+}
+
+.googlebot-log .panel-head span {
+  color: #687169;
+  font-size: 13px;
+}
+
+.googlebot-log-import {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.googlebot-log-import strong,
+.googlebot-log-import small {
+  display: block;
+}
+
+.googlebot-log-import small {
+  margin-top: 4px;
+  color: #687169;
+  line-height: 1.45;
+}
+
+.googlebot-log-note {
+  display: block;
+  margin: 0 16px 10px;
+  color: #9a5c00;
+}
+
+.googlebot-log-summary {
+  padding: 0 16px 10px;
+}
+
+.googlebot-log-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 0 16px 10px;
+  color: #687169;
+}
+
+.googlebot-log-actions {
+  justify-content: flex-end;
+  padding: 0 16px 10px;
+}
+
+.googlebot-log-findings {
+  display: grid;
+  margin: 0 16px 16px;
+  overflow: hidden;
+  border: 1px solid #dfe6dd;
+  border-radius: 6px;
+}
+
+.googlebot-log-row {
+  display: grid;
+  grid-template-columns: minmax(135px, 0.7fr) minmax(260px, 1.8fr) minmax(90px, 0.5fr) minmax(80px, 0.4fr) minmax(170px, 0.9fr);
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  border-top: 1px solid #edf1eb;
+  font-size: 12px;
+}
+
+.googlebot-log-row:first-child {
+  border-top: 0;
+}
+
+.googlebot-log-row strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #172018;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.googlebot-log-row span,
+.googlebot-log-row small {
+  color: #687169;
+}
+
 @media (max-width: 780px) {
   .url-set-row,
-  .structured-data-row {
+  .structured-data-row,
+  .googlebot-log-row {
     grid-template-columns: 1fr;
   }
 
   .url-set-row strong,
   .url-set-row small,
   .structured-data-row strong {
+    white-space: normal;
+  }
+
+  .googlebot-log-import,
+  .googlebot-log-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .googlebot-log-actions select,
+  .googlebot-log-actions .export-button {
+    width: 100%;
+    max-width: none;
+  }
+
+  .googlebot-log-row strong {
     white-space: normal;
   }
 }

@@ -18,6 +18,7 @@ Detailed architecture, implementation status and the active roadmap are maintain
 - URL set comparison across sitemap, scanned internal links, Search Analytics, and Google sitemap/referrer signals.
 - Sitemap orphan detection and HTTP/HTTPS, www, trailing-slash, and query URL variant diagnosis.
 - JSON-LD graph parsing, common Google field rules, page-signal consistency checks, and rich results issue comparison.
+- Local access-log analysis with verified Googlebot IPs and sitemap crawl comparison.
 - OAuth refresh token support so access tokens can refresh automatically.
 
 ## Requirements
@@ -188,6 +189,16 @@ Structured data notes:
 - Name, URL, and image consistency checks are diagnostic hints. Confirm warnings with Google's Rich Results Test because lazy-loaded images and rendered content may not appear in the fetched HTML.
 - Current rules follow the Google Search Central structured data documentation: https://developers.google.com/search/docs/appearance/structured-data/search-gallery
 - Book Actions use a separate feed rather than ordinary page markup and are outside this crawler's current scope. Vehicle Listing is omitted because Google ended support in January 2026.
+
+Googlebot log notes:
+
+- Import Nginx/Apache Combined logs, Cloudflare or Vercel JSON/NDJSON exports, or CSV/TSV logs from the report.
+- Raw log lines are parsed locally in the browser and are not uploaded or stored in Neon.
+- Only unique IPs from requests with a Google crawler user agent are sent to `/api/googlebot/verify`.
+- The server rejects private IPs and verifies Google crawlers with reverse DNS, a trusted Google hostname suffix, and matching forward DNS.
+- Diagnostics compare verified requests with the current sitemap scan and highlight HTTP errors, repeated server failures, query URLs, static assets, robots-blocked URLs, sitemap gaps, and spoofed Googlebot user agents.
+- Large files are limited to the first 200,000 lines and DNS verification is limited to 100 unique public IPs per request.
+- Verification follows Google's official guidance: https://developers.google.com/search/docs/crawling-indexing/verifying-googlebot
 
 ## Release Checklist
 
