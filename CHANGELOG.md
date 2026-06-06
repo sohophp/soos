@@ -22,6 +22,10 @@ All notable changes to soos will be documented in this file.
 - Structured data rules for Course, Dataset, SoftwareApplication, ProfilePage, QAPage, discussion posts, and ItemList.
 - Nested address, location, employer, author, comment, date, rating, price, count, and list-order validation.
 - English, Simplified Chinese, and Traditional Chinese labels for structured data diagnostic codes.
+- Structured data rules for Movie, reviews, employer ratings, fact checks, image licensing, vacation rentals, and math solvers.
+- Video clip, speakable, paywall, vacation occupancy, claim rating, and math action validation.
+- Per-type validation coverage showing Google-specific validation versus parse-only types.
+- Updated VideoObject validation to treat `description` as recommended under current Google guidance.
 - Neon-backed audit job records scoped to each browser session.
 - Automatic active-job restoration after a page refresh.
 - Interrupted worker detection and recoverable audit restart after a server cold start.

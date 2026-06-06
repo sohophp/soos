@@ -2016,6 +2016,7 @@ const gscDataText = {
     structuredErrors: "Required or graph errors", structuredRecommendations: "Recommended improvements",
     structuredGoogle: "Google rich result issues", structuredNodes: "nodes", structuredTypes: "Types",
     structuredLocalIssues: "Local issues", structuredGoogleVerdict: "Google verdict", structuredNoIssues: "No detected issues",
+    structuredCoverage: "Rule coverage", structuredValidated: "Google-specific validation", structuredParsedOnly: "Parsed only",
     noIssue: "No immediate index issue", noIssueDetail: "Google reports this URL as passing URL Inspection checks.",
     noIssueAction: "Keep monitoring performance data and canonical consistency.",
     inspectPropertyFirst: "Enter the Search Console Property URL before running URL Inspection.",
@@ -2070,6 +2071,7 @@ const gscDataText = {
     structuredErrors: "必填字段或 graph 错误", structuredRecommendations: "建议完善项",
     structuredGoogle: "Google 富媒体结果问题", structuredNodes: "个节点", structuredTypes: "类型",
     structuredLocalIssues: "本地问题", structuredGoogleVerdict: "Google 结果", structuredNoIssues: "未发现问题",
+    structuredCoverage: "规则覆盖", structuredValidated: "已按 Google 规则验证", structuredParsedOnly: "仅解析，未配置专属规则",
     noIssue: "没有明显索引问题", noIssueDetail: "Google 报告该网址通过了网址检查。",
     noIssueAction: "继续监控表现数据和 canonical 一致性。",
     inspectPropertyFirst: "运行网址检查前，请先输入 Search Console Property URL。",
@@ -2124,6 +2126,7 @@ const gscDataText = {
     structuredErrors: "必填欄位或 graph 錯誤", structuredRecommendations: "建議完善項",
     structuredGoogle: "Google 複合式搜尋結果問題", structuredNodes: "個節點", structuredTypes: "類型",
     structuredLocalIssues: "本地問題", structuredGoogleVerdict: "Google 結果", structuredNoIssues: "未發現問題",
+    structuredCoverage: "規則涵蓋", structuredValidated: "已依 Google 規則驗證", structuredParsedOnly: "僅解析，未設定專屬規則",
     noIssue: "沒有明顯索引問題", noIssueDetail: "Google 回報該網址通過網址檢查。",
     noIssueAction: "繼續監控成效資料和 canonical 一致性。",
     inspectPropertyFirst: "執行網址檢查前，請先輸入 Search Console Property URL。",
@@ -2172,7 +2175,7 @@ const structuredDiagnosticText = {
     name_not_visible: "Name not found in visible text", image_not_visible: "Image not found in page signals",
     invalid_value: "Invalid value", invalid_length: "Invalid text length", invalid_count: "Invalid item count",
     duplicate_value: "Duplicate value", non_sequential: "Non-sequential positions", invalid_date: "Invalid date",
-    invalid_number: "Invalid number",
+    invalid_number: "Invalid number", type_not_validated: "No type-specific Google rule", insufficient_images: "Too few images",
   },
   "zh-CN": {
     json_syntax: "JSON 语法无效", missing_context: "缺少 @context", unresolved_reference: "Graph 引用断裂",
@@ -2182,7 +2185,7 @@ const structuredDiagnosticText = {
     name_not_visible: "名称未出现在可见内容", image_not_visible: "图片未出现在页面信号中",
     invalid_value: "字段值无效", invalid_length: "文本长度无效", invalid_count: "项目数量无效",
     duplicate_value: "存在重复值", non_sequential: "顺序编号不连续", invalid_date: "日期格式无效",
-    invalid_number: "数字格式无效",
+    invalid_number: "数字格式无效", type_not_validated: "尚无 Google 类型专属规则", insufficient_images: "图片数量偏少",
   },
   "zh-TW": {
     json_syntax: "JSON 語法無效", missing_context: "缺少 @context", unresolved_reference: "Graph 參照中斷",
@@ -2192,7 +2195,7 @@ const structuredDiagnosticText = {
     name_not_visible: "名稱未出現在可見內容", image_not_visible: "圖片未出現在頁面訊號中",
     invalid_value: "欄位值無效", invalid_length: "文字長度無效", invalid_count: "項目數量無效",
     duplicate_value: "存在重複值", non_sequential: "順序編號不連續", invalid_date: "日期格式無效",
-    invalid_number: "數字格式無效",
+    invalid_number: "數字格式無效", type_not_validated: "尚無 Google 類型專屬規則", insufficient_images: "圖片數量偏少",
   },
 };
 
@@ -3463,6 +3466,8 @@ function StructuredDataDiagnostics({ report, inspectionResults, copy, language }
           url: page.url,
           nodeCount: local?.nodeCount || 0,
           types: local?.types || [],
+          validatedTypes: local?.validatedTypes || [],
+          unvalidatedTypes: local?.unvalidatedTypes || [],
           localErrors,
           recommendations,
           googleIssues,
@@ -3490,6 +3495,15 @@ function StructuredDataDiagnostics({ report, inspectionResults, copy, language }
     { errors: 0, recommendations: 0, google: 0 },
   );
   const diagnosticLabels = structuredDiagnosticText[language] || structuredDiagnosticText.en;
+  const coverage = [...rows.reduce((typeMap, row) => {
+    for (const type of row.types) {
+      const current = typeMap.get(type) || { type, pages: 0, validated: false };
+      current.pages += 1;
+      current.validated = current.validated || row.validatedTypes.includes(type);
+      typeMap.set(type, current);
+    }
+    return typeMap;
+  }, new Map()).values()].sort((a, b) => Number(b.validated) - Number(a.validated) || b.pages - a.pages || a.type.localeCompare(b.type));
 
   function exportDiagnostics() {
     const exportRows = [["url", "source", "severity", "schema_type", "property", "detail"]];
@@ -3528,6 +3542,16 @@ function StructuredDataDiagnostics({ report, inspectionResults, copy, language }
         <span>{copy.structuredErrors}: {totals.errors}</span>
         <span>{copy.structuredRecommendations}: {totals.recommendations}</span>
         <span>{copy.structuredGoogle}: {totals.google}</span>
+      </div>
+      <div className="structured-coverage">
+        <strong>{copy.structuredCoverage}</strong>
+        <div>
+          {coverage.map((item) => (
+            <span className={item.validated ? "validated" : "parsed"} key={item.type}>
+              {item.type}: {item.pages} · {item.validated ? copy.structuredValidated : copy.structuredParsedOnly}
+            </span>
+          ))}
+        </div>
       </div>
       <div className="structured-data-list">
         {filteredRows.map((row) => (

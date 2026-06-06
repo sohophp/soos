@@ -1860,6 +1860,44 @@ main {
   border-radius: 6px;
 }
 
+.structured-coverage {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid #dfe6dd;
+  border-radius: 6px;
+  background: #fbfcfa;
+}
+
+.structured-coverage > strong {
+  color: #172018;
+  font-size: 13px;
+}
+
+.structured-coverage > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.structured-coverage span {
+  padding: 4px 7px;
+  border: 1px solid #dfe6dd;
+  border-radius: 6px;
+  color: #465047;
+  font-size: 11px;
+}
+
+.structured-coverage span.validated {
+  border-color: #cddfce;
+  background: #f7fbf6;
+}
+
+.structured-coverage span.parsed {
+  border-color: #f0dab0;
+  background: #fffaf0;
+}
+
 .structured-data-row {
   display: grid;
   grid-template-columns: minmax(240px, 1.4fr) minmax(150px, 0.7fr) minmax(150px, 0.7fr) minmax(260px, 1.4fr);

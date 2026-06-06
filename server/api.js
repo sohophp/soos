@@ -697,8 +697,8 @@ const STRUCTURED_DATA_RULES = {
     recommended: ["url", "telephone", "image", "openingHoursSpecification"],
   },
   VideoObject: {
-    required: [["name"], ["description"], ["thumbnailUrl"], ["uploadDate"]],
-    recommended: ["contentUrl", "embedUrl", "duration"],
+    required: [["name"], ["thumbnailUrl"], ["uploadDate"]],
+    recommended: ["description", "contentUrl", "embedUrl", "duration"],
   },
   Recipe: {
     required: [["name"], ["image"]],
@@ -746,12 +746,59 @@ const STRUCTURED_DATA_RULES = {
   ItemList: {
     required: [["itemListElement"]],
   },
+  Movie: {
+    required: [["name"], ["image"]],
+    recommended: ["aggregateRating", "dateCreated", "director", "review"],
+  },
+  EmployerAggregateRating: {
+    required: [["itemReviewed"], ["ratingValue"]],
+    requiredAny: [["ratingCount", "reviewCount"]],
+    recommended: ["bestRating", "worstRating"],
+  },
+  ClaimReview: {
+    required: [["claimReviewed"], ["reviewRating"], ["url"]],
+    recommended: ["author", "itemReviewed"],
+  },
+  ImageObject: {
+    requiredAny: [["contentUrl", "url"], ["creator", "creditText", "copyrightNotice", "license"]],
+    recommended: ["license", "acquireLicensePage", "creator", "creditText", "copyrightNotice"],
+  },
+  VacationRental: {
+    required: [["containsPlace"], ["identifier"], ["image"], ["name"]],
+    requiredAny: [["latitude", "geo"], ["longitude", "geo"]],
+    recommended: ["address", "aggregateRating", "brand", "description", "review"],
+  },
+  Review: {
+    required: [["author"], ["itemReviewed"], ["reviewRating"]],
+    recommended: ["datePublished", "reviewBody"],
+  },
+  AggregateRating: {
+    required: [["itemReviewed"], ["ratingValue"]],
+    requiredAny: [["ratingCount", "reviewCount"]],
+    recommended: ["bestRating", "worstRating"],
+  },
+  MathSolver: {
+    required: [["potentialAction"], ["url"], ["usageInfo"]],
+    recommended: ["inLanguage", "assesses"],
+  },
 };
 
 const ARTICLE_TYPES = new Set(["Article", "NewsArticle", "BlogPosting"]);
 const LOCAL_BUSINESS_TYPES = new Set([
   "LocalBusiness", "Restaurant", "Store", "Hotel", "LodgingBusiness", "MedicalBusiness",
   "ProfessionalService", "FoodEstablishment", "HealthAndBeautyBusiness", "HomeAndConstructionBusiness",
+]);
+const GOOGLE_VALIDATED_TYPES = new Set([
+  ...Object.keys(STRUCTURED_DATA_RULES),
+  ...ARTICLE_TYPES,
+  ...LOCAL_BUSINESS_TYPES,
+  "Organization",
+  "WebSite",
+]);
+const COMMON_HELPER_TYPES = new Set([
+  "WebPage", "Person", "Organization", "Brand", "Offer", "AggregateOffer", "Rating", "AggregateRating",
+  "PostalAddress", "Place", "Question", "Answer", "ListItem", "DataDownload", "QuantitativeValue",
+  "InteractionCounter", "EntryPoint", "SeekToAction", "Clip", "BroadcastEvent", "CreativeWork", "Claim",
 ]);
 
 function structuredTypes(node) {
@@ -892,10 +939,12 @@ export function inspectJsonLd(html, baseUrl, pageTitle = "") {
   for (const node of nodes) {
     const types = structuredTypes(node);
     const primaryType = types[0] || "Unknown";
+    const validated = types.some((type) => GOOGLE_VALIDATED_TYPES.has(type));
     summaries.push({
       id: node["@id"] || "",
       types,
       name: node.name || node.headline || "",
+      validated,
     });
 
     let rule = STRUCTURED_DATA_RULES[primaryType];
@@ -912,6 +961,9 @@ export function inspectJsonLd(html, baseUrl, pageTitle = "") {
       for (const property of rule.recommended || []) {
         if (!hasStructuredValue(node, property)) addDiagnostic("notice", "missing_recommended", primaryType, property, `Consider adding ${property}`);
       }
+    }
+    if (primaryType !== "Unknown" && !validated && !COMMON_HELPER_TYPES.has(primaryType)) {
+      addDiagnostic("notice", "type_not_validated", primaryType, "@type", "Parsed successfully, but no Google-specific rule is configured");
     }
 
     if (types.some((type) => ARTICLE_TYPES.has(type))) {
@@ -966,6 +1018,105 @@ export function inspectJsonLd(html, baseUrl, pageTitle = "") {
       offers.forEach((offer, index) => {
         if (!isNonNegativeNumber(offer?.price ?? offer?.priceSpecification?.price)) {
           addDiagnostic("warning", "invalid_value", "Offer", "price", `Software offer ${index + 1} needs a non-negative price`);
+        }
+      });
+    }
+
+    if (types.includes("Review")) {
+      const reviewAuthor = node.author;
+      if (reviewAuthor && typeof reviewAuthor === "object" && !hasStructuredValue(reviewAuthor, "name")) {
+        addDiagnostic("warning", "missing_required", structuredTypes(reviewAuthor)[0] || "Author", "name", "Review author");
+      }
+      if (node.reviewRating && typeof node.reviewRating === "object" && !hasStructuredValue(node.reviewRating, "ratingValue")) {
+        addDiagnostic("warning", "missing_required", "Rating", "ratingValue", "Review rating");
+      }
+      if (node.itemReviewed && typeof node.itemReviewed === "object" && !hasStructuredValue(node.itemReviewed, "name")) {
+        addDiagnostic("warning", "missing_required", structuredTypes(node.itemReviewed)[0] || "Reviewed item", "name", "Reviewed item");
+      }
+    }
+
+    if (types.includes("EmployerAggregateRating") && node.itemReviewed && typeof node.itemReviewed === "object") {
+      if (!hasStructuredValue(node.itemReviewed, "name")) {
+        addDiagnostic("warning", "missing_required", "Organization", "name", "Rated employer");
+      }
+      if (!hasStructuredValue(node.itemReviewed, "sameAs")) {
+        addDiagnostic("notice", "missing_recommended", "Organization", "sameAs", "Rated employer");
+      }
+    }
+
+    if (types.includes("ClaimReview") && node.reviewRating && typeof node.reviewRating === "object") {
+      if (!hasStructuredValue(node.reviewRating, "ratingValue")) {
+        addDiagnostic("warning", "missing_required", "Rating", "ratingValue", "Claim review rating");
+      }
+      if (!hasStructuredValue(node.reviewRating, "bestRating")) {
+        addDiagnostic("warning", "missing_required", "Rating", "bestRating", "Claim review rating");
+      }
+      if (!hasStructuredValue(node.reviewRating, "worstRating")) {
+        addDiagnostic("warning", "missing_required", "Rating", "worstRating", "Claim review rating");
+      }
+    }
+
+    if (types.includes("ImageObject")) {
+      const creator = node.creator;
+      if (creator && typeof creator === "object" && !hasStructuredValue(creator, "name")) {
+        addDiagnostic("warning", "missing_required", structuredTypes(creator)[0] || "Creator", "name", "Image creator");
+      }
+    }
+
+    if (types.includes("VacationRental")) {
+      const places = Array.isArray(node.containsPlace) ? node.containsPlace : node.containsPlace ? [node.containsPlace] : [];
+      places.forEach((place, index) => {
+        if (!hasStructuredValue(place, "occupancy")) {
+          addDiagnostic("warning", "missing_required", "Accommodation", "occupancy", `Unit ${index + 1}`);
+        }
+        const occupancy = place?.occupancy;
+        if (occupancy && typeof occupancy === "object" && !isNonNegativeNumber(occupancy.maxValue)) {
+          addDiagnostic("warning", "invalid_value", "QuantitativeValue", "maxValue", `Unit ${index + 1}`);
+        }
+      });
+      const images = Array.isArray(node.image) ? node.image : node.image ? [node.image] : [];
+      if (images.length && images.length < 8) {
+        addDiagnostic("notice", "insufficient_images", primaryType, "image", `${images.length} image(s); Google recommends at least 8`);
+      }
+    }
+
+    if (types.includes("VideoObject")) {
+      const clips = Array.isArray(node.hasPart) ? node.hasPart : node.hasPart ? [node.hasPart] : [];
+      clips.filter((clip) => structuredTypes(clip).includes("Clip")).forEach((clip, index) => {
+        if (!hasStructuredValue(clip, "name")) addDiagnostic("warning", "missing_required", "Clip", "name", `Clip ${index + 1}`);
+        if (!isNonNegativeNumber(clip.startOffset)) addDiagnostic("warning", "invalid_value", "Clip", "startOffset", `Clip ${index + 1}`);
+        if (!hasStructuredValue(clip, "url")) addDiagnostic("warning", "missing_required", "Clip", "url", `Clip ${index + 1}`);
+      });
+    }
+
+    if (types.includes("MathSolver")) {
+      const actions = Array.isArray(node.potentialAction) ? node.potentialAction : node.potentialAction ? [node.potentialAction] : [];
+      actions.forEach((action, index) => {
+        if (!hasStructuredValue(action, "target")) addDiagnostic("warning", "missing_required", "SolveMathAction", "target", `Action ${index + 1}`);
+        if (!hasStructuredValue(action, "mathExpression-input")) {
+          addDiagnostic("warning", "missing_required", "SolveMathAction", "mathExpression-input", `Action ${index + 1}`);
+        }
+        if (!hasStructuredValue(action, "eduQuestionType")) {
+          addDiagnostic("notice", "missing_recommended", "SolveMathAction", "eduQuestionType", `Action ${index + 1}`);
+        }
+      });
+    }
+
+    if (node.speakable && typeof node.speakable === "object") {
+      if (!hasStructuredValue(node.speakable, "cssSelector") && !hasStructuredValue(node.speakable, "xpath")) {
+        addDiagnostic("warning", "missing_required_any", "SpeakableSpecification", "cssSelector / xpath", primaryType);
+      }
+    }
+
+    if (node.isAccessibleForFree === false || node.isAccessibleForFree === "false") {
+      const parts = Array.isArray(node.hasPart) ? node.hasPart : node.hasPart ? [node.hasPart] : [];
+      const paywalledParts = parts.filter((part) => part?.isAccessibleForFree === false || part?.isAccessibleForFree === "false");
+      if (!paywalledParts.length) {
+        addDiagnostic("warning", "missing_required", primaryType, "hasPart", "Paywalled content needs a marked-up paywalled section");
+      }
+      paywalledParts.forEach((part, index) => {
+        if (!hasStructuredValue(part, "cssSelector")) {
+          addDiagnostic("warning", "missing_required", "WebPageElement", "cssSelector", `Paywalled section ${index + 1}`);
         }
       });
     }
@@ -1141,6 +1292,8 @@ export function inspectJsonLd(html, baseUrl, pageTitle = "") {
     nodeCount: nodes.length,
     types,
     nodes: summaries.slice(0, 100),
+    validatedTypes: [...new Set(summaries.filter((node) => node.validated).flatMap((node) => node.types))],
+    unvalidatedTypes: [...new Set(summaries.filter((node) => !node.validated).flatMap((node) => node.types))],
     diagnostics: diagnostics.slice(0, 100),
   };
 }

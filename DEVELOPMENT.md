@@ -174,16 +174,18 @@ soos 的目标关系链是：
 
 ### Milestone D：结构化数据
 
-状态：进行中
+状态：已完成
 
 - [x] 解析全部 JSON-LD graph，而不只是检查是否存在。
 - [x] 报告 JSON 语法错误和 graph 引用错误。
-- [ ] 验证 Google 支持的类型和必填字段。
+- [x] 验证 Google 支持的常见页面类型和必填字段。
 - [x] 根据页面类型推荐有价值的字段。
 - [x] 对比结构化数据中的 URL、图片、名称和页面可见内容。
 - [x] 合并本地验证结果与 Google rich results issue。
 
-当前已覆盖的类型：Article、NewsArticle、BlogPosting、Product、Offer、BreadcrumbList、FAQPage、LocalBusiness 常见子类型、VideoObject、Recipe、Event、JobPosting、Organization、WebSite、Course、Dataset、SoftwareApplication、ProfilePage、QAPage、DiscussionForumPosting、SocialMediaPosting 和 ItemList。后续仍需扩充 Google Search Gallery 中的其它类型和少见类型专属细则。
+当前已覆盖的类型：Article、NewsArticle、BlogPosting、Product、Offer、Review、AggregateRating、BreadcrumbList、FAQPage、LocalBusiness 常见子类型、VideoObject、Recipe、Event、JobPosting、Organization、WebSite、Course、Dataset、SoftwareApplication、ProfilePage、QAPage、DiscussionForumPosting、SocialMediaPosting、ItemList、Movie、EmployerAggregateRating、ClaimReview、ImageObject、VacationRental 和 MathSolver。
+
+结构化数据面板会显示每种实际发现类型的规则覆盖状态。未配置 Google 专属规则的自定义或少见类型仍会被解析，并明确标记为“仅解析”，不会伪装成已完整验证。Book Actions 依赖独立 DataFeed，不属于当前 HTML 页面扫描范围；Google 已于 2026 年 1 月停止支持 Vehicle Listing，因此不再新增该规则。
 
 ### Milestone E：Googlebot 日志
 
@@ -246,6 +248,12 @@ soos 的目标关系链是：
 - 增加 LocalBusiness 地址、Event 地点、JobPosting 雇主/地点、讨论作者/评论和 Article 作者嵌套对象验证。
 - 结构化数据内部诊断代码增加 English、简体中文和繁體中文可读标签。
 - 扩展回归样例到 42 个预期诊断，`npm run check` 通过。
+- 修正 VideoObject 当前规则：`description` 已由 Google 从必填字段调整为建议字段。
+- 增加 Movie、Review、AggregateRating、EmployerAggregateRating、ClaimReview、ImageObject、VacationRental 和 MathSolver 规则。
+- 增加视频 Clip、图片许可、度假租赁 occupancy、事实核查评分、MathSolver action、Speakable 和付费内容标记验证。
+- 增加类型规则覆盖矩阵；自定义或未覆盖类型显示“仅解析”状态。
+- 明确排除独立 Book Actions DataFeed 和 Google 已于 2026 年 1 月停止支持的 Vehicle Listing。
+- 扩展回归样例到 72 个预期诊断，完成 Milestone D。
 
 ## 9. 当前完成度
 
@@ -260,7 +268,7 @@ soos 的目标关系链是：
 | URL Inspection 诊断 | 95% |
 | Google URL 对照矩阵 | 85% |
 | URL 集合对比 | 100% |
-| 结构化数据验证 | 85% |
+| 结构化数据验证 | 100% |
 | Googlebot 日志分析 | 0% |
 | 定时监控 | 0% |
 
