@@ -1978,11 +1978,18 @@ const gscDataText = {
     propertyFirst: "Enter the Search Console Property URL before loading Search Analytics.",
     inspectionTitle: "URL Inspection", inspectStatus: "Inspect real Google index status",
     inspectionHelp: "Checks up to 25 scanned sitemap URLs with the connected Search Console property.",
-    inspect: "Inspect URLs", inspecting: "Inspecting...", inspected: "Inspected", review: "Needs review",
+    inspect: "Inspect URLs", inspectNext: "Inspect next 25", inspectionComplete: "All scanned URLs inspected",
+    remaining: "remaining", inspecting: "Inspecting...", inspected: "Inspected", review: "Needs review",
     critical: "critical", warnings: "warnings", notices: "notices", noCoverage: "No coverage state",
     indexing: "Indexing", robots: "Robots", fetch: "Fetch", crawledAs: "Crawled as", lastCrawl: "Last crawl",
     sitemap: "Seen in sitemap", referrers: "Referrers", googleCanonical: "Google canonical",
     userCanonical: "User canonical", mobile: "Mobile", richResults: "Rich results",
+    alignmentTitle: "Google URL alignment", alignmentHelp: "Compares the sitemap URL, fetched URL, HTML canonical and Google's selected canonical.",
+    alignmentAll: "All states", submittedUrl: "Submitted URL", fetchedUrl: "Fetched URL", htmlCanonical: "HTML canonical",
+    alignmentState: "Diagnosis", alignedIndexed: "Aligned and indexed", alignedNotIndexed: "Aligned but not indexed",
+    submittedRedirects: "Submitted URL redirects", htmlCanonicalDiffers: "HTML canonical differs",
+    googleCanonicalDiffers: "Google selected another canonical", crawlBlocked: "Crawl or indexing blocker",
+    inspectionFailed: "Inspection failed", unknownAlignment: "Needs review", exportAlignment: "Export URL alignment",
     noIssue: "No immediate index issue", noIssueDetail: "Google reports this URL as passing URL Inspection checks.",
     noIssueAction: "Keep monitoring performance data and canonical consistency.",
     inspectPropertyFirst: "Enter the Search Console Property URL before running URL Inspection.",
@@ -1999,11 +2006,18 @@ const gscDataText = {
     propertyFirst: "加载 Search Analytics 前，请先输入 Search Console Property URL。",
     inspectionTitle: "网址检查", inspectStatus: "检查 Google 中的真实收录状态",
     inspectionHelp: "使用已连接的 Search Console property 检查最多 25 个 sitemap 网址。",
-    inspect: "检查网址", inspecting: "检查中...", inspected: "已检查", review: "需要处理",
+    inspect: "检查网址", inspectNext: "检查接下来 25 个", inspectionComplete: "已检查全部扫描网址",
+    remaining: "个待检查", inspecting: "检查中...", inspected: "已检查", review: "需要处理",
     critical: "严重", warnings: "警告", notices: "提示", noCoverage: "没有覆盖状态",
     indexing: "索引", robots: "Robots", fetch: "抓取", crawledAs: "抓取类型", lastCrawl: "最后抓取",
     sitemap: "所在 sitemap", referrers: "来源网址", googleCanonical: "Google 规范网址",
     userCanonical: "用户规范网址", mobile: "移动端", richResults: "富媒体结果",
+    alignmentTitle: "Google 网址对照诊断", alignmentHelp: "对照 sitemap 提交网址、实际抓取网址、HTML canonical 与 Google 选择的 canonical。",
+    alignmentAll: "全部状态", submittedUrl: "Sitemap 提交网址", fetchedUrl: "实际抓取网址", htmlCanonical: "HTML canonical",
+    alignmentState: "诊断", alignedIndexed: "信号一致且已收录", alignedNotIndexed: "信号一致但未收录",
+    submittedRedirects: "提交网址发生跳转", htmlCanonicalDiffers: "HTML canonical 不一致",
+    googleCanonicalDiffers: "Google 选择了其它 canonical", crawlBlocked: "存在抓取或索引阻挡",
+    inspectionFailed: "网址检查失败", unknownAlignment: "需要检查", exportAlignment: "导出网址对照",
     noIssue: "没有明显索引问题", noIssueDetail: "Google 报告该网址通过了网址检查。",
     noIssueAction: "继续监控表现数据和 canonical 一致性。",
     inspectPropertyFirst: "运行网址检查前，请先输入 Search Console Property URL。",
@@ -2020,11 +2034,18 @@ const gscDataText = {
     propertyFirst: "載入 Search Analytics 前，請先輸入 Search Console Property URL。",
     inspectionTitle: "網址檢查", inspectStatus: "檢查 Google 中的真實收錄狀態",
     inspectionHelp: "使用已連接的 Search Console property 檢查最多 25 個 sitemap 網址。",
-    inspect: "檢查網址", inspecting: "檢查中...", inspected: "已檢查", review: "需要處理",
+    inspect: "檢查網址", inspectNext: "檢查接下來 25 個", inspectionComplete: "已檢查全部掃描網址",
+    remaining: "個待檢查", inspecting: "檢查中...", inspected: "已檢查", review: "需要處理",
     critical: "嚴重", warnings: "警告", notices: "提示", noCoverage: "沒有涵蓋狀態",
     indexing: "索引", robots: "Robots", fetch: "擷取", crawledAs: "檢索類型", lastCrawl: "最後檢索",
     sitemap: "所在 sitemap", referrers: "來源網址", googleCanonical: "Google 標準網址",
     userCanonical: "使用者標準網址", mobile: "行動裝置", richResults: "複合式搜尋結果",
+    alignmentTitle: "Google 網址對照診斷", alignmentHelp: "對照 sitemap 提交網址、實際檢索網址、HTML canonical 與 Google 選擇的 canonical。",
+    alignmentAll: "全部狀態", submittedUrl: "Sitemap 提交網址", fetchedUrl: "實際檢索網址", htmlCanonical: "HTML canonical",
+    alignmentState: "診斷", alignedIndexed: "訊號一致且已收錄", alignedNotIndexed: "訊號一致但未收錄",
+    submittedRedirects: "提交網址發生重新導向", htmlCanonicalDiffers: "HTML canonical 不一致",
+    googleCanonicalDiffers: "Google 選擇了其它 canonical", crawlBlocked: "存在檢索或索引阻擋",
+    inspectionFailed: "網址檢查失敗", unknownAlignment: "需要檢查", exportAlignment: "匯出網址對照",
     noIssue: "沒有明顯索引問題", noIssueDetail: "Google 回報該網址通過網址檢查。",
     noIssueAction: "繼續監控成效資料和 canonical 一致性。",
     inspectPropertyFirst: "執行網址檢查前，請先輸入 Search Console Property URL。",
@@ -2655,14 +2676,158 @@ function SearchVisibility({ report, t, gscRows, language }) {
     </section>
   );
 }
+function buildUrlAlignmentRows(report, inspectionResults, copy) {
+  const pagesByUrl = new Map((report?.pages || []).map((page) => [normalizeReportUrl(page.url), page]));
+  return (inspectionResults || []).map((inspection) => {
+    const page = pagesByUrl.get(normalizeReportUrl(inspection.url)) || {};
+    const submittedUrl = inspection.url || page.url || "";
+    const fetchedUrl = page.finalUrl || submittedUrl;
+    const htmlCanonical = page.canonical || "";
+    const googleCanonical = inspection.googleCanonical || "";
+    const userCanonical = inspection.userCanonical || "";
+    const submittedKey = normalizeReportUrl(submittedUrl);
+    const fetchedKey = normalizeReportUrl(fetchedUrl);
+    const htmlKey = normalizeReportUrl(htmlCanonical);
+    const googleKey = normalizeReportUrl(googleCanonical);
+    const userKey = normalizeReportUrl(userCanonical);
+    const issueTypes = new Set((page.issues || []).map((issue) => issue.type));
+    const blocked = ["robots_disallow", "noindex", "http_error", "fetch_failed", "canonical_blocked"].some((type) => issueTypes.has(type));
+    const verdict = String(inspection.verdict || "").toUpperCase();
+    let state = "unknown";
+    let severity = "notice";
+    let label = copy.unknownAlignment;
+
+    if (!inspection.ok) {
+      state = "inspection_failed";
+      severity = "critical";
+      label = copy.inspectionFailed;
+    } else if (blocked) {
+      state = "blocked";
+      severity = "critical";
+      label = copy.crawlBlocked;
+    } else if (googleKey && googleKey !== submittedKey && googleKey !== fetchedKey && googleKey !== htmlKey) {
+      state = "google_canonical_differs";
+      severity = "warning";
+      label = copy.googleCanonicalDiffers;
+    } else if (submittedKey && fetchedKey && submittedKey !== fetchedKey) {
+      state = "redirect";
+      severity = "warning";
+      label = copy.submittedRedirects;
+    } else if (htmlKey && fetchedKey && htmlKey !== fetchedKey) {
+      state = "html_canonical_differs";
+      severity = "warning";
+      label = copy.htmlCanonicalDiffers;
+    } else if (verdict === "PASS") {
+      state = "aligned_indexed";
+      severity = "good";
+      label = copy.alignedIndexed;
+    } else if (
+      fetchedKey
+      && (!htmlKey || htmlKey === fetchedKey)
+      && (!userKey || userKey === fetchedKey)
+      && (!googleKey || googleKey === fetchedKey)
+    ) {
+      state = "aligned_not_indexed";
+      severity = "critical";
+      label = copy.alignedNotIndexed;
+    }
+
+    return {
+      submittedUrl,
+      fetchedUrl,
+      htmlCanonical,
+      userCanonical,
+      googleCanonical,
+      coverageState: inspection.coverageState || inspection.error || "",
+      state,
+      severity,
+      label,
+    };
+  });
+}
+
+function UrlAlignmentMatrix({ report, inspectionResults, copy }) {
+  const [filter, setFilter] = useState("all");
+  const rows = useMemo(() => buildUrlAlignmentRows(report, inspectionResults, copy), [copy, inspectionResults, report]);
+  const counts = rows.reduce((summary, row) => {
+    summary[row.state] = (summary[row.state] || 0) + 1;
+    return summary;
+  }, {});
+  const visibleRows = filter === "all" ? rows : rows.filter((row) => row.state === filter);
+  const states = [...new Set(rows.map((row) => row.state))];
+  if (!rows.length) return null;
+
+  function exportRows() {
+    downloadCsvFile("soos-google-url-alignment.csv", [
+      ["diagnosis", "state", "submitted_url", "fetched_url", "html_canonical", "gsc_user_canonical", "google_canonical", "coverage_state"],
+      ...rows.map((row) => [
+        row.label,
+        row.state,
+        row.submittedUrl,
+        row.fetchedUrl,
+        row.htmlCanonical,
+        row.userCanonical,
+        row.googleCanonical,
+        row.coverageState,
+      ]),
+    ]);
+  }
+
+  return (
+    <section className="url-alignment">
+      <div className="url-alignment-head">
+        <div>
+          <strong>{copy.alignmentTitle}</strong>
+          <small>{copy.alignmentHelp}</small>
+        </div>
+        <div className="url-alignment-actions">
+          <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+            <option value="all">{copy.alignmentAll} ({rows.length})</option>
+            {states.map((state) => {
+              const row = rows.find((item) => item.state === state);
+              return <option value={state} key={state}>{row.label} ({counts[state]})</option>;
+            })}
+          </select>
+          <button className="export-button" type="button" onClick={exportRows}>{copy.exportAlignment}</button>
+        </div>
+      </div>
+      <div className="url-alignment-table">
+        <div className="url-alignment-row head">
+          <span>{copy.alignmentState}</span>
+          <span>{copy.submittedUrl}</span>
+          <span>{copy.fetchedUrl}</span>
+          <span>{copy.htmlCanonical}</span>
+          <span>{copy.googleCanonical}</span>
+        </div>
+        {visibleRows.map((row) => (
+          <div className="url-alignment-row" key={row.submittedUrl}>
+            <span><Badge severity={row.severity === "good" ? "ok" : row.severity}>{row.label}</Badge></span>
+            <span title={row.submittedUrl}>{row.submittedUrl || "-"}</span>
+            <span title={row.fetchedUrl}>{row.fetchedUrl || "-"}</span>
+            <span title={row.htmlCanonical}>{row.htmlCanonical || "-"}</span>
+            <span title={row.googleCanonical}>{row.googleCanonical || "-"}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function UrlInspectionPanel({ report, gscStatus, siteUrl, language }) {
   const copy = gscDataText[language] || gscDataText.en;
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  useEffect(() => {
+    setResult(null);
+    setError("");
+  }, [report?.scannedAt]);
   if (!report?.pages?.length) return null;
 
-  const urls = report.pages.map((page) => page.url).slice(0, 25);
+  const urls = report.pages.map((page) => page.url);
+  const inspectedUrlKeys = new Set((result?.results || []).map((item) => normalizeReportUrl(item.url)));
+  const pendingUrls = urls.filter((url) => !inspectedUrlKeys.has(normalizeReportUrl(url)));
+  const nextUrls = pendingUrls.slice(0, 25);
   const indexedCount = (result?.results || []).filter((item) => item.verdict === "PASS").length;
   const failedCount = (result?.results || []).filter((item) => !item.ok || item.verdict === "FAIL").length;
   const diagnosedResults = (result?.results || []).map((item) => ({
@@ -2693,11 +2858,15 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language }) {
       const response = await fetch("/api/gsc/inspect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls, siteUrl }),
+        body: JSON.stringify({ urls: nextUrls, siteUrl }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "URL Inspection failed");
-      setResult(body);
+      setResult((current) => ({
+        ...body,
+        inspected: (current?.results?.length || 0) + (body.results?.length || 0),
+        results: [...(current?.results || []), ...(body.results || [])],
+      }));
     } catch (err) {
       setError(err.message || String(err));
     } finally {
@@ -2716,10 +2885,11 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language }) {
           <strong>{copy.inspectStatus}</strong>
           <small>{copy.inspectionHelp}</small>
         </div>
-        <button className="export-button" type="button" disabled={!gscStatus?.configured || loading} onClick={runInspection}>
-          {loading ? copy.inspecting : copy.inspect}
+        <button className="export-button" type="button" disabled={!gscStatus?.configured || loading || !nextUrls.length} onClick={runInspection}>
+          {loading ? copy.inspecting : result ? nextUrls.length ? copy.inspectNext : copy.inspectionComplete : copy.inspect}
         </button>
       </div>
+      {result && pendingUrls.length ? <small className="inspection-remaining">{pendingUrls.length} {copy.remaining}</small> : null}
       {error ? <div className="url-inspection-error">{error}</div> : null}
       {result ? (
         <>
@@ -2733,6 +2903,7 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language }) {
             <span>{diagnosisSummary.warning} {copy.warnings}</span>
             <span>{diagnosisSummary.notice} {copy.notices}</span>
           </div>
+          <UrlAlignmentMatrix report={report} inspectionResults={result.results} copy={copy} />
           <div className="inspection-list">
             {diagnosedResults.map((item) => (
               <article className="inspection-card" key={item.url}>

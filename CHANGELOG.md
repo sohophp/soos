@@ -6,6 +6,9 @@ All notable changes to soos will be documented in this file.
 
 ### Added
 
+- A living development guide with project goals, architecture, completion tracking and milestone roadmap.
+- A three-language Google URL alignment matrix with state filters and CSV export.
+- Cumulative, user-controlled URL Inspection batches for sites with more than 25 scanned URLs.
 - Neon-backed audit job records scoped to each browser session.
 - Automatic active-job restoration after a page refresh.
 - Interrupted worker detection and recoverable audit restart after a server cold start.
