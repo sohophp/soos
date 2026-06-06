@@ -4,6 +4,8 @@ All notable changes to soos will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-06
+
 ### Added
 
 - Connected Google account display in the Search Console API panel.
@@ -26,6 +28,7 @@ All notable changes to soos will be documented in this file.
 
 ### Changed
 
+- Standardized production validation through `npm run check`.
 - API handler can now be reused by both local Node server and Vercel Serverless Functions.
 - OAuth Client ID and Client Secret are now server-side deployment settings; visitors connect their own Google account from the UI.
 - Removed Admin Key and visitor-entered OAuth credential fields from the Search Console API panel.
@@ -34,6 +37,7 @@ All notable changes to soos will be documented in this file.
 - OAuth completion also broadcasts through local storage, and closing the popup triggers a status refresh as a fallback.
 - GSC browser sessions now expire after 90 days; inactive Neon sessions are cleaned up and Disconnect rotates the session cookie.
 - UI avoids showing local debug callback URLs in OAuth setup hints.
+- Deployment examples now recommend per-visitor OAuth instead of temporary manual access tokens.
 
 ## [0.1.0] - 2026-06-04
 

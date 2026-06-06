@@ -63,7 +63,7 @@ Runtime Google Search Console config is stored locally in `.soos-gsc.json` when 
 
 When `DATABASE_URL` is configured, soos stores each browser session's Search Console connection in Neon/Postgres instead of `.soos-gsc.json`. This is the recommended path for public Vercel deployments because different visitors need separate Google authorizations and Serverless Functions cannot persist local files between deployments.
 
-`.env` is for deployment helpers, the shared Google OAuth app, a database connection, or an optional temporary manual access token:
+`.env` is for deployment helpers, the shared Google OAuth app, and the database connection:
 
 ```env
 SOOS_PUBLIC_BASE_URL=https://your-deployed-domain.example
@@ -71,10 +71,11 @@ DATABASE_URL=postgresql://...
 GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
 SOOS_TOKEN_ENCRYPTION_KEY=generate-a-long-random-value
-SOOS_GSC_ACCESS_TOKEN=optional-manual-access-token
 ```
 
 Visitors do not enter OAuth Client ID or Client Secret. The deployment owner configures one Google OAuth app on the server, and each visitor connects their own Google account from the UI.
+
+Older installations may still use a server-side `SOOS_GSC_ACCESS_TOKEN`, but the public multi-user flow should use OAuth refresh tokens instead. Manual access tokens expire quickly and do not identify or isolate visitors.
 
 `SOOS_TOKEN_ENCRYPTION_KEY` is recommended for production. soos encrypts stored access and refresh tokens with AES-256-GCM. If the variable is omitted, the Google OAuth Client Secret is used to derive the encryption key. Keep the selected key stable; changing it makes existing encrypted connections unreadable.
 
@@ -139,7 +140,6 @@ DATABASE_URL=postgresql://...
 GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
 SOOS_TOKEN_ENCRYPTION_KEY=generate-a-long-random-value
-SOOS_GSC_ACCESS_TOKEN=optional-manual-access-token
 ```
 
 Notes:
@@ -173,8 +173,7 @@ When functionality, setup, deployment, or user-facing behavior changes:
 3. Run:
 
 ```bash
-node --check server/api.js
-npm run build
+npm run check
 ```
 
 4. Commit changes.

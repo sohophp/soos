@@ -1,6 +1,6 @@
 {
   "name": "soos",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,6 +8,7 @@
     "dev:api": "node server/api.js",
     "dev:web": "vite --host 127.0.0.1",
     "build": "vite build",
+    "check": "node --check server/api.js && node --check api/index.js && npm run build",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
