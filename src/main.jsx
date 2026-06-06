@@ -1990,6 +1990,13 @@ const gscDataText = {
     submittedRedirects: "Submitted URL redirects", htmlCanonicalDiffers: "HTML canonical differs",
     googleCanonicalDiffers: "Google selected another canonical", crawlBlocked: "Crawl or indexing blocker",
     inspectionFailed: "Inspection failed", unknownAlignment: "Needs review", exportAlignment: "Export URL alignment",
+    coverageTitle: "Index coverage priorities", coverageHelp: "Groups Google indexing outcomes and prioritizes fixable URLs with Search Analytics demand.",
+    coverageExport: "Export coverage diagnosis", needsFix: "Needs fix", expectedExclusion: "Expected exclusion", indexedState: "Indexed",
+    priorityHigh: "High priority", priorityMedium: "Medium priority", priorityLow: "Low priority",
+    affectedUrls: "URLs", staleCrawl: "Stale crawl", noPerformanceData: "No page performance data",
+    reasonDiscovered: "Discovered, not crawled", reasonCrawled: "Crawled, not indexed", reasonDuplicate: "Duplicate or alternate",
+    reasonCanonical: "Canonical conflict", reasonBlocked: "Blocked from indexing", reasonSoft404: "Soft 404",
+    reasonFetch: "Fetch or server problem", reasonOther: "Other indexing reason",
     noIssue: "No immediate index issue", noIssueDetail: "Google reports this URL as passing URL Inspection checks.",
     noIssueAction: "Keep monitoring performance data and canonical consistency.",
     inspectPropertyFirst: "Enter the Search Console Property URL before running URL Inspection.",
@@ -2018,6 +2025,13 @@ const gscDataText = {
     submittedRedirects: "提交网址发生跳转", htmlCanonicalDiffers: "HTML canonical 不一致",
     googleCanonicalDiffers: "Google 选择了其它 canonical", crawlBlocked: "存在抓取或索引阻挡",
     inspectionFailed: "网址检查失败", unknownAlignment: "需要检查", exportAlignment: "导出网址对照",
+    coverageTitle: "收录覆盖优先级", coverageHelp: "按 Google 收录原因分组，并结合 Search Analytics 需求确定修复优先级。",
+    coverageExport: "导出收录诊断", needsFix: "需要修复", expectedExclusion: "合理排除", indexedState: "已收录",
+    priorityHigh: "高优先级", priorityMedium: "中优先级", priorityLow: "低优先级",
+    affectedUrls: "网址", staleCrawl: "长期未抓取", noPerformanceData: "没有网页表现数据",
+    reasonDiscovered: "已发现但尚未抓取", reasonCrawled: "已抓取但尚未收录", reasonDuplicate: "重复页或替代页",
+    reasonCanonical: "Canonical 冲突", reasonBlocked: "被阻止收录", reasonSoft404: "软 404",
+    reasonFetch: "抓取或服务器问题", reasonOther: "其它收录原因",
     noIssue: "没有明显索引问题", noIssueDetail: "Google 报告该网址通过了网址检查。",
     noIssueAction: "继续监控表现数据和 canonical 一致性。",
     inspectPropertyFirst: "运行网址检查前，请先输入 Search Console Property URL。",
@@ -2046,6 +2060,13 @@ const gscDataText = {
     submittedRedirects: "提交網址發生重新導向", htmlCanonicalDiffers: "HTML canonical 不一致",
     googleCanonicalDiffers: "Google 選擇了其它 canonical", crawlBlocked: "存在檢索或索引阻擋",
     inspectionFailed: "網址檢查失敗", unknownAlignment: "需要檢查", exportAlignment: "匯出網址對照",
+    coverageTitle: "收錄涵蓋優先級", coverageHelp: "依 Google 收錄原因分組，並結合 Search Analytics 需求決定修復優先級。",
+    coverageExport: "匯出收錄診斷", needsFix: "需要修復", expectedExclusion: "合理排除", indexedState: "已收錄",
+    priorityHigh: "高優先級", priorityMedium: "中優先級", priorityLow: "低優先級",
+    affectedUrls: "網址", staleCrawl: "長期未檢索", noPerformanceData: "沒有網頁成效資料",
+    reasonDiscovered: "已發現但尚未檢索", reasonCrawled: "已檢索但尚未收錄", reasonDuplicate: "重複頁或替代頁",
+    reasonCanonical: "Canonical 衝突", reasonBlocked: "被阻止收錄", reasonSoft404: "軟 404",
+    reasonFetch: "檢索或伺服器問題", reasonOther: "其它收錄原因",
     noIssue: "沒有明顯索引問題", noIssueDetail: "Google 回報該網址通過網址檢查。",
     noIssueAction: "繼續監控成效資料和 canonical 一致性。",
     inspectPropertyFirst: "執行網址檢查前，請先輸入 Search Console Property URL。",
@@ -2813,7 +2834,203 @@ function UrlAlignmentMatrix({ report, inspectionResults, copy }) {
   );
 }
 
-function UrlInspectionPanel({ report, gscStatus, siteUrl, language }) {
+function classifyIndexCoverage(inspection, page, gsc, copy) {
+  const coverage = String(inspection.coverageState || "").toLowerCase();
+  const robots = String(inspection.robotsTxtState || "").toLowerCase();
+  const indexing = String(inspection.indexingState || "").toLowerCase();
+  const fetchState = String(inspection.pageFetchState || "").toLowerCase();
+  const verdict = String(inspection.verdict || "").toUpperCase();
+  const issueTypes = new Set((page?.issues || []).map((issue) => issue.type));
+  const submittedKey = normalizeReportUrl(inspection.url);
+  const localCanonicalKey = normalizeReportUrl(page?.canonical || inspection.userCanonical || "");
+  const googleCanonicalKey = normalizeReportUrl(inspection.googleCanonical || "");
+  const canonicalAgreement = Boolean(
+    googleCanonicalKey
+    && localCanonicalKey
+    && googleCanonicalKey === localCanonicalKey
+    && googleCanonicalKey !== submittedKey
+  );
+  let reason = "other";
+  let reasonLabel = copy.reasonOther;
+  let disposition = "needs_fix";
+  let dispositionLabel = copy.needsFix;
+
+  if (!inspection.ok) {
+    reason = "inspection_error";
+    reasonLabel = copy.inspectionFailed;
+  } else if (verdict === "PASS") {
+    reason = "indexed";
+    reasonLabel = copy.indexedState;
+    disposition = "indexed";
+    dispositionLabel = copy.indexedState;
+  } else if (
+    robots.includes("blocked")
+    || robots.includes("disallow")
+    || indexing.includes("blocked")
+    || indexing.includes("noindex")
+    || ["robots_disallow", "noindex", "canonical_blocked"].some((type) => issueTypes.has(type))
+  ) {
+    reason = "blocked";
+    reasonLabel = copy.reasonBlocked;
+  } else if (coverage.includes("soft 404")) {
+    reason = "soft_404";
+    reasonLabel = copy.reasonSoft404;
+  } else if (
+    coverage.includes("server error")
+    || coverage.includes("redirect error")
+    || (
+      fetchState
+      && !fetchState.includes("unspecified")
+      && !["successful", "page_fetch_state_successful"].includes(fetchState)
+    )
+    || ["fetch_failed", "http_error"].some((type) => issueTypes.has(type))
+  ) {
+    reason = "fetch_problem";
+    reasonLabel = copy.reasonFetch;
+  } else if (coverage.includes("discovered") && coverage.includes("not indexed")) {
+    reason = "discovered_not_crawled";
+    reasonLabel = copy.reasonDiscovered;
+  } else if (coverage.includes("crawled") && coverage.includes("not indexed")) {
+    reason = "crawled_not_indexed";
+    reasonLabel = copy.reasonCrawled;
+  } else if (coverage.includes("duplicate") || coverage.includes("alternate page")) {
+    reason = "duplicate";
+    reasonLabel = copy.reasonDuplicate;
+    if (canonicalAgreement) {
+      disposition = "expected_exclusion";
+      dispositionLabel = copy.expectedExclusion;
+    }
+  } else if (googleCanonicalKey && googleCanonicalKey !== submittedKey) {
+    reason = "canonical_conflict";
+    reasonLabel = copy.reasonCanonical;
+    if (canonicalAgreement) {
+      disposition = "expected_exclusion";
+      dispositionLabel = copy.expectedExclusion;
+    }
+  }
+
+  const impressions = gsc?.impressions || 0;
+  const clicks = gsc?.clicks || 0;
+  const lastCrawlMs = inspection.lastCrawlTime ? new Date(inspection.lastCrawlTime).getTime() : NaN;
+  const crawlAgeDays = Number.isFinite(lastCrawlMs) ? Math.floor((Date.now() - lastCrawlMs) / 86400000) : null;
+  const stale = crawlAgeDays != null && crawlAgeDays > 90;
+  let priority = "low";
+  if (disposition === "needs_fix" && (clicks > 0 || impressions >= 100 || reason === "blocked" || reason === "fetch_problem")) {
+    priority = "high";
+  } else if (disposition === "needs_fix" || impressions > 0 || stale) {
+    priority = "medium";
+  }
+
+  return {
+    url: inspection.url,
+    reason,
+    reasonLabel,
+    disposition,
+    dispositionLabel,
+    priority,
+    impressions,
+    clicks,
+    position: gsc?.position ?? null,
+    lastCrawlTime: inspection.lastCrawlTime || "",
+    crawlAgeDays,
+    stale,
+    coverageState: inspection.coverageState || inspection.error || "",
+    googleCanonical: inspection.googleCanonical || "",
+  };
+}
+
+function IndexCoveragePriorities({ report, inspectionResults, gscRows, copy }) {
+  const pagesByUrl = new Map((report?.pages || []).map((page) => [normalizeReportUrl(page.url), page]));
+  const gscByUrl = buildGscRowMap(uniqueGscRows(gscRows || []));
+  const rows = (inspectionResults || []).map((inspection) => {
+    const page = pagesByUrl.get(normalizeReportUrl(inspection.url));
+    const gsc = gscByUrl.get(normalizeReportUrl(inspection.url))
+      || gscByUrl.get(normalizeReportUrl(inspection.googleCanonical || ""));
+    return classifyIndexCoverage(inspection, page, gsc, copy);
+  });
+  const priorityRank = { high: 3, medium: 2, low: 1 };
+  const actionableRows = rows
+    .filter((row) => row.disposition !== "indexed")
+    .sort((a, b) => priorityRank[b.priority] - priorityRank[a.priority] || b.impressions - a.impressions);
+  const groups = [...new Map(actionableRows.map((row) => [row.reason, {
+    reason: row.reason,
+    label: row.reasonLabel,
+    rows: actionableRows.filter((item) => item.reason === row.reason),
+  }])).values()];
+  if (!rows.length) return null;
+
+  function priorityLabel(priority) {
+    if (priority === "high") return copy.priorityHigh;
+    if (priority === "medium") return copy.priorityMedium;
+    return copy.priorityLow;
+  }
+
+  function exportCoverage() {
+    downloadCsvFile("soos-google-index-coverage.csv", [
+      ["url", "reason", "disposition", "priority", "coverage_state", "clicks", "impressions", "position", "last_crawl", "crawl_age_days", "google_canonical"],
+      ...rows.map((row) => [
+        row.url,
+        row.reason,
+        row.disposition,
+        row.priority,
+        row.coverageState,
+        row.clicks,
+        row.impressions,
+        row.position ?? "",
+        row.lastCrawlTime,
+        row.crawlAgeDays ?? "",
+        row.googleCanonical,
+      ]),
+    ]);
+  }
+
+  return (
+    <section className="index-coverage-priorities">
+      <div className="url-alignment-head">
+        <div>
+          <strong>{copy.coverageTitle}</strong>
+          <small>{copy.coverageHelp}</small>
+        </div>
+        <button className="export-button" type="button" onClick={exportCoverage}>{copy.coverageExport}</button>
+      </div>
+      <div className="coverage-disposition-summary">
+        <span>{copy.needsFix}: {rows.filter((row) => row.disposition === "needs_fix").length}</span>
+        <span>{copy.expectedExclusion}: {rows.filter((row) => row.disposition === "expected_exclusion").length}</span>
+        <span>{copy.indexedState}: {rows.filter((row) => row.disposition === "indexed").length}</span>
+      </div>
+      {groups.length ? (
+        <div className="coverage-groups">
+          {groups.map((group) => (
+            <article className="coverage-group" key={group.reason}>
+              <div className="impact-top">
+                <Badge severity={group.rows.some((row) => row.priority === "high") ? "critical" : "warning"}>{group.label}</Badge>
+                <strong>{group.rows.length} {copy.affectedUrls}</strong>
+                <span>{group.rows.reduce((sum, row) => sum + row.impressions, 0)} {copy.impressions}</span>
+              </div>
+              <div className="coverage-priority-rows">
+                {group.rows.slice(0, 8).map((row) => (
+                  <div className="coverage-priority-row" key={row.url}>
+                    <Badge severity={row.priority === "high" ? "critical" : row.priority === "medium" ? "warning" : "notice"}>{priorityLabel(row.priority)}</Badge>
+                    <strong title={row.url}>{row.url}</strong>
+                    <span>{row.dispositionLabel}</span>
+                    <small>
+                      {row.impressions || row.clicks
+                        ? `${row.clicks} ${copy.clicks} / ${row.impressions} ${copy.impressions}`
+                        : copy.noPerformanceData}
+                      {row.stale ? ` | ${copy.staleCrawl}: ${row.crawlAgeDays}d` : ""}
+                    </small>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
   const copy = gscDataText[language] || gscDataText.en;
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -2903,6 +3120,7 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language }) {
             <span>{diagnosisSummary.warning} {copy.warnings}</span>
             <span>{diagnosisSummary.notice} {copy.notices}</span>
           </div>
+          <IndexCoveragePriorities report={report} inspectionResults={result.results} gscRows={gscRows} copy={copy} />
           <UrlAlignmentMatrix report={report} inspectionResults={result.results} copy={copy} />
           <div className="inspection-list">
             {diagnosedResults.map((item) => (
@@ -3128,7 +3346,7 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
       <ScoreCard score={report.summary.healthScore} t={t} />
       <SearchVisibility report={report} t={t} gscRows={gscRows} language={language} />
       <GscOpportunities report={report} rows={gscRows} language={language} />
-      <UrlInspectionPanel report={report} gscStatus={gscStatus} siteUrl={gscSiteUrl} language={language} />
+      <UrlInspectionPanel report={report} gscStatus={gscStatus} siteUrl={gscSiteUrl} language={language} gscRows={gscRows} />
       <section className="summary">
         <Stat label={t.urls} value={report.summary.urlCount} />
         <Stat label={t.affected} value={report.summary.affectedUrlCount} tone="warn" />

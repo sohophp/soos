@@ -149,9 +149,9 @@ soos 的目标关系链是：
 状态：进行中
 
 - [x] 以用户控制的 25 URL 批次检查 sitemap URL，避免不受控消耗配额。
-- [ ] 按 Google 未收录原因分组。
-- [ ] 区分合理重复页和需要修复的排除页。
-- [ ] 结合 Search Analytics 点击和展示确定重要页面优先级。
+- [x] 按 Google 未收录原因分组。
+- [x] 区分合理重复页和需要修复的排除页。
+- [x] 结合 Search Analytics 点击和展示确定重要页面优先级。
 - [ ] 检查最后抓取时间，发现长期未抓取的重要页面。
 
 ### Milestone C：URL 集合对比
@@ -206,6 +206,10 @@ soos 的目标关系链是：
 - 三种语言均已加入相关界面文案。
 - 开始 Milestone B：收录覆盖诊断。
 - 增加累计式 25 URL Inspection 批次，可以继续检查超过最初 25 个的网址，同时由用户控制 Google 配额使用。
+- 按 discovered、crawled、duplicate、canonical、blocked、soft 404、fetch 等 Google 状态分组。
+- 将检查结果区分为需要修复、合理排除和已收录。
+- 结合 Search Analytics 点击、展示、技术阻挡和最后抓取时间计算高、中、低优先级。
+- 增加收录覆盖诊断 CSV 导出。
 
 ## 9. 当前完成度
 
@@ -217,7 +221,7 @@ soos 的目标关系链是：
 | 后台与 Serverless 执行 | 85% |
 | Search Console OAuth | 90% |
 | Search Analytics 诊断 | 70% |
-| URL Inspection 诊断 | 70% |
+| URL Inspection 诊断 | 85% |
 | Google URL 对照矩阵 | 70% |
 | 结构化数据验证 | 20% |
 | Googlebot 日志分析 | 0% |
