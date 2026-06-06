@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { absoluteLogUrl, parseAccessLog, STATIC_ASSET_PATH } from "./googlebot-log.js";
+import { buildUrlInspectionCandidates, inspectionCandidateKey } from "./url-inspection-candidates.js";
 import "./styles.css";
 
 const severityLabels = { critical: "Critical", warning: "Warning", notice: "Notice" };
@@ -2104,7 +2105,7 @@ const gscDataText = {
     position: "Position", connectFirst: "Connect Google Search Console first, then load Search Analytics.",
     propertyFirst: "Enter the Search Console Property URL before loading Search Analytics.",
     inspectionTitle: "URL Inspection", inspectStatus: "Inspect real Google index status",
-    inspectionHelp: "Checks up to 25 scanned sitemap URLs with the connected Search Console property.",
+    inspectionHelp: "Checks prioritized anomalies across sitemap URLs, Search Analytics pages, and internal URLs, up to 25 per batch.",
     inspect: "Inspect URLs", inspectNext: "Inspect next 25", inspectionComplete: "All scanned URLs inspected",
     remaining: "remaining", inspecting: "Inspecting...", inspected: "Inspected", review: "Needs review",
     critical: "critical", warnings: "warnings", notices: "notices", noCoverage: "No coverage state",
@@ -2147,6 +2148,12 @@ const gscDataText = {
     noIssue: "No immediate index issue", noIssueDetail: "Google reports this URL as passing URL Inspection checks.",
     noIssueAction: "Keep monitoring performance data and canonical consistency.",
     inspectPropertyFirst: "Enter the Search Console Property URL before running URL Inspection.",
+    inspectionQueue: "Priority inspection queue", inspectionCandidates: "candidates", inspectionAnomalies: "anomalies first",
+    inspectionNextBatch: "Next batch", inspectionSources: "Sources", sourceSitemapShort: "Sitemap",
+    sourceGscShort: "GSC", sourceInternalShort: "Internal", candidateTechnical: "Technical blocker",
+    candidateSignals: "Redirect or canonical mismatch", candidateGscMissing: "GSC page missing from sitemap",
+    candidateInternalMissing: "Internal URL missing from sitemap", candidateNoGsc: "Sitemap URL without GSC impressions",
+    candidateBaseline: "Sitemap baseline",
     sitemapsTitle: "Google sitemap status", sitemapsLoad: "Load sitemap status", sitemapsLoading: "Loading...",
     sitemapsHelp: "Shows sitemaps submitted to this Search Console property, Google's last download, and reported errors or warnings.",
     sitemapsTotal: "submitted sitemaps", sitemapsPending: "pending", sitemapsErrors: "with errors",
@@ -2166,7 +2173,7 @@ const gscDataText = {
     position: "排名", connectFirst: "请先连接 Google Search Console，再加载 Search Analytics。",
     propertyFirst: "加载 Search Analytics 前，请先输入 Search Console Property URL。",
     inspectionTitle: "网址检查", inspectStatus: "检查 Google 中的真实收录状态",
-    inspectionHelp: "使用已连接的 Search Console property 检查最多 25 个 sitemap 网址。",
+    inspectionHelp: "优先检查 sitemap、Search Analytics 页面和站内网址的异常并集，每批最多 25 个。",
     inspect: "检查网址", inspectNext: "检查接下来 25 个", inspectionComplete: "已检查全部扫描网址",
     remaining: "个待检查", inspecting: "检查中...", inspected: "已检查", review: "需要处理",
     critical: "严重", warnings: "警告", notices: "提示", noCoverage: "没有覆盖状态",
@@ -2209,6 +2216,12 @@ const gscDataText = {
     noIssue: "没有明显索引问题", noIssueDetail: "Google 报告该网址通过了网址检查。",
     noIssueAction: "继续监控表现数据和 canonical 一致性。",
     inspectPropertyFirst: "运行网址检查前，请先输入 Search Console Property URL。",
+    inspectionQueue: "优先网址检查队列", inspectionCandidates: "个候选网址", inspectionAnomalies: "异常优先",
+    inspectionNextBatch: "下一批", inspectionSources: "来源", sourceSitemapShort: "Sitemap",
+    sourceGscShort: "GSC", sourceInternalShort: "站内发现", candidateTechnical: "存在技术阻挡",
+    candidateSignals: "跳转或 canonical 不一致", candidateGscMissing: "GSC 页面未进入 sitemap",
+    candidateInternalMissing: "站内网址未进入 sitemap", candidateNoGsc: "Sitemap 网址没有 GSC 展示",
+    candidateBaseline: "Sitemap 基线检查",
     sitemapsTitle: "Google Sitemap 状态", sitemapsLoad: "加载 Sitemap 状态", sitemapsLoading: "加载中...",
     sitemapsHelp: "显示该 Search Console property 已提交的 sitemap、Google 最后读取时间以及错误和警告。",
     sitemapsTotal: "个已提交 sitemap", sitemapsPending: "个待处理", sitemapsErrors: "个有错误",
@@ -2228,7 +2241,7 @@ const gscDataText = {
     position: "排名", connectFirst: "請先連接 Google Search Console，再載入 Search Analytics。",
     propertyFirst: "載入 Search Analytics 前，請先輸入 Search Console Property URL。",
     inspectionTitle: "網址檢查", inspectStatus: "檢查 Google 中的真實收錄狀態",
-    inspectionHelp: "使用已連接的 Search Console property 檢查最多 25 個 sitemap 網址。",
+    inspectionHelp: "優先檢查 sitemap、Search Analytics 頁面和站內網址的異常聯集，每批最多 25 個。",
     inspect: "檢查網址", inspectNext: "檢查接下來 25 個", inspectionComplete: "已檢查全部掃描網址",
     remaining: "個待檢查", inspecting: "檢查中...", inspected: "已檢查", review: "需要處理",
     critical: "嚴重", warnings: "警告", notices: "提示", noCoverage: "沒有涵蓋狀態",
@@ -2271,6 +2284,12 @@ const gscDataText = {
     noIssue: "沒有明顯索引問題", noIssueDetail: "Google 回報該網址通過網址檢查。",
     noIssueAction: "繼續監控成效資料和 canonical 一致性。",
     inspectPropertyFirst: "執行網址檢查前，請先輸入 Search Console Property URL。",
+    inspectionQueue: "優先網址檢查佇列", inspectionCandidates: "個候選網址", inspectionAnomalies: "異常優先",
+    inspectionNextBatch: "下一批", inspectionSources: "來源", sourceSitemapShort: "Sitemap",
+    sourceGscShort: "GSC", sourceInternalShort: "站內發現", candidateTechnical: "存在技術阻擋",
+    candidateSignals: "重新導向或 canonical 不一致", candidateGscMissing: "GSC 頁面未進入 sitemap",
+    candidateInternalMissing: "站內網址未進入 sitemap", candidateNoGsc: "Sitemap 網址沒有 GSC 曝光",
+    candidateBaseline: "Sitemap 基線檢查",
     sitemapsTitle: "Google Sitemap 狀態", sitemapsLoad: "載入 Sitemap 狀態", sitemapsLoading: "載入中...",
     sitemapsHelp: "顯示該 Search Console property 已提交的 sitemap、Google 最後讀取時間以及錯誤和警告。",
     sitemapsTotal: "個已提交 sitemap", sitemapsPending: "個待處理", sitemapsErrors: "個有錯誤",
@@ -3884,16 +3903,38 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const candidates = useMemo(
+    () => buildUrlInspectionCandidates(report, gscRows),
+    [gscRows, report],
+  );
   useEffect(() => {
     setResult(null);
     setError("");
   }, [report?.scannedAt]);
   if (!report?.pages?.length) return null;
 
-  const urls = report.pages.map((page) => page.url);
-  const inspectedUrlKeys = new Set((result?.results || []).map((item) => normalizeReportUrl(item.url)));
-  const pendingUrls = urls.filter((url) => !inspectedUrlKeys.has(normalizeReportUrl(url)));
-  const nextUrls = pendingUrls.slice(0, 25);
+  const inspectedUrlKeys = new Set((result?.results || []).map((item) => inspectionCandidateKey(item.url)));
+  const pendingCandidates = candidates.filter((candidate) => !inspectedUrlKeys.has(candidate.key));
+  const nextCandidates = pendingCandidates.slice(0, 25);
+  const nextUrls = nextCandidates.map((candidate) => candidate.url);
+  const anomalyCount = candidates.filter((candidate) => candidate.priority < 40).length;
+  const sourceCounts = candidates.reduce((counts, candidate) => {
+    for (const source of candidate.sources) counts[source] = (counts[source] || 0) + 1;
+    return counts;
+  }, {});
+  const reasonLabel = (reason) => {
+    if (reason.startsWith("technical_blocker:")) return copy.candidateTechnical;
+    if (reason.startsWith("url_signal:")) return copy.candidateSignals;
+    if (reason === "gsc_missing_sitemap") return copy.candidateGscMissing;
+    if (reason === "internal_missing_sitemap") return copy.candidateInternalMissing;
+    if (reason === "sitemap_no_gsc_impressions") return copy.candidateNoGsc;
+    return copy.candidateBaseline;
+  };
+  const sourceLabel = (source) => ({
+    sitemap: copy.sourceSitemapShort,
+    gsc: copy.sourceGscShort,
+    internal: copy.sourceInternalShort,
+  })[source] || source;
   const indexedCount = (result?.results || []).filter((item) => item.verdict === "PASS").length;
   const failedCount = (result?.results || []).filter((item) => !item.ok || item.verdict === "FAIL").length;
   const diagnosedResults = (result?.results || []).map((item) => ({
@@ -3928,10 +3969,17 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "URL Inspection failed");
+      const candidateByKey = new Map(nextCandidates.map((candidate) => [candidate.key, candidate]));
       setResult((current) => ({
         ...body,
         inspected: (current?.results?.length || 0) + (body.results?.length || 0),
-        results: [...(current?.results || []), ...(body.results || [])],
+        results: [
+          ...(current?.results || []),
+          ...(body.results || []).map((item) => ({
+            ...item,
+            candidate: candidateByKey.get(inspectionCandidateKey(item.url)) || null,
+          })),
+        ],
       }));
     } catch (err) {
       setError(err.message || String(err));
@@ -3955,7 +4003,28 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
           {loading ? copy.inspecting : result ? nextUrls.length ? copy.inspectNext : copy.inspectionComplete : copy.inspect}
         </button>
       </div>
-      {result && pendingUrls.length ? <small className="inspection-remaining">{pendingUrls.length} {copy.remaining}</small> : null}
+      <div className="inspection-queue">
+        <div className="coverage-disposition-summary">
+          <span>{candidates.length} {copy.inspectionCandidates}</span>
+          <span>{anomalyCount} {copy.inspectionAnomalies}</span>
+          <span>{copy.sourceSitemapShort}: {sourceCounts.sitemap || 0}</span>
+          <span>{copy.sourceGscShort}: {sourceCounts.gsc || 0}</span>
+          <span>{copy.sourceInternalShort}: {sourceCounts.internal || 0}</span>
+        </div>
+        {nextCandidates.length ? (
+          <div className="inspection-queue-list">
+            <strong>{copy.inspectionNextBatch}: {nextCandidates.length}</strong>
+            {nextCandidates.slice(0, 6).map((candidate) => (
+              <div className="inspection-queue-row" key={candidate.key}>
+                <span title={candidate.url}>{candidate.url}</span>
+                <small>{candidate.reasons.map(reasonLabel).join(" / ")}</small>
+                <small>{copy.inspectionSources}: {candidate.sources.map(sourceLabel).join(", ")}</small>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      {result && pendingCandidates.length ? <small className="inspection-remaining">{pendingCandidates.length} {copy.remaining}</small> : null}
       {error ? <div className="url-inspection-error">{error}</div> : null}
       <StructuredDataDiagnostics report={report} inspectionResults={result?.results || []} copy={copy} language={language} />
       <UrlSetComparison report={report} gscRows={gscRows} inspectionResults={result?.results || []} copy={copy} />
@@ -3983,6 +4052,8 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
                   <span>{item.coverageState || item.error || copy.noCoverage}</span>
                 </div>
                 <div className="impact-details">
+                  {item.candidate?.reasons?.length ? <small>{copy.inspectionQueue}: {item.candidate.reasons.map(reasonLabel).join(" / ")}</small> : null}
+                  {item.candidate?.sources?.length ? <small>{copy.inspectionSources}: {item.candidate.sources.map(sourceLabel).join(", ")}</small> : null}
                   {item.indexingState ? <small>{copy.indexing}: {item.indexingState}</small> : null}
                   {item.robotsTxtState ? <small>{copy.robots}: {item.robotsTxtState}</small> : null}
                   {item.pageFetchState ? <small>{copy.fetch}: {item.pageFetchState}</small> : null}

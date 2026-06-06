@@ -242,7 +242,7 @@ soos 的目标关系链是：
 - 增加 Search Analytics 日期区间对比和点击、展示、CTR、排名变化解释。
 - 支持 Query、Country、Device、Page + Query 组合分析。
 - 识别关键词蚕食、同查询多页面、排名良好但 CTR 偏低、展示增长但点击未增长。
-- 为 URL Inspection 建立优先级抽样：高价值页、异常页、新页面和回归页优先。
+- 已为 URL Inspection 建立异常并集优先队列：本地技术阻挡、跳转/canonical 异常、GSC 非 sitemap 页面和站内发现非 sitemap URL 优先；新页面和历史回归优先级仍待加入。
 - 显示 API 配额估算、已检查数量、跳过原因和可继续批次。
 - 已接入 GSC Sitemaps API，展示 Google 看到的 sitemap、提交时间、最后读取、待处理状态、错误和警告；下一步可加入提交与删除操作。
 
@@ -455,6 +455,9 @@ soos 的目标关系链是：
 - 2026-06-07：重新核对 Sitemap / Google 收录、URL 集合、Googlebot 日志和结构化数据原始计划，确认主体诊断已完成。
 - 2026-06-07：接入 Search Console Sitemaps API，增加三语言状态面板、当前扫描 sitemap 对照和数据转换测试。
 - 2026-06-07：明确忽略已弃用的 sitemap `indexed` 汇总字段，不使用它判断 URL 级收录。
+- 2026-06-07：URL Inspection 从顺序检查 sitemap URL 改为 sitemap、GSC 页面和站内发现 URL 的异常并集优先队列。
+- 2026-06-07：候选 URL 按技术阻挡、URL 信号异常、GSC 缺失 sitemap、站内缺失 sitemap、无 GSC 展示和普通基线分级；同一 URL 合并来源并保留查询参数。
+- 2026-06-07：新增候选队列单元测试并纳入 `npm run check`；站内候选仍仅覆盖已扫描页面抽取的链接。
 
 ## 12. 历史完成度基线
 

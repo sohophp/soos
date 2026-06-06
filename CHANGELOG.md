@@ -11,6 +11,8 @@ All notable changes to soos will be documented in this file.
 
 ### Added
 
+- A prioritized URL Inspection queue combining sitemap anomalies, Search Analytics pages missing from sitemap, and internally discovered URLs missing from sitemap.
+- Candidate source/reason visibility, cross-source deduplication, query-parameter preservation, and focused queue regression tests.
 - Search Console Sitemaps API status with submitted sitemap discovery, last download time, pending state, errors, warnings, submitted URL totals, and current-audit sitemap matching.
 - A focused Sitemaps API response normalization test that deliberately excludes Google's deprecated sitemap indexed totals.
 - A living development guide with project goals, architecture, completion tracking and milestone roadmap.

@@ -1672,6 +1672,52 @@ main {
   text-align: right;
 }
 
+.inspection-queue {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 12px;
+}
+
+.inspection-queue-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #dfe6dd;
+  border-radius: 6px;
+}
+
+.inspection-queue-list > strong {
+  padding: 9px 10px;
+  background: #f2f6f0;
+  color: #172018;
+  font-size: 12px;
+}
+
+.inspection-queue-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) minmax(180px, 1fr) minmax(140px, 0.7fr);
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid #edf1eb;
+  font-size: 12px;
+}
+
+.inspection-queue-row span,
+.inspection-queue-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspection-queue-row span {
+  color: #172018;
+  font-weight: 700;
+}
+
+.inspection-queue-row small {
+  color: #687169;
+}
+
 .inspection-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1761,6 +1807,12 @@ main {
 .inspection-diagnosis.good {
   border-color: #cddfce;
   background: #f7fbf6;
+}
+
+@media (max-width: 760px) {
+  .inspection-queue-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .url-alignment {
