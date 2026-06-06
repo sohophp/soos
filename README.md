@@ -10,6 +10,7 @@ soos is a local-first React + Node SEO audit tool for sitemap, robots.txt, index
 - Optional page content checks and lightweight performance checks.
 - Pause, resume, stop, background worker scans, history, CSV export, and summary export.
 - Neon-backed background jobs, completed reports, and URL-batch checkpoints with automatic recovery after page refresh.
+- Request-driven serverless workers with Neon leases, so scan work completes inside each API request instead of relying on background promises.
 - Google Search Console CSV import with English and Chinese column support.
 - Google Search Console API integration for Search Analytics dimensions and URL Inspection.
 - OAuth refresh token support so access tokens can refresh automatically.
@@ -154,6 +155,8 @@ Notes:
 - With `DATABASE_URL`, background job ownership, progress, request settings, and completed reports are retained in Neon for 7 days. Refreshing the page restores the active task.
 - Page inspection results are checkpointed to Neon every 10 URLs. If a serverless worker stops mid-scan, soos marks the task as interrupted and automatically resumes from the last completed batch. At most the unfinished batch is repeated.
 - Sitemap discovery is checkpointed before page inspection, so a resumed task does not re-fetch completed sitemap files or already saved page results.
+- The browser drives the worker through `/api/audit-jobs/:id/run`. Each request claims an atomic Neon lease and processes at most one 10-URL batch, preventing duplicate work when Vercel routes requests to different instances.
+- Pause and stop take effect between checkpoint batches; an in-flight batch is allowed to finish before the saved task state changes.
 - If `/api/gsc/status` returns `Not Found`, confirm the deployed branch includes `api/index.js` and `vercel.json`, then redeploy. The Vercel rewrite maps `/api/:path*` to `api/index.js`.
 
 Search Analytics notes:

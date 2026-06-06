@@ -10,12 +10,15 @@ All notable changes to soos will be documented in this file.
 - Automatic active-job restoration after a page refresh.
 - Interrupted worker detection and recoverable audit restart after a server cold start.
 - Sitemap discovery and page-result checkpoints for true URL-batch continuation.
+- Atomic Neon worker leases and request-driven batch execution for serverless deployments.
 
 ### Changed
 
 - Completed background reports remain available in Neon for 7 days.
 - Background job endpoints now enforce browser-session ownership.
 - Page inspection persists every 10 URLs and resumes from the last completed batch.
+- Creating an audit now only queues it; `/api/audit-jobs/:id/run` synchronously processes one leased batch per request.
+- Removed reliance on post-response background promises for Vercel audit jobs.
 - Updated the crawler user agent to `soos/0.2 SEO audit`.
 
 ## [0.2.0] - 2026-06-06

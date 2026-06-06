@@ -18,6 +18,7 @@ const JOB_TTL_MS = 1000 * 60 * 60 * 4;
 const PERSISTED_JOB_TTL_DAYS = 7;
 const JOB_PERSIST_INTERVAL_MS = 1500;
 const JOB_HEARTBEAT_TIMEOUT_MS = 45000;
+const JOB_LEASE_SECONDS = 120;
 const jobs = new Map();
 const activeJobRuns = new Set();
 const jobPersistTimers = new Map();
@@ -1209,7 +1210,7 @@ async function mapLimit(items, limit, worker, job) {
   return results;
 }
 
-async function audit(sitemapUrl, options = {}, onProgress, job = null) {
+async function audit(sitemapUrl, options = {}, onProgress, job = null, execution = {}) {
   const auditOptions = {
     contentChecks: Boolean(options.contentChecks),
     performanceChecks: Boolean(options.performanceChecks),
@@ -1309,6 +1310,7 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null) {
     : [];
   const inspectedPages = [...checkpointPages];
   let inspectedCount = inspectedPages.length;
+  let processedBatches = 0;
   await waitForJob(job);
   onProgress?.({
     stage: "inspecting",
@@ -1349,6 +1351,18 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null) {
       sitemapLimitReached,
       pages: inspectedPages,
     }, batchPages, Math.floor(offset / PAGE_CHECKPOINT_BATCH_SIZE));
+    processedBatches += 1;
+    if (
+      Number.isFinite(execution.maxBatches)
+      && processedBatches >= execution.maxBatches
+      && inspectedPages.length < pageUrls.length
+    ) {
+      return {
+        pending: true,
+        processedUrls: inspectedPages.length,
+        totalUrls: pageUrls.length,
+      };
+    }
   }
   const pages = structuredClone(inspectedPages);
   if (auditOptions.contentChecks) addDuplicateContentIssues(pages);
@@ -1642,6 +1656,13 @@ async function ensureNeonConfigTable(sql) {
     )
   `;
   await sql`
+    CREATE TABLE IF NOT EXISTS soos_job_lease (
+      job_id text PRIMARY KEY,
+      lease_token text NOT NULL,
+      leased_until timestamptz NOT NULL
+    )
+  `;
+  await sql`
     DELETE FROM soos_config
     WHERE key LIKE 'gsc_config:%'
       AND updated_at < now() - interval '90 days'
@@ -1651,7 +1672,39 @@ async function ensureNeonConfigTable(sql) {
     WHERE (key LIKE 'audit_job:%' OR key LIKE 'audit_job_batch:%')
       AND updated_at < now() - (${PERSISTED_JOB_TTL_DAYS} * interval '1 day')
   `;
+  await sql`DELETE FROM soos_job_lease WHERE leased_until < now()`;
   neonReady = true;
+}
+
+async function claimAuditJobLease(jobId) {
+  const sql = await getNeonSql();
+  const leaseToken = crypto.randomBytes(16).toString("hex");
+  if (!sql) {
+    if (activeJobRuns.has(jobId)) return null;
+    return leaseToken;
+  }
+  await ensureNeonConfigTable(sql);
+  const rows = await sql`
+    INSERT INTO soos_job_lease (job_id, lease_token, leased_until)
+    VALUES (${jobId}, ${leaseToken}, now() + (${JOB_LEASE_SECONDS} * interval '1 second'))
+    ON CONFLICT (job_id)
+    DO UPDATE SET
+      lease_token = EXCLUDED.lease_token,
+      leased_until = EXCLUDED.leased_until
+    WHERE soos_job_lease.leased_until < now()
+    RETURNING lease_token
+  `;
+  return rows[0]?.lease_token === leaseToken ? leaseToken : null;
+}
+
+async function releaseAuditJobLease(jobId, leaseToken) {
+  const sql = await getNeonSql();
+  if (!sql || !leaseToken) return;
+  await ensureNeonConfigTable(sql);
+  await sql`
+    DELETE FROM soos_job_lease
+    WHERE job_id = ${jobId} AND lease_token = ${leaseToken}
+  `;
 }
 
 function storedAuditJob(job) {
@@ -1759,7 +1812,7 @@ async function saveAuditCheckpoint(job, checkpoint, batch = null, batchIndex = 0
   await flushAuditJob(job);
 }
 
-async function readPersistedAuditJob(jobId, sessionId) {
+async function readPersistedAuditJob(jobId, sessionId, options = {}) {
   const sql = await getNeonSql();
   if (!sql) return null;
   await ensureNeonConfigTable(sql);
@@ -1775,7 +1828,7 @@ async function readPersistedAuditJob(jobId, sessionId) {
   if (job.checkpoint && !Array.isArray(job.checkpoint.pages)) {
     job.checkpoint.pages = await readAuditJobBatches(sql, job.id);
   }
-  const runningElsewhere = ["running", "queued"].includes(job.status) && !activeJobRuns.has(job.id);
+  const runningElsewhere = job.status === "running" && !activeJobRuns.has(job.id);
   if (runningElsewhere && Date.now() - job.updatedAt > JOB_HEARTBEAT_TIMEOUT_MS) {
     job.status = "interrupted";
     job.error = "The previous worker stopped before this audit completed. Restart the audit to continue.";
@@ -1783,7 +1836,7 @@ async function readPersistedAuditJob(jobId, sessionId) {
     job.updatedAt = Date.now();
     await persistAuditJob(job);
   }
-  if (!["running", "queued", "paused"].includes(job.status) || activeJobRuns.has(job.id)) {
+  if (options.cache !== false && (!["running", "queued", "paused"].includes(job.status) || activeJobRuns.has(job.id))) {
     jobs.set(job.id, job);
   }
   return job;
@@ -2273,15 +2326,17 @@ async function queryGscSearchAnalytics({ startDate, endDate, rowLimit = 25000, s
   };
 }
 
-async function runAuditJob(job) {
-  if (!job || activeJobRuns.has(job.id)) return;
+async function runAuditJob(job, execution = {}) {
+  if (!job || activeJobRuns.has(job.id)) return job;
   activeJobRuns.add(job.id);
-  updateJob(job, {
+  const startingPatch = {
     status: "running",
     error: null,
     recoverable: false,
     result: null,
-    progress: {
+  };
+  if (!job.checkpoint) {
+    startingPatch.progress = {
       stage: "preparing",
       label: "Preparing scan",
       percent: 5,
@@ -2289,8 +2344,9 @@ async function runAuditJob(job) {
       totalUrls: 0,
       processedSitemaps: 0,
       discoveredSitemaps: 0,
-    },
-  });
+    };
+  }
+  updateJob(job, startingPatch);
   await flushAuditJob(job);
   try {
     const result = await audit(
@@ -2298,8 +2354,29 @@ async function runAuditJob(job) {
       job.request?.options,
       (progress) => updateJob(job, { progress }),
       job,
+      execution,
     );
     if (job.status === "stopped") return;
+    if (result?.pending) {
+      const persistedJob = await readPersistedAuditJob(job.id, job.sessionId, { cache: false });
+      if (job.status === "paused" || job.status === "stopped") {
+        updateJob(job, { recoverable: true });
+      } else if (persistedJob?.status === "paused" || persistedJob?.status === "stopped") {
+        updateJob(job, {
+          status: persistedJob.status,
+          error: persistedJob.error || null,
+          recoverable: true,
+          progress: persistedJob.progress,
+        });
+      } else {
+        updateJob(job, {
+          status: "queued",
+          error: null,
+          recoverable: true,
+        });
+      }
+      return job;
+    }
     updateJob(job, {
       status: "done",
       error: null,
@@ -2345,6 +2422,7 @@ async function runAuditJob(job) {
       });
     }
   }
+  return job;
 }
 
 export function handleRequest(req, res) {
@@ -2494,6 +2572,31 @@ export function handleRequest(req, res) {
       .catch((error) => sendJson(res, 500, { error: String(error.message || error) }));
     return;
   }
+  if (req.method === "POST" && /^\/api\/audit-jobs\/[^/]+\/run$/.test(requestPath)) {
+    const id = requestPath.split("/")[3];
+    findAuditJob(id, sessionId)
+      .then(async (job) => {
+        if (!job) return sendJson(res, 404, { error: "Job not found" });
+        if (["done", "stopped", "error"].includes(job.status)) {
+          return sendJson(res, 200, jobSnapshot(job));
+        }
+        if (job.status === "paused") {
+          return sendJson(res, 200, jobSnapshot(job));
+        }
+        const leaseToken = await claimAuditJobLease(job.id);
+        if (!leaseToken) {
+          return sendJson(res, 202, { ...jobSnapshot(job), leaseBusy: true });
+        }
+        try {
+          await runAuditJob(job, { maxBatches: 1 });
+          return sendJson(res, job.status === "done" ? 200 : 202, jobSnapshot(job));
+        } finally {
+          await releaseAuditJobLease(job.id, leaseToken);
+        }
+      })
+      .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));
+    return;
+  }
   if (req.method === "POST" && /^\/api\/audit-jobs\/[^/]+\/control$/.test(requestPath)) {
     const parts = requestPath.split("/");
     const id = parts[3];
@@ -2501,20 +2604,15 @@ export function handleRequest(req, res) {
       .then(async (body) => {
         const job = await findAuditJob(id, sessionId);
         if (!job) return sendJson(res, 404, { error: "Job not found" });
-        if (body.action === "pause" && job.status === "running") {
+        if (body.action === "pause" && (job.status === "running" || job.status === "queued")) {
           updateJob(job, { status: "paused", progress: { label: "Paused" } });
         } else if (body.action === "resume" && job.status === "paused") {
-          if (activeJobRuns.has(job.id)) {
-            updateJob(job, { status: "running", progress: { label: job.progress.stage === "inspecting" ? "Inspecting URLs" : job.progress.label } });
-          } else {
-            void runAuditJob(job);
-            return sendJson(res, 202, jobSnapshot(job));
-          }
-        } else if (body.action === "stop" && (job.status === "running" || job.status === "paused")) {
+          updateJob(job, { status: "queued", progress: { label: job.progress.stage === "inspecting" ? "Inspecting URLs" : job.progress.label } });
+        } else if (body.action === "stop" && ["running", "queued", "paused"].includes(job.status)) {
           updateJob(job, { status: "stopped", progress: { label: "Stopped" }, error: null, recoverable: true });
         } else if (body.action === "restart" && ["interrupted", "error", "stopped"].includes(job.status)) {
+          updateJob(job, { status: "queued", error: null, recoverable: true });
           await flushAuditJob(job);
-          void runAuditJob(job);
           return sendJson(res, 202, jobSnapshot(job));
         }
         await flushAuditJob(job);
@@ -2531,7 +2629,6 @@ export function handleRequest(req, res) {
           options: body.options || {},
         });
         await flushAuditJob(job);
-        void runAuditJob(job);
         return sendJson(res, 202, jobSnapshot(job));
       })
       .catch((error) => sendJson(res, 400, { error: String(error.message || error) }));

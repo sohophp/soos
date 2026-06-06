@@ -3168,9 +3168,12 @@ useEffect(() => {
   }
 
   async function pollAuditJob(jobId) {
-    let restartedInterruptedJob = false;
     while (true) {
-      const pollResponse = await fetch(`/api/audit-jobs/${jobId}`);
+      const pollResponse = await fetch(`/api/audit-jobs/${jobId}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
       const pollBody = await pollResponse.json();
       if (!pollResponse.ok) {
         window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
@@ -3211,26 +3214,16 @@ useEffect(() => {
         saveCompletedReport(pollBody.result);
         return;
       }
-      if (pollBody.status === "interrupted" && pollBody.recoverable && !restartedInterruptedJob) {
-        restartedInterruptedJob = true;
-        const restartResponse = await fetch(`/api/audit-jobs/${jobId}/control`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "restart" }),
-        });
-        const restartBody = await restartResponse.json();
-        if (!restartResponse.ok) throw new Error(restartBody.error || "Could not restart interrupted audit");
-        setJobStatus(restartBody.status);
-      } else if (pollBody.status === "stopped") {
+      if (pollBody.status === "stopped") {
         window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
         setProgress({ label: t.progressStopped, value: pollBody.progress?.percent || 0, meta: metaParts.join(" | ") });
         return;
-      } else if (pollBody.status === "error" || pollBody.status === "interrupted") {
+      } else if (pollBody.status === "error") {
         window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
         throw new Error(pollBody.error || "Audit failed");
       }
 
-      await new Promise((resolve) => window.setTimeout(resolve, 500));
+      await new Promise((resolve) => window.setTimeout(resolve, pollBody.leaseBusy ? 1000 : 250));
     }
   }
 
