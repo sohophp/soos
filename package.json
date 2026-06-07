@@ -12,7 +12,8 @@
     "test:googlebot-log": "node tests/googlebot-log.test.js",
     "test:gsc-sitemaps": "node tests/gsc-sitemaps.test.js",
     "test:url-inspection-candidates": "node tests/url-inspection-candidates.test.js",
-    "check": "node --check server/api.js && node --check api/index.js && npm run test:structured-data && npm run test:googlebot-log && npm run test:gsc-sitemaps && npm run test:url-inspection-candidates && npm run build",
+    "test:internal-crawl": "node tests/internal-crawl.test.js",
+    "check": "node --check server/api.js && node --check api/index.js && npm run test:structured-data && npm run test:googlebot-log && npm run test:gsc-sitemaps && npm run test:url-inspection-candidates && npm run test:internal-crawl && npm run build",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

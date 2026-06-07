@@ -2350,6 +2350,61 @@ main {
   color: #687169;
 }
 
+.internal-discovery-copy {
+  padding: 12px 16px;
+  color: #687169;
+}
+
+.internal-discovery-list {
+  display: grid;
+  overflow: hidden;
+  margin: 0 16px 16px;
+  border: 1px solid #dfe6dd;
+  border-radius: 6px;
+}
+
+.internal-discovery-row {
+  display: grid;
+  grid-template-columns: 70px minmax(220px, 1.5fr) 90px minmax(200px, 1fr) 80px;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  border-top: 1px solid #edf1eb;
+  font-size: 12px;
+}
+
+.internal-discovery-row:first-child {
+  border-top: 0;
+}
+
+.internal-discovery-row strong,
+.internal-discovery-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.internal-discovery-row strong {
+  color: #172018;
+}
+
+.internal-discovery-row span,
+.internal-discovery-row small {
+  color: #687169;
+}
+
+@media (max-width: 760px) {
+  .internal-discovery-row {
+    grid-template-columns: 70px minmax(0, 1fr);
+  }
+
+  .internal-discovery-row span,
+  .internal-discovery-row small {
+    grid-column: 2;
+  }
+}
+
 @media (max-width: 780px) {
   .retained-job-row {
     grid-template-columns: 1fr;

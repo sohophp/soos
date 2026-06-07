@@ -11,6 +11,8 @@ All notable changes to soos will be documented in this file.
 
 ### Added
 
+- Optional bounded recursive internal discovery with same-site filtering, depth and URL budgets, checkpoint recovery, and a separate discovered-page report.
+- Recursive discoveries feed URL-set comparison and prioritized URL Inspection without changing sitemap health scoring.
 - A prioritized URL Inspection queue combining sitemap anomalies, Search Analytics pages missing from sitemap, and internally discovered URLs missing from sitemap.
 - Candidate source/reason visibility, cross-source deduplication, query-parameter preservation, and focused queue regression tests.
 - Search Console Sitemaps API status with submitted sitemap discovery, last download time, pending state, errors, warnings, submitted URL totals, and current-audit sitemap matching.

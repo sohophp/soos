@@ -133,6 +133,16 @@ const dictionaries = {
     performanceChecksHelp: "TTFB, HTML size, scripts, stylesheets, images, and lightweight CWV readiness signals",
     backgroundModeTitle: "Background worker mode",
     backgroundModeHelp: "Raise the scan limit to 2000 URLs and keep the job available longer",
+    internalCrawlTitle: "Recursive internal discovery",
+    internalCrawlHelp: "Crawl same-site links to depth 2, separately limited to 100 URLs or 500 in background mode",
+    progressDiscovering: "Discovering internal URLs",
+    discoveredUrls: "Discovered URLs",
+    internalDiscoveryTitle: "Recursive internal discovery",
+    internalDiscoveryHelp: "Pages found outside the sitemap by following same-site links. These do not change the sitemap health score.",
+    crawlDepth: "Depth",
+    discoveredFrom: "Found from",
+    noDiscoveredUrls: "No additional internal pages were crawled.",
+    internalCrawlLimit: "Internal discovery reached its separate URL budget. Results cover the crawled subset.",
     status: "Status",
     robotsAnalysis: "Robots analysis",
     robotsContent: "robots.txt content",
@@ -269,6 +279,16 @@ const dictionaries = {
     performanceChecksHelp: "TTFB\u3001HTML \u5927\u5c0f\u3001\u811a\u672c\u3001\u6837\u5f0f\u3001\u56fe\u7247\u548c\u8f7b\u91cf CWV \u51c6\u5907\u5ea6\u4fe1\u53f7",
     backgroundModeTitle: "\u540e\u53f0 worker \u6a21\u5f0f",
     backgroundModeHelp: "\u5c06\u626b\u63cf\u4e0a\u9650\u63d0\u9ad8\u5230 2000 \u4e2a URL\uff0c\u5e76\u5ef6\u957f job \u4fdd\u7559\u65f6\u95f4",
+    internalCrawlTitle: "\u9012\u5f52\u53d1\u73b0\u7ad9\u5185\u7f51\u5740",
+    internalCrawlHelp: "\u8ddf\u968f\u540c\u7ad9\u94fe\u63a5\u6293\u53d6\u5230\u7b2c 2 \u5c42\uff0c\u72ec\u7acb\u9650\u5236\u4e3a 100 \u4e2a URL\uff0c\u540e\u53f0\u6a21\u5f0f\u4e3a 500 \u4e2a",
+    progressDiscovering: "\u9012\u5f52\u53d1\u73b0\u7ad9\u5185\u7f51\u5740",
+    discoveredUrls: "\u53d1\u73b0\u7f51\u5740",
+    internalDiscoveryTitle: "\u9012\u5f52\u7ad9\u5185\u53d1\u73b0",
+    internalDiscoveryHelp: "\u901a\u8fc7\u540c\u7ad9\u94fe\u63a5\u53d1\u73b0\u7684 sitemap \u5916\u9875\u9762\uff0c\u4e0d\u4f1a\u6539\u53d8 sitemap \u5065\u5eb7\u5206\u3002",
+    crawlDepth: "\u6df1\u5ea6",
+    discoveredFrom: "\u53d1\u73b0\u6765\u6e90",
+    noDiscoveredUrls: "\u672a\u6293\u53d6\u5230\u989d\u5916\u7ad9\u5185\u9875\u9762\u3002",
+    internalCrawlLimit: "\u9012\u5f52\u7ad9\u5185\u53d1\u73b0\u5df2\u8fbe\u5230\u72ec\u7acb URL \u9884\u7b97\uff0c\u7ed3\u679c\u4ec5\u8986\u76d6\u5df2\u6293\u53d6\u96c6\u5408\u3002",
     status: "\u72b6\u6001",
     robotsAnalysis: "Robots \u5206\u6790",
     robotsContent: "robots.txt \u5185\u5bb9",
@@ -405,6 +425,16 @@ const dictionaries = {
     performanceChecksHelp: "TTFB\u3001HTML \u5927\u5c0f\u3001\u8173\u672c\u3001\u6a23\u5f0f\u3001\u5716\u7247\u548c\u8f15\u91cf CWV \u6e96\u5099\u5ea6\u8a0a\u865f",
     backgroundModeTitle: "\u80cc\u666f worker \u6a21\u5f0f",
     backgroundModeHelp: "\u5c07\u6383\u63cf\u4e0a\u9650\u63d0\u9ad8\u5230 2000 \u500b URL\uff0c\u4e26\u5ef6\u9577 job \u4fdd\u7559\u6642\u9593",
+    internalCrawlTitle: "\u905e\u8ff4\u767c\u73fe\u7ad9\u5167\u7db2\u5740",
+    internalCrawlHelp: "\u8ddf\u96a8\u540c\u7ad9\u9023\u7d50\u6aa2\u7d22\u5230\u7b2c 2 \u5c64\uff0c\u7368\u7acb\u9650\u5236\u70ba 100 \u500b URL\uff0c\u80cc\u666f\u6a21\u5f0f\u70ba 500 \u500b",
+    progressDiscovering: "\u905e\u8ff4\u767c\u73fe\u7ad9\u5167\u7db2\u5740",
+    discoveredUrls: "\u767c\u73fe\u7db2\u5740",
+    internalDiscoveryTitle: "\u905e\u8ff4\u7ad9\u5167\u767c\u73fe",
+    internalDiscoveryHelp: "\u900f\u904e\u540c\u7ad9\u9023\u7d50\u767c\u73fe\u7684 sitemap \u5916\u9801\u9762\uff0c\u4e0d\u6703\u6539\u8b8a sitemap \u5065\u5eb7\u5206\u3002",
+    crawlDepth: "\u6df1\u5ea6",
+    discoveredFrom: "\u767c\u73fe\u4f86\u6e90",
+    noDiscoveredUrls: "\u672a\u6aa2\u7d22\u5230\u984d\u5916\u7ad9\u5167\u9801\u9762\u3002",
+    internalCrawlLimit: "\u905e\u8ff4\u7ad9\u5167\u767c\u73fe\u5df2\u9054\u5230\u7368\u7acb URL \u9810\u7b97\uff0c\u7d50\u679c\u50c5\u6db5\u84cb\u5df2\u6aa2\u7d22\u96c6\u5408\u3002",
     status: "\u72c0\u614b",
     robotsAnalysis: "Robots \u5206\u6790",
     robotsContent: "robots.txt \u5167\u5bb9",
@@ -3489,9 +3519,14 @@ function urlVariantFamily(value) {
 
 function buildUrlSetFindings(report, gscRows, inspectionResults, copy) {
   const pages = report?.pages || [];
-  const hasInternalLinkData = pages.some((page) => Array.isArray(page.internalLinks));
+  const scannedPages = [...pages, ...(report?.discoveredPages || [])];
+  const hasInternalLinkData = scannedPages.some((page) => Array.isArray(page.internalLinks));
   const sitemapUrls = new Map();
-  const internalUrls = new Map();
+  const internalUrls = new Map(
+    (report?.discoveredPages || []).flatMap((page) => [page.url, ...(page.internalLinks || [])])
+      .map((url) => [normalizeReportUrl(url), url])
+      .filter(([key]) => key),
+  );
   const inboundSources = new Map();
   const sourceUrls = new Map();
   const addSourceUrl = (value, source) => {
@@ -4408,6 +4443,38 @@ function GooglebotLogAnalysis({ report, language, gscRows }) {
   );
 }
 
+function InternalDiscovery({ report, t }) {
+  const pages = report?.discoveredPages || [];
+  if (!report?.options?.internalCrawl) return null;
+  return (
+    <section className="panel internal-discovery">
+      <div className="panel-head">
+        <h2>{t.internalDiscoveryTitle}</h2>
+        <span>{pages.length} {t.discoveredUrls}</span>
+      </div>
+      <div className="internal-discovery-copy">
+        <small>{t.internalDiscoveryHelp}</small>
+        {report.truncation?.internalCrawlLimitReached ? <small className="gsc-api-error">{t.internalCrawlLimit}</small> : null}
+      </div>
+      {pages.length ? (
+        <div className="internal-discovery-list">
+          {pages.map((page) => (
+            <article className="internal-discovery-row" key={page.url}>
+              <Badge severity={page.status >= 400 || !page.status ? "critical" : page.issues?.length ? "warning" : "ok"}>
+                {page.status || "ERR"}
+              </Badge>
+              <strong title={page.url}>{page.url}</strong>
+              <span>{t.crawlDepth}: {page.crawlDepth || 1}</span>
+              <small title={page.discoveredFrom}>{t.discoveredFrom}: {page.discoveredFrom || "-"}</small>
+              <small>{page.issues?.length || 0} {t.tasks}</small>
+            </article>
+          ))}
+        </div>
+      ) : <p className="none">{t.noDiscoveredUrls}</p>}
+    </section>
+  );
+}
+
 function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
@@ -4456,8 +4523,10 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
       <GscOpportunities report={report} rows={gscRows} language={language} />
       <GooglebotLogAnalysis report={report} language={language} gscRows={gscRows} />
       <UrlInspectionPanel report={report} gscStatus={gscStatus} siteUrl={gscSiteUrl} language={language} gscRows={gscRows} />
+      <InternalDiscovery report={report} t={t} />
       <section className="summary">
         <Stat label={t.urls} value={report.summary.urlCount} />
+        {report.options?.internalCrawl ? <Stat label={t.discoveredUrls} value={report.summary.discoveredUrlCount || 0} /> : null}
         <Stat label={t.affected} value={report.summary.affectedUrlCount} tone="warn" />
         <Stat label={t.googleRisk} value={report.summary.googleBlockedCount} tone="bad" />
         <Stat label={t.critical} value={report.summary.issueCounts.critical} tone="bad" />
@@ -4577,6 +4646,7 @@ function App() {
   const [directoryRobots, setDirectoryRobots] = useState(false);
   const [performanceChecks, setPerformanceChecks] = useState(false);
   const [backgroundMode, setBackgroundMode] = useState(false);
+  const [internalCrawl, setInternalCrawl] = useState(false);
   const [gscRows, setGscRows] = useState([]);
   const [gscStatus, setGscStatus] = useState(null);
   const [gscSiteUrl, setGscSiteUrl] = useState("");
@@ -4763,6 +4833,8 @@ useEffect(() => {
                 ? t.progressFetching
                 : pollBody.progress?.stage === "inspecting"
                   ? t.progressInspecting
+                  : pollBody.progress?.stage === "discovering"
+                    ? t.progressDiscovering
                   : pollBody.progress?.stage === "finalizing"
                     ? t.progressFinalizing
                     : t.progressPreparing;
@@ -4817,6 +4889,7 @@ useEffect(() => {
             contentChecks,
             performanceChecks,
             backgroundMode,
+            internalCrawl,
             robotsSource: directoryRobots ? "sitemap-directory" : "root",
             proxyEnabled: false,
           },
@@ -4907,6 +4980,14 @@ useEffect(() => {
         <span>
           <strong>{t.backgroundModeTitle || "Background worker mode"}</strong>
           <small>{t.backgroundModeHelp || "Raise the scan limit to 2000 URLs and keep the job available longer"}</small>
+        </span>
+      </label>
+
+      <label className="option-toggle">
+        <input type="checkbox" checked={internalCrawl} onChange={(event) => setInternalCrawl(event.target.checked)} />
+        <span>
+          <strong>{t.internalCrawlTitle}</strong>
+          <small>{t.internalCrawlHelp}</small>
         </span>
       </label>
 

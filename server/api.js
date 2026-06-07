@@ -8,12 +8,16 @@ import net from "node:net";
 import { ProxyAgent } from "undici";
 import { neon } from "@neondatabase/serverless";
 import { normalizeGscSitemapResponse } from "../src/gsc-sitemaps.js";
+import { enqueueInternalLinks, internalCrawlKey } from "../src/internal-crawl.js";
 
 const PORT = Number(process.env.SOOS_API_PORT || 4177);
 const USER_AGENT = "soos/0.2 SEO audit";
 const MAX_SITEMAPS = 30;
 const MAX_URLS = 250;
 const BACKGROUND_MAX_URLS = 2000;
+const INTERNAL_CRAWL_MAX_URLS = 100;
+const BACKGROUND_INTERNAL_CRAWL_MAX_URLS = 500;
+const INTERNAL_CRAWL_MAX_DEPTH = 2;
 const PAGE_CONCURRENCY = 5;
 const PAGE_CHECKPOINT_BATCH_SIZE = 10;
 const FETCH_TIMEOUT_MS = 15000;
@@ -1916,6 +1920,9 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null, execution
     performanceChecks: Boolean(options.performanceChecks),
     backgroundMode: Boolean(options.backgroundMode),
     maxUrls: options.backgroundMode ? BACKGROUND_MAX_URLS : MAX_URLS,
+    internalCrawl: Boolean(options.internalCrawl),
+    internalCrawlMaxUrls: options.backgroundMode ? BACKGROUND_INTERNAL_CRAWL_MAX_URLS : INTERNAL_CRAWL_MAX_URLS,
+    internalCrawlMaxDepth: INTERNAL_CRAWL_MAX_DEPTH,
     robotsSource: options.robotsSource === "sitemap-directory" ? "sitemap-directory" : "root",
     proxyEnabled: Boolean(options.proxyEnabled),
     proxyUrl: typeof options.proxyUrl === "string" && options.proxyUrl.trim() ? options.proxyUrl.trim() : "http://127.0.0.1:7890",
@@ -1941,7 +1948,11 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null, execution
   let truncated;
   let urlLimitReached;
   let sitemapLimitReached;
-  if (savedCheckpoint?.phase === "inspecting" && Array.isArray(savedCheckpoint.pageUrls) && Array.isArray(savedCheckpoint.sitemapReports)) {
+  if (
+    ["inspecting", "discovering"].includes(savedCheckpoint?.phase)
+    && Array.isArray(savedCheckpoint.pageUrls)
+    && Array.isArray(savedCheckpoint.sitemapReports)
+  ) {
     robots = savedCheckpoint.robots;
     sitemapReports = savedCheckpoint.sitemapReports;
     pageUrls = savedCheckpoint.pageUrls;
@@ -2005,9 +2016,10 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null, execution
     });
   }
   const sitemapUrlSet = new Set(pageUrls.map((url) => normalizeUrl(url)).filter(Boolean));
-  const checkpointPages = savedCheckpoint?.phase === "inspecting" && Array.isArray(savedCheckpoint.pages)
-    ? savedCheckpoint.pages.slice(0, pageUrls.length)
+  const restoredPages = ["inspecting", "discovering"].includes(savedCheckpoint?.phase) && Array.isArray(savedCheckpoint.pages)
+    ? savedCheckpoint.pages
     : [];
+  const checkpointPages = restoredPages.filter((page) => page.source !== "internal-crawl").slice(0, pageUrls.length);
   const inspectedPages = [...checkpointPages];
   let inspectedCount = inspectedPages.length;
   let processedBatches = 0;
@@ -2021,7 +2033,7 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null, execution
     processedSitemaps: sitemapReports.length,
     discoveredSitemaps: sitemapReports.length,
   });
-  for (let offset = inspectedCount; offset < pageUrls.length; offset += PAGE_CHECKPOINT_BATCH_SIZE) {
+  for (let offset = inspectedCount; savedCheckpoint?.phase !== "discovering" && offset < pageUrls.length; offset += PAGE_CHECKPOINT_BATCH_SIZE) {
     await waitForJob(job);
     const batchUrls = pageUrls.slice(offset, offset + PAGE_CHECKPOINT_BATCH_SIZE);
     const batchPages = await mapLimit(batchUrls, PAGE_CONCURRENCY, async (url) => {
@@ -2037,7 +2049,7 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null, execution
         processedSitemaps: sitemapReports.length,
         discoveredSitemaps: sitemapReports.length,
       });
-      return page;
+      return { ...page, source: "sitemap", crawlDepth: 0, discoveredFrom: "" };
     }, job);
     inspectedPages.push(...batchPages);
     await saveAuditCheckpoint(job, {
@@ -2064,10 +2076,115 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null, execution
       };
     }
   }
+  const discoveredPages = restoredPages.filter((page) => page.source === "internal-crawl");
+  let crawlQueue = savedCheckpoint?.phase === "discovering" && Array.isArray(savedCheckpoint.crawlQueue)
+    ? savedCheckpoint.crawlQueue
+    : [];
+  let crawlCursor = savedCheckpoint?.phase === "discovering"
+    ? Math.max(0, Number(savedCheckpoint.crawlCursor) || 0)
+    : 0;
+  const crawlSeen = new Set(
+    savedCheckpoint?.phase === "discovering" && Array.isArray(savedCheckpoint.crawlSeen)
+      ? savedCheckpoint.crawlSeen
+      : pageUrls.map((url) => internalCrawlKey(url)).filter(Boolean),
+  );
+
+  if (auditOptions.internalCrawl && savedCheckpoint?.phase !== "discovering") {
+    for (const page of inspectedPages) {
+      enqueueInternalLinks({
+        queue: crawlQueue,
+        seen: crawlSeen,
+        links: page.internalLinks,
+        siteRootUrl: detected.siteRootUrl,
+        depth: 1,
+        maxDepth: auditOptions.internalCrawlMaxDepth,
+        maxUrls: auditOptions.internalCrawlMaxUrls,
+        discoveredFrom: page.finalUrl || page.url,
+      });
+    }
+    await saveAuditCheckpoint(job, {
+      key: checkpointKey,
+      phase: "discovering",
+      robots,
+      sitemapReports,
+      pageUrls,
+      truncated,
+      urlLimitReached,
+      sitemapLimitReached,
+      pages: inspectedPages,
+      crawlQueue,
+      crawlCursor,
+      crawlSeen: [...crawlSeen],
+    });
+  }
+
+  while (auditOptions.internalCrawl && crawlCursor < crawlQueue.length) {
+    if (Number.isFinite(execution.maxBatches) && processedBatches >= execution.maxBatches) {
+      return {
+        pending: true,
+        processedUrls: inspectedPages.length + discoveredPages.length,
+        totalUrls: pageUrls.length + crawlQueue.length,
+      };
+    }
+    await waitForJob(job);
+    const batchStart = crawlCursor;
+    const batchItems = crawlQueue.slice(batchStart, batchStart + PAGE_CHECKPOINT_BATCH_SIZE);
+    const batchPages = await mapLimit(batchItems, PAGE_CONCURRENCY, async (item) => {
+      const page = await inspectPage(item.url, robots.found ? robots : null, sitemapUrlSet, auditOptions, fetchContext, job);
+      return {
+        ...page,
+        source: "internal-crawl",
+        crawlDepth: item.depth,
+        discoveredFrom: item.discoveredFrom,
+      };
+    }, job);
+    crawlCursor += batchItems.length;
+    discoveredPages.push(...batchPages);
+    for (const page of batchPages) {
+      enqueueInternalLinks({
+        queue: crawlQueue,
+        seen: crawlSeen,
+        links: page.internalLinks,
+        siteRootUrl: detected.siteRootUrl,
+        depth: (Number(page.crawlDepth) || 0) + 1,
+        maxDepth: auditOptions.internalCrawlMaxDepth,
+        maxUrls: auditOptions.internalCrawlMaxUrls,
+        discoveredFrom: page.finalUrl || page.url,
+      });
+    }
+    onProgress?.({
+      stage: "discovering",
+      label: "Discovering internal URLs",
+      percent: Math.min(90 + Math.round((crawlCursor / Math.max(crawlQueue.length, 1)) * 7), 97),
+      processedUrls: inspectedPages.length + discoveredPages.length,
+      totalUrls: pageUrls.length + crawlQueue.length,
+      processedSitemaps: sitemapReports.length,
+      discoveredSitemaps: sitemapReports.length,
+    });
+    await saveAuditCheckpoint(job, {
+      key: checkpointKey,
+      phase: "discovering",
+      robots,
+      sitemapReports,
+      pageUrls,
+      truncated,
+      urlLimitReached,
+      sitemapLimitReached,
+      pages: [...inspectedPages, ...discoveredPages],
+      crawlQueue,
+      crawlCursor,
+      crawlSeen: [...crawlSeen],
+    }, batchPages, 100000 + Math.floor(batchStart / PAGE_CHECKPOINT_BATCH_SIZE));
+    processedBatches += 1;
+  }
   const pages = structuredClone(inspectedPages);
+  const crawledInternalPages = structuredClone(discoveredPages);
   if (auditOptions.contentChecks) addDuplicateContentIssues(pages);
   addAlternateReciprocityIssues(pages);
   for (const page of pages) {
+    page.googleReasons = classifyGoogleReasons(page);
+  }
+  for (const page of crawledInternalPages) {
     page.googleReasons = classifyGoogleReasons(page);
   }
   if (robots.analysis) {
@@ -2088,8 +2205,8 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null, execution
     stage: "finalizing",
     label: "Finalizing report",
     percent: 98,
-    processedUrls: pageUrls.length,
-    totalUrls: pageUrls.length,
+    processedUrls: pageUrls.length + crawledInternalPages.length,
+    totalUrls: pageUrls.length + crawledInternalPages.length,
     processedSitemaps: sitemapReports.length,
     discoveredSitemaps: sitemapReports.length,
   });
@@ -2097,8 +2214,20 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null, execution
   return {
     scannedAt: new Date().toISOString(),
     durationMs: Date.now() - startedAt,
-    limits: { maxSitemaps: MAX_SITEMAPS, maxUrls: auditOptions.maxUrls, pageConcurrency: PAGE_CONCURRENCY, backgroundMode: auditOptions.backgroundMode },
-    truncation: { truncated, urlLimitReached, sitemapLimitReached },
+    limits: {
+      maxSitemaps: MAX_SITEMAPS,
+      maxUrls: auditOptions.maxUrls,
+      internalCrawlMaxUrls: auditOptions.internalCrawlMaxUrls,
+      internalCrawlMaxDepth: auditOptions.internalCrawlMaxDepth,
+      pageConcurrency: PAGE_CONCURRENCY,
+      backgroundMode: auditOptions.backgroundMode,
+    },
+    truncation: {
+      truncated,
+      urlLimitReached,
+      sitemapLimitReached,
+      internalCrawlLimitReached: auditOptions.internalCrawl && crawlQueue.length >= auditOptions.internalCrawlMaxUrls,
+    },
     input: {
       originalUrl: normalizedInput,
       inputType: detected.inputType,
@@ -2121,6 +2250,7 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null, execution
       healthScore: calculateHealthScore(pages, sitemapReports),
       sitemapCount: sitemapReports.length,
       urlCount: pageUrls.length,
+      discoveredUrlCount: crawledInternalPages.length,
       affectedUrlCount: pages.filter((page) => page.issues.length).length,
       googleBlockedCount: pages.filter((page) => page.googleReasons.some((reason) => reason.severity === "critical")).length,
       issueCounts,
@@ -2148,6 +2278,7 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null, execution
     internationalSignals,
     sitemaps: sitemapReports,
     pages,
+    discoveredPages: crawledInternalPages,
   };
 }
 
@@ -3154,8 +3285,8 @@ async function runAuditJob(job, execution = {}) {
         stage: "done",
         label: "Completed",
         percent: 100,
-        processedUrls: result.summary.urlCount,
-        totalUrls: result.summary.urlCount,
+        processedUrls: result.summary.urlCount + (result.summary.discoveredUrlCount || 0),
+        totalUrls: result.summary.urlCount + (result.summary.discoveredUrlCount || 0),
         processedSitemaps: result.summary.sitemapCount,
         discoveredSitemaps: result.summary.sitemapCount,
       },

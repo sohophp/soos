@@ -22,6 +22,13 @@ const report = {
       internalLinks: [],
     },
   ],
+  discoveredPages: [
+    {
+      url: "https://example.com/crawled-only",
+      issues: [],
+      internalLinks: ["https://example.com/deeper-only"],
+    },
+  ],
 };
 
 const rows = [
@@ -42,6 +49,8 @@ const shared = candidates.find((item) => item.url === "https://example.com/share
 assert.deepEqual(shared.sources.sort(), ["gsc", "internal"]);
 assert.equal(shared.priority, 20);
 assert.equal(candidates.filter((item) => item.key === shared.key).length, 1);
+assert.equal(candidates.find((item) => item.url === "https://example.com/crawled-only").priority, 25);
+assert.ok(candidates.some((item) => item.url === "https://example.com/deeper-only"));
 
 assert.notEqual(
   inspectionCandidateKey("https://example.com/shared?view=1"),

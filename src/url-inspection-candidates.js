@@ -32,6 +32,8 @@ function gscPage(row) {
 
 export function buildUrlInspectionCandidates(report, gscRows = []) {
   const pages = Array.isArray(report?.pages) ? report.pages : [];
+  const discoveredPages = Array.isArray(report?.discoveredPages) ? report.discoveredPages : [];
+  const allScannedPages = [...pages, ...discoveredPages];
   const sitemapKeys = new Set(pages.map((page) => inspectionCandidateKey(page.url)).filter(Boolean));
   const candidates = new Map();
 
@@ -78,11 +80,16 @@ export function buildUrlInspectionCandidates(report, gscRows = []) {
     }
   }
 
-  for (const page of pages) {
+  for (const page of allScannedPages) {
     for (const link of page.internalLinks || []) {
       const key = inspectionCandidateKey(link);
       if (key && !sitemapKeys.has(key)) add(link, 30, "internal", "internal_missing_sitemap");
     }
+  }
+
+  for (const page of discoveredPages) {
+    const key = inspectionCandidateKey(page.url);
+    if (key && !sitemapKeys.has(key)) add(page.url, 25, "internal", "internal_missing_sitemap");
   }
 
   for (const page of pages) {
