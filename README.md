@@ -38,6 +38,7 @@ Paid scheduled scans such as Vercel Cron are intentionally excluded.
 - Local access-log analysis with verified Googlebot IPs and sitemap crawl comparison.
 - Neon retained-task management and URL-level regression comparisons across repeated scans.
 - OAuth refresh token support so access tokens can refresh automatically.
+- Shared frontend API client with structured request errors and a three-language React render fallback.
 
 ## Requirements
 

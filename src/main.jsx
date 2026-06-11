@@ -17,560 +17,24 @@ import { absoluteLogUrl, parseAccessLog, STATIC_ASSET_PATH } from "./googlebot-l
 import { buildUrlInspectionCandidates, inspectionCandidateKey } from "./url-inspection-candidates.js";
 import { buildInternalLinkGraph } from "./link-graph.js";
 import { analyzeUrlVariantGroup, comparisonUrl, urlVariantFamily } from "./url-policy.js";
+import { apiDelete, apiGet, apiPost } from "./api-client.js";
+import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
+import {
+  detectLanguage,
+  dictionaries,
+  formatText,
+  googlebotLogText,
+  gscDataText,
+  gscSupportingText,
+  gscUiText,
+  inspectionDiagnosisText,
+  structuredDiagnosticText,
+} from "./i18n.js";
 import "./styles.css";
 
 const severityLabels = { critical: "Critical", warning: "Warning", notice: "Notice" };
 const severityIcons = { critical: XCircle, warning: AlertTriangle, notice: ShieldAlert };
-const dictionaries = {
-  en: {
-    heading: "Google crawl diagnostics",
-    subheading: "sitemap, robots.txt, canonical, and hreflang checks",
-    placeholder: "https://example.com, /sitemap.xml, or /robots.txt",
-    audit: "Audit",
-    pageChecksTitle: "Page content checks",
-    pageChecksHelp: "Title, description, H1, lang, viewport, JSON-LD, and duplicate metadata",
-    directoryRobotsTitle: "Use sitemap-directory robots.txt",
-    directoryRobotsHelp: "For test URLs, read robots.txt beside the sitemap instead of the domain root",
-    healthScore: "Health Score",
-    executiveSummary: "Executive summary",
-    priorityActions: "Priority actions",
-    statusFlags: "Status flags",
-    history: "Recent audits",
-    retainedJobs: "Retained Neon tasks",
-    retainedJobsHelp: "Tasks and completed reports retained for this browser session.",
-    refreshJobs: "Refresh tasks",
-    openReport: "Open report",
-    continueJob: "Continue",
-    noRetainedJobs: "No retained tasks are available.",
-    jobCreated: "Created",
-    jobUpdated: "Updated",
-    jobProgress: "Progress",
-    clearHistory: "Clear history",
-    keepRecent: "Keep recent",
-    rerun: "Rerun",
-    compareToCurrent: "Compare to current",
-    deleteHistory: "Delete",
-    details: "Details",
-    hideDetails: "Hide details",
-    noHistory: "No saved audits yet.",
-    historyScore: "Score",
-    historyUrls: "URLs",
-    historyAffected: "Affected",
-    trendUp: "Improved",
-    trendDown: "Worse",
-    trendFlat: "Unchanged",
-    issueDelta: "Issue delta",
-    improvedIssues: "Improved issues",
-    worsenedIssues: "Worsened issues",
-    noDelta: "No material issue changes detected.",
-    categoryDelta: "Category delta",
-    regressions: "New regressions",
-    resolvedIssues: "Resolved URL issues",
-    noRegressions: "No new URL-level regressions.",
-    cleanSignals: "Clean crawl signals",
-    needsCleanup: "Needs focused cleanup",
-    likelyBlockers: "Likely crawl/indexing blockers",
-    urls: "URLs",
-    affected: "Affected",
-    googleRisk: "Google Risk",
-    critical: "Critical",
-    warnings: "Warnings",
-    limitReachedTitle: "Interactive scan limit reached",
-    limitReachedText: "This report reached the configured limit of {urls} URLs or {sitemaps} sitemap files. Diagnostics and comparisons cover only the scanned set.",
-    limitOk: "Scan stayed within the current limit of {urls} URLs and {sitemaps} sitemap files.",
-    fixFirst: "Fix First",
-    tasks: "tasks",
-    noPriority: "No priority blockers found in the scanned URL set.",
-    robots: "Robots",
-    found: "Found",
-    groups: "groups",
-    sitemaps: "Sitemaps",
-    urlFindings: "URL Findings",
-    noFilter: "No URLs match this filter.",
-    searchUrls: "Search URLs or issues",
-    exportCsv: "Export CSV",
-    exportSummary: "Export Summary",
-    showMatchingUrls: "Show matching URLs",
-    copyBlockedUrls: "Copy blocked URLs",
-    copiedBlockedUrls: "Copied",
-    final: "Final",
-    redirectChain: "Redirect chain",
-    redirectHops: "hops",
-    canonical: "Canonical",
-    alternates: "Alternates",
-    hreflangLinks: "hreflang links",
-    likelyOutcome: "Likely Google outcome",
-    noBlockers: "No obvious crawl blockers found.",
-    title: "Title",
-    description: "Description",
-    h1: "H1",
-    lang: "Lang",
-    viewport: "Viewport",
-    jsonLd: "JSON-LD",
-    missing: "Missing",
-    present: "Present",
-    unknown: "Unknown",
-    noneFound: "None found",
-    validInvalid: "{valid} valid / {invalid} invalid",
-    detectedInputs: "Detected inputs",
-    original: "Original",
-    siteRoot: "Site root",
-    inputType: "Input type",
-    progressPreparing: "Preparing scan",
-    progressFetching: "Fetching sitemap and robots.txt",
-    progressInspecting: "Inspecting URLs",
-    progressFinalizing: "Finalizing report",
-    progressPaused: "Paused",
-    progressStopped: "Stopped",
-    progressInterrupted: "Worker interrupted, restarting audit",
-    pause: "Pause",
-    resume: "Resume",
-    stop: "Stop",
-    runtime: "Runtime",
-    startedAt: "Started",
-    elapsed: "Elapsed",
-    currentStage: "Current stage",
-    pauseCount: "Pauses",
-    stageElapsed: "Stage elapsed",
-    performance: "Performance",
-    performanceChecksTitle: "Performance checks",
-    performanceChecksHelp: "TTFB, HTML size, scripts, stylesheets, images, and lightweight CWV readiness signals",
-    backgroundModeTitle: "Background worker mode",
-    backgroundModeHelp: "Raise the scan limit to 2000 URLs and keep the job available longer",
-    internalCrawlTitle: "Recursive internal discovery",
-    internalCrawlHelp: "Crawl same-site links to depth 2, separately limited to 100 URLs or 500 in background mode",
-    urlPolicyTitle: "URL comparison policy",
-    urlPolicyHelp: "Changes URL matching and variant diagnosis only. Actual crawl requests are not rewritten.",
-    queryPolicy: "Query parameters",
-    queryPreserve: "Preserve all",
-    queryStripTracking: "Remove known tracking parameters",
-    queryDropAll: "Ignore all query parameters",
-    trailingSlashPolicy: "Trailing slash",
-    slashPreserve: "Preserve",
-    slashRemove: "Normalize without slash",
-    slashAdd: "Normalize with slash",
-    progressDiscovering: "Discovering internal URLs",
-    discoveredUrls: "Discovered URLs",
-    internalDiscoveryTitle: "Recursive internal discovery",
-    internalDiscoveryHelp: "Pages found outside the sitemap by following same-site links. These do not change the sitemap health score.",
-    crawlDepth: "Depth",
-    discoveredFrom: "Found from",
-    noDiscoveredUrls: "No additional internal pages were crawled.",
-    internalCrawlLimit: "Internal discovery reached its separate URL budget. Results cover the crawled subset.",
-    linkGraphTitle: "Internal link graph",
-    linkGraphHelp: "Builds directed links across scanned pages and calculates the shortest click path from the site root when that root was scanned.",
-    linkGraphExport: "Export link graph",
-    graphNodes: "nodes",
-    graphEdges: "edges",
-    graphAll: "All pages",
-    graphUnreachable: "Unreachable from site root",
-    graphOrphan: "Sitemap orphan",
-    graphDeep: "Deep click path",
-    graphWeak: "Weak inbound links",
-    graphDeadEnd: "No scanned outbound links",
-    graphHealthy: "Healthy linkage",
-    inboundCount: "Inbound",
-    outboundCount: "Outbound",
-    graphSource: "Source",
-    graphSourceSitemap: "Sitemap",
-    graphSourceInternal: "Recursive discovery",
-    clickDepth: "Click depth",
-    reachablePages: "reachable",
-    maxClickDepth: "max click depth",
-    rootNotScanned: "The site root was not scanned, so homepage click depth and unreachable status cannot be calculated.",
-    status: "Status",
-    robotsAnalysis: "Robots analysis",
-    robotsContent: "robots.txt content",
-    sitemapDirectives: "Sitemap directives",
-    rules: "rules",
-    googleGroups: "Google groups",
-    robotsImpact: "Robots impact",
-    blockedSubmittedUrls: "Blocked submitted URLs",
-    blockedCanonicalTargets: "Blocked canonical targets",
-    blockedAlternateTargets: "Blocked alternate targets",
-    sampleUrls: "Sample URLs",
-    sitemapSignals: "Sitemap signals",
-    redirectUrlsInSitemap: "Redirect URLs still in sitemap",
-    noindexUrlsInSitemap: "Noindex URLs still in sitemap",
-    canonicalizedElsewhere: "Submitted URLs canonicalize elsewhere",
-    canonicalMissingFromSitemap: "Canonical targets missing from sitemap",
-    brokenUrlsInSitemap: "Broken URLs still in sitemap",
-    relatedTargets: "Related targets",
-    internationalSignals: "International signals",
-    alternateNotReciprocal: "Alternate pages do not link back",
-    alternateCanonicalMismatch: "Alternate targets canonicalize elsewhere",
-    invalidHreflangValues: "Invalid hreflang values",
-  },
-  "zh-CN": {
-    heading: "\u0047\u006f\u006f\u0067\u006c\u0065 \u6293\u53d6\u8bca\u65ad",
-    subheading: "\u68c0\u67e5 sitemap\u3001robots.txt\u3001canonical \u548c hreflang",
-    placeholder: "https://example.com\u3001/sitemap.xml \u6216 /robots.txt",
-    audit: "\u5f00\u59cb\u68c0\u67e5",
-    pageChecksTitle: "\u9875\u9762\u5185\u5bb9\u68c0\u67e5",
-    pageChecksHelp: "Title\u3001description\u3001H1\u3001lang\u3001viewport\u3001JSON-LD \u548c\u91cd\u590d\u5143\u6570\u636e",
-    directoryRobotsTitle: "\u8bfb\u53d6 sitemap \u540c\u76ee\u5f55 robots.txt",
-    directoryRobotsHelp: "\u7528\u4e8e\u6d4b\u8bd5\u7f51\u5740\uff1a\u8bfb\u53d6 sitemap \u540c\u76ee\u5f55\u7684 robots.txt\uff0c\u800c\u4e0d\u662f\u57df\u540d\u6839\u76ee\u5f55",
-    healthScore: "\u5065\u5eb7\u5206",
-    executiveSummary: "\u6458\u8981\u7ed3\u8bba",
-    priorityActions: "\u4f18\u5148\u52a8\u4f5c",
-    statusFlags: "\u72b6\u6001\u6807\u7b7e",
-    history: "\u6700\u8fd1\u68c0\u67e5",
-    retainedJobs: "Neon \u4fdd\u7559\u4efb\u52a1",
-    retainedJobsHelp: "\u5f53\u524d\u6d4f\u89c8\u5668\u4f1a\u8bdd\u4fdd\u7559\u7684\u4efb\u52a1\u548c\u5df2\u5b8c\u6210\u62a5\u544a\u3002",
-    refreshJobs: "\u5237\u65b0\u4efb\u52a1",
-    openReport: "\u6253\u5f00\u62a5\u544a",
-    continueJob: "\u7ee7\u7eed\u4efb\u52a1",
-    noRetainedJobs: "\u6ca1\u6709\u53ef\u7528\u7684\u4fdd\u7559\u4efb\u52a1\u3002",
-    jobCreated: "\u521b\u5efa\u65f6\u95f4",
-    jobUpdated: "\u66f4\u65b0\u65f6\u95f4",
-    jobProgress: "\u8fdb\u5ea6",
-    clearHistory: "\u6e05\u7a7a\u5386\u53f2",
-    keepRecent: "\u4fdd\u7559\u6700\u8fd1",
-    rerun: "\u91cd\u65b0\u68c0\u67e5",
-    compareToCurrent: "\u4e0e\u5f53\u524d\u6bd4\u8f83",
-    deleteHistory: "\u5220\u9664",
-    details: "\u8be6\u60c5",
-    hideDetails: "\u6536\u8d77\u8be6\u60c5",
-    noHistory: "\u8fd8\u6ca1\u6709\u4fdd\u5b58\u7684\u68c0\u67e5\u8bb0\u5f55\u3002",
-    historyScore: "\u5206\u6570",
-    historyUrls: "\u7f51\u5740\u6570",
-    historyAffected: "\u53d7\u5f71\u54cd",
-    trendUp: "\u53d8\u597d",
-    trendDown: "\u53d8\u5dee",
-    trendFlat: "\u65e0\u53d8\u5316",
-    issueDelta: "\u95ee\u9898\u53d8\u5316",
-    improvedIssues: "\u6539\u5584\u7684\u95ee\u9898",
-    worsenedIssues: "\u53d8\u5dee\u7684\u95ee\u9898",
-    noDelta: "\u6ca1\u6709\u53d1\u73b0\u660e\u663e\u7684\u95ee\u9898\u53d8\u5316\u3002",
-    categoryDelta: "\u4e13\u9898\u53d8\u5316",
-    regressions: "\u65b0\u589e\u56de\u5f52\u95ee\u9898",
-    resolvedIssues: "\u5df2\u89e3\u51b3\u7684 URL \u95ee\u9898",
-    noRegressions: "\u6ca1\u6709\u65b0\u589e URL \u7ea7\u56de\u5f52\u95ee\u9898\u3002",
-    cleanSignals: "\u6293\u53d6\u4fe1\u53f7\u826f\u597d",
-    needsCleanup: "\u9700\u8981\u91cd\u70b9\u6e05\u7406",
-    likelyBlockers: "\u53ef\u80fd\u5b58\u5728\u6293\u53d6/\u7d22\u5f15\u963b\u585e",
-    urls: "\u7f51\u5740\u6570",
-    affected: "\u53d7\u5f71\u54cd",
-    googleRisk: "Google \u98ce\u9669",
-    critical: "\u4e25\u91cd",
-    warnings: "\u8b66\u544a",
-    limitReachedTitle: "\u5df2\u8fbe\u5230\u4ea4\u4e92\u5f0f\u626b\u63cf\u4e0a\u9650",
-    limitReachedText: "\u672c\u62a5\u544a\u5df2\u8fbe\u5230\u5f53\u524d\u914d\u7f6e\u4e0a\u9650\uff1a{urls} \u4e2a\u7f51\u5740\u6216 {sitemaps} \u4e2a sitemap \u6587\u4ef6\u3002\u8bca\u65ad\u4e0e\u5bf9\u6bd4\u4ec5\u8986\u76d6\u5df2\u626b\u63cf\u96c6\u5408\u3002",
-    limitOk: "\u672c\u6b21\u626b\u63cf\u672a\u8d85\u8fc7\u5f53\u524d\u9650\u5236\uff1a{urls} \u4e2a\u7f51\u5740\u548c {sitemaps} \u4e2a sitemap \u6587\u4ef6\u3002",
-    fixFirst: "\u4f18\u5148\u4fee\u590d",
-    tasks: "\u9879\u4efb\u52a1",
-    noPriority: "\u5f53\u524d\u626b\u63cf\u8303\u56f4\u5185\u6ca1\u6709\u53d1\u73b0\u4f18\u5148\u963b\u585e\u9879\u3002",
-    robots: "Robots",
-    found: "\u5df2\u627e\u5230",
-    groups: "\u7ec4\u89c4\u5219",
-    sitemaps: "Sitemaps",
-    urlFindings: "\u7f51\u5740\u95ee\u9898",
-    noFilter: "\u6ca1\u6709\u7f51\u5740\u7b26\u5408\u5f53\u524d\u7b5b\u9009\u3002",
-    searchUrls: "\u641c\u7d22\u7f51\u5740\u6216\u95ee\u9898",
-    exportCsv: "\u5bfc\u51fa CSV",
-    exportSummary: "\u5bfc\u51fa\u6458\u8981",
-    showMatchingUrls: "\u67e5\u770b\u5bf9\u5e94\u7f51\u5740",
-    copyBlockedUrls: "复制被阻挡网址",
-    copiedBlockedUrls: "已复制",
-    final: "\u6700\u7ec8\u5730\u5740",
-    redirectChain: "\u91cd\u5b9a\u5411\u94fe",
-    redirectHops: "\u8df3",
-    canonical: "Canonical",
-    alternates: "Alternates",
-    hreflangLinks: "\u4e2a hreflang \u94fe\u63a5",
-    likelyOutcome: "Google \u53ef\u80fd\u7ed3\u679c",
-    noBlockers: "\u672a\u53d1\u73b0\u660e\u663e\u6293\u53d6\u963b\u585e\u3002",
-    title: "Title",
-    description: "Description",
-    h1: "H1",
-    lang: "Lang",
-    viewport: "Viewport",
-    jsonLd: "JSON-LD",
-    missing: "\u7f3a\u5931",
-    present: "\u5b58\u5728",
-    unknown: "\u672a\u77e5",
-    noneFound: "\u672a\u53d1\u73b0",
-    validInvalid: "{valid} \u6709\u6548 / {invalid} \u65e0\u6548",
-    detectedInputs: "\u81ea\u52a8\u8bc6\u522b\u7ed3\u679c",
-    original: "\u539f\u59cb\u8f93\u5165",
-    siteRoot: "\u7ad9\u70b9\u6839\u76ee\u5f55",
-    inputType: "\u8f93\u5165\u7c7b\u578b",
-    progressPreparing: "\u51c6\u5907\u626b\u63cf",
-    progressFetching: "\u8bfb\u53d6 sitemap \u548c robots.txt",
-    progressInspecting: "\u68c0\u67e5\u7f51\u5740",
-    progressFinalizing: "\u751f\u6210\u62a5\u544a",
-    progressPaused: "\u5df2\u6682\u505c",
-    progressStopped: "\u5df2\u505c\u6b62",
-    progressInterrupted: "\u540e\u53f0 worker \u5df2\u4e2d\u65ad\uff0c\u6b63\u5728\u91cd\u65b0\u6267\u884c\u68c0\u67e5",
-    pause: "\u6682\u505c",
-    resume: "\u7ee7\u7eed",
-    stop: "\u505c\u6b62",
-    runtime: "\u8fd0\u884c\u72b6\u6001",
-    startedAt: "\u5f00\u59cb\u65f6\u95f4",
-    elapsed: "\u5df2\u8fd0\u884c",
-    currentStage: "\u5f53\u524d\u9636\u6bb5",
-    pauseCount: "\u6682\u505c\u6b21\u6570",
-    stageElapsed: "\u9636\u6bb5\u8017\u65f6",
-    performance: "\u6027\u80fd",
-    performanceChecksTitle: "\u6027\u80fd\u68c0\u67e5",
-    performanceChecksHelp: "TTFB\u3001HTML \u5927\u5c0f\u3001\u811a\u672c\u3001\u6837\u5f0f\u3001\u56fe\u7247\u548c\u8f7b\u91cf CWV \u51c6\u5907\u5ea6\u4fe1\u53f7",
-    backgroundModeTitle: "\u540e\u53f0 worker \u6a21\u5f0f",
-    backgroundModeHelp: "\u5c06\u626b\u63cf\u4e0a\u9650\u63d0\u9ad8\u5230 2000 \u4e2a URL\uff0c\u5e76\u5ef6\u957f job \u4fdd\u7559\u65f6\u95f4",
-    internalCrawlTitle: "\u9012\u5f52\u53d1\u73b0\u7ad9\u5185\u7f51\u5740",
-    internalCrawlHelp: "\u8ddf\u968f\u540c\u7ad9\u94fe\u63a5\u6293\u53d6\u5230\u7b2c 2 \u5c42\uff0c\u72ec\u7acb\u9650\u5236\u4e3a 100 \u4e2a URL\uff0c\u540e\u53f0\u6a21\u5f0f\u4e3a 500 \u4e2a",
-    urlPolicyTitle: "URL \u5bf9\u6bd4\u7b56\u7565",
-    urlPolicyHelp: "\u4ec5\u5f71\u54cd\u7f51\u5740\u5339\u914d\u4e0e\u53d8\u4f53\u8bca\u65ad\uff0c\u4e0d\u4f1a\u6539\u5199\u5b9e\u9645\u6293\u53d6\u8bf7\u6c42\u3002",
-    queryPolicy: "\u67e5\u8be2\u53c2\u6570",
-    queryPreserve: "\u4fdd\u7559\u5168\u90e8",
-    queryStripTracking: "\u79fb\u9664\u5df2\u77e5\u8ddf\u8e2a\u53c2\u6570",
-    queryDropAll: "\u5ffd\u7565\u5168\u90e8\u67e5\u8be2\u53c2\u6570",
-    trailingSlashPolicy: "\u5c3e\u659c\u6760",
-    slashPreserve: "\u4fdd\u6301\u539f\u6837",
-    slashRemove: "\u7edf\u4e00\u4e0d\u5e26\u659c\u6760",
-    slashAdd: "\u7edf\u4e00\u5e26\u659c\u6760",
-    progressDiscovering: "\u9012\u5f52\u53d1\u73b0\u7ad9\u5185\u7f51\u5740",
-    discoveredUrls: "\u53d1\u73b0\u7f51\u5740",
-    internalDiscoveryTitle: "\u9012\u5f52\u7ad9\u5185\u53d1\u73b0",
-    internalDiscoveryHelp: "\u901a\u8fc7\u540c\u7ad9\u94fe\u63a5\u53d1\u73b0\u7684 sitemap \u5916\u9875\u9762\uff0c\u4e0d\u4f1a\u6539\u53d8 sitemap \u5065\u5eb7\u5206\u3002",
-    crawlDepth: "\u6df1\u5ea6",
-    discoveredFrom: "\u53d1\u73b0\u6765\u6e90",
-    noDiscoveredUrls: "\u672a\u6293\u53d6\u5230\u989d\u5916\u7ad9\u5185\u9875\u9762\u3002",
-    internalCrawlLimit: "\u9012\u5f52\u7ad9\u5185\u53d1\u73b0\u5df2\u8fbe\u5230\u72ec\u7acb URL \u9884\u7b97\uff0c\u7ed3\u679c\u4ec5\u8986\u76d6\u5df2\u6293\u53d6\u96c6\u5408\u3002",
-    linkGraphTitle: "\u7ad9\u5185\u94fe\u63a5\u56fe\u8c31",
-    linkGraphHelp: "\u5efa\u7acb\u5df2\u626b\u63cf\u9875\u9762\u7684\u6709\u5411\u94fe\u63a5\uff0c\u5e76\u5728\u7ad9\u70b9\u6839\u9875\u5df2\u626b\u63cf\u65f6\u8ba1\u7b97\u4ece\u6839\u9875\u51fa\u53d1\u7684\u6700\u77ed\u70b9\u51fb\u8def\u5f84\u3002",
-    linkGraphExport: "\u5bfc\u51fa\u94fe\u63a5\u56fe\u8c31",
-    graphNodes: "\u4e2a\u8282\u70b9",
-    graphEdges: "\u6761\u8fde\u8fb9",
-    graphAll: "\u5168\u90e8\u9875\u9762",
-    graphUnreachable: "\u4ece\u7ad9\u70b9\u6839\u9875\u4e0d\u53ef\u8fbe",
-    graphOrphan: "Sitemap \u5b64\u7acb\u9875",
-    graphDeep: "\u70b9\u51fb\u8def\u5f84\u8fc7\u6df1",
-    graphWeak: "\u5165\u94fe\u504f\u5c11",
-    graphDeadEnd: "\u65e0\u5df2\u626b\u63cf\u51fa\u94fe",
-    graphHealthy: "\u94fe\u63a5\u5065\u5eb7",
-    inboundCount: "\u5165\u94fe",
-    outboundCount: "\u51fa\u94fe",
-    graphSource: "\u6765\u6e90",
-    graphSourceSitemap: "Sitemap",
-    graphSourceInternal: "\u9012\u5f52\u53d1\u73b0",
-    clickDepth: "\u70b9\u51fb\u6df1\u5ea6",
-    reachablePages: "\u4e2a\u53ef\u8fbe\u9875\u9762",
-    maxClickDepth: "\u6700\u5927\u70b9\u51fb\u6df1\u5ea6",
-    rootNotScanned: "\u672c\u6b21\u672a\u626b\u63cf\u7ad9\u70b9\u6839\u9875\uff0c\u65e0\u6cd5\u8ba1\u7b97\u4ece\u9996\u9875\u51fa\u53d1\u7684\u70b9\u51fb\u6df1\u5ea6\u548c\u4e0d\u53ef\u8fbe\u72b6\u6001\u3002",
-    status: "\u72b6\u6001",
-    robotsAnalysis: "Robots \u5206\u6790",
-    robotsContent: "robots.txt \u5185\u5bb9",
-    sitemapDirectives: "Sitemap \u6307\u4ee4",
-    rules: "\u6761\u89c4\u5219",
-    googleGroups: "Google \u89c4\u5219\u7ec4",
-    robotsImpact: "Robots \u5f71\u54cd",
-    blockedSubmittedUrls: "\u88ab\u62e6\u622a\u7684\u63d0\u4ea4\u7f51\u5740",
-    blockedCanonicalTargets: "\u88ab\u62e6\u622a\u7684 canonical \u76ee\u6807",
-    blockedAlternateTargets: "\u88ab\u62e6\u622a\u7684 alternate \u76ee\u6807",
-    sampleUrls: "\u793a\u4f8b\u7f51\u5740",
-    sitemapSignals: "Sitemap \u4fe1\u53f7",
-    redirectUrlsInSitemap: "sitemap \u4e2d\u4ecd\u5b58\u5728\u8df3\u8f6c\u7f51\u5740",
-    noindexUrlsInSitemap: "sitemap \u4e2d\u4ecd\u5b58\u5728 noindex \u7f51\u5740",
-    canonicalizedElsewhere: "\u63d0\u4ea4\u7f51\u5740 canonical \u5230\u522b\u5904",
-    canonicalMissingFromSitemap: "canonical \u76ee\u6807\u672a\u5305\u542b\u5728 sitemap \u4e2d",
-    brokenUrlsInSitemap: "sitemap \u4e2d\u4ecd\u5b58\u5728\u9519\u8bef\u7f51\u5740",
-    relatedTargets: "\u76f8\u5173\u76ee\u6807",
-    internationalSignals: "\u56fd\u9645\u5316\u4fe1\u53f7",
-    alternateNotReciprocal: "alternate \u9875\u9762\u6ca1\u6709\u56de\u6307",
-    alternateCanonicalMismatch: "alternate \u76ee\u6807 canonical \u5230\u522b\u5904",
-    invalidHreflangValues: "\u65e0\u6548\u7684 hreflang \u503c",
-  },
-  "zh-TW": {
-    heading: "\u0047\u006f\u006f\u0067\u006c\u0065 \u6293\u53d6\u8a3a\u65b7",
-    subheading: "\u6aa2\u67e5 sitemap\u3001robots.txt\u3001canonical \u548c hreflang",
-    placeholder: "https://example.com\u3001/sitemap.xml \u6216 /robots.txt",
-    audit: "\u958b\u59cb\u6aa2\u67e5",
-    pageChecksTitle: "\u9801\u9762\u5167\u5bb9\u6aa2\u67e5",
-    pageChecksHelp: "Title\u3001description\u3001H1\u3001lang\u3001viewport\u3001JSON-LD \u548c\u91cd\u8907\u4e2d\u7e7c\u8cc7\u6599",
-    directoryRobotsTitle: "\u8b80\u53d6 sitemap \u540c\u76ee\u9304 robots.txt",
-    directoryRobotsHelp: "\u7528\u65bc\u6e2c\u8a66\u7db2\u5740\uff1a\u8b80\u53d6 sitemap \u540c\u76ee\u9304\u7684 robots.txt\uff0c\u800c\u4e0d\u662f\u7db2\u57df\u6839\u76ee\u9304",
-    healthScore: "\u5065\u5eb7\u5206",
-    executiveSummary: "\u6458\u8981\u7d50\u8ad6",
-    priorityActions: "\u512a\u5148\u52d5\u4f5c",
-    statusFlags: "\u72c0\u614b\u6a19\u7c64",
-    history: "\u6700\u8fd1\u6aa2\u67e5",
-    retainedJobs: "Neon \u4fdd\u7559\u4efb\u52d9",
-    retainedJobsHelp: "\u76ee\u524d\u700f\u89bd\u5668\u6703\u8a71\u4fdd\u7559\u7684\u4efb\u52d9\u548c\u5df2\u5b8c\u6210\u5831\u544a\u3002",
-    refreshJobs: "\u91cd\u65b0\u6574\u7406\u4efb\u52d9",
-    openReport: "\u958b\u555f\u5831\u544a",
-    continueJob: "\u7e7c\u7e8c\u4efb\u52d9",
-    noRetainedJobs: "\u6c92\u6709\u53ef\u7528\u7684\u4fdd\u7559\u4efb\u52d9\u3002",
-    jobCreated: "\u5efa\u7acb\u6642\u9593",
-    jobUpdated: "\u66f4\u65b0\u6642\u9593",
-    jobProgress: "\u9032\u5ea6",
-    clearHistory: "\u6e05\u7a7a\u6b77\u53f2",
-    keepRecent: "\u4fdd\u7559\u6700\u8fd1",
-    rerun: "\u91cd\u65b0\u6aa2\u67e5",
-    compareToCurrent: "\u8207\u76ee\u524d\u6bd4\u8f03",
-    deleteHistory: "\u522a\u9664",
-    details: "\u8a73\u60c5",
-    hideDetails: "\u6536\u8d77\u8a73\u60c5",
-    noHistory: "\u9084\u6c92\u6709\u5132\u5b58\u7684\u6aa2\u67e5\u8a18\u9304\u3002",
-    historyScore: "\u5206\u6578",
-    historyUrls: "\u7db2\u5740\u6578",
-    historyAffected: "\u53d7\u5f71\u97ff",
-    trendUp: "\u8b8a\u597d",
-    trendDown: "\u8b8a\u5dee",
-    trendFlat: "\u7121\u8b8a\u5316",
-    issueDelta: "\u554f\u984c\u8b8a\u5316",
-    improvedIssues: "\u6539\u5584\u7684\u554f\u984c",
-    worsenedIssues: "\u8b8a\u5dee\u7684\u554f\u984c",
-    noDelta: "\u6c92\u6709\u767c\u73fe\u660e\u986f\u7684\u554f\u984c\u8b8a\u5316\u3002",
-    categoryDelta: "\u5c08\u984c\u8b8a\u5316",
-    regressions: "\u65b0\u589e\u56de\u6b78\u554f\u984c",
-    resolvedIssues: "\u5df2\u89e3\u6c7a\u7684 URL \u554f\u984c",
-    noRegressions: "\u6c92\u6709\u65b0\u589e URL \u5c64\u7d1a\u56de\u6b78\u554f\u984c\u3002",
-    cleanSignals: "\u6293\u53d6\u8a0a\u865f\u826f\u597d",
-    needsCleanup: "\u9700\u8981\u91cd\u9ede\u6e05\u7406",
-    likelyBlockers: "\u53ef\u80fd\u5b58\u5728\u6293\u53d6/\u7d22\u5f15\u963b\u585e",
-    urls: "\u7db2\u5740\u6578",
-    affected: "\u53d7\u5f71\u97ff",
-    googleRisk: "Google \u98a8\u96aa",
-    critical: "\u56b4\u91cd",
-    warnings: "\u8b66\u544a",
-    limitReachedTitle: "\u5df2\u9054\u5230\u4e92\u52d5\u5f0f\u6383\u63cf\u4e0a\u9650",
-    limitReachedText: "\u672c\u5831\u544a\u5df2\u9054\u5230\u76ee\u524d\u8a2d\u5b9a\u4e0a\u9650\uff1a{urls} \u500b\u7db2\u5740\u6216 {sitemaps} \u500b sitemap \u6a94\u6848\u3002\u8a3a\u65b7\u8207\u5c0d\u6bd4\u50c5\u6db5\u84cb\u5df2\u6383\u63cf\u96c6\u5408\u3002",
-    limitOk: "\u672c\u6b21\u6383\u63cf\u672a\u8d85\u904e\u76ee\u524d\u9650\u5236\uff1a{urls} \u500b\u7db2\u5740\u548c {sitemaps} \u500b sitemap \u6a94\u6848\u3002",
-    fixFirst: "\u512a\u5148\u4fee\u5fa9",
-    tasks: "\u9805\u4efb\u52d9",
-    noPriority: "\u76ee\u524d\u6383\u63cf\u7bc4\u570d\u5167\u6c92\u6709\u767c\u73fe\u512a\u5148\u963b\u585e\u9805\u3002",
-    robots: "Robots",
-    found: "\u5df2\u627e\u5230",
-    groups: "\u7d44\u898f\u5247",
-    sitemaps: "Sitemaps",
-    urlFindings: "\u7db2\u5740\u554f\u984c",
-    noFilter: "\u6c92\u6709\u7db2\u5740\u7b26\u5408\u76ee\u524d\u7be9\u9078\u3002",
-    searchUrls: "\u641c\u5c0b\u7db2\u5740\u6216\u554f\u984c",
-    exportCsv: "\u532f\u51fa CSV",
-    exportSummary: "\u532f\u51fa\u6458\u8981",
-    showMatchingUrls: "\u67e5\u770b\u5c0d\u61c9\u7db2\u5740",
-    copyBlockedUrls: "複製被阻擋網址",
-    copiedBlockedUrls: "已複製",
-    final: "\u6700\u7d42\u5730\u5740",
-    redirectChain: "\u91cd\u65b0\u5c0e\u5411\u93c8",
-    redirectHops: "\u8df3",
-    canonical: "Canonical",
-    alternates: "Alternates",
-    hreflangLinks: "\u500b hreflang \u9023\u7d50",
-    likelyOutcome: "Google \u53ef\u80fd\u7d50\u679c",
-    noBlockers: "\u672a\u767c\u73fe\u660e\u986f\u6293\u53d6\u963b\u585e\u3002",
-    title: "Title",
-    description: "Description",
-    h1: "H1",
-    lang: "Lang",
-    viewport: "Viewport",
-    jsonLd: "JSON-LD",
-    missing: "\u7f3a\u5931",
-    present: "\u5b58\u5728",
-    unknown: "\u672a\u77e5",
-    noneFound: "\u672a\u767c\u73fe",
-    validInvalid: "{valid} \u6709\u6548 / {invalid} \u7121\u6548",
-    detectedInputs: "\u81ea\u52d5\u8b58\u5225\u7d50\u679c",
-    original: "\u539f\u59cb\u8f38\u5165",
-    siteRoot: "\u7db2\u7ad9\u6839\u76ee\u9304",
-    inputType: "\u8f38\u5165\u985e\u578b",
-    progressPreparing: "\u6e96\u5099\u6383\u63cf",
-    progressFetching: "\u8b80\u53d6 sitemap \u548c robots.txt",
-    progressInspecting: "\u6aa2\u67e5\u7db2\u5740",
-    progressFinalizing: "\u7522\u751f\u5831\u544a",
-    progressPaused: "\u5df2\u66ab\u505c",
-    progressStopped: "\u5df2\u505c\u6b62",
-    progressInterrupted: "\u80cc\u666f worker \u5df2\u4e2d\u65b7\uff0c\u6b63\u5728\u91cd\u65b0\u57f7\u884c\u6aa2\u67e5",
-    pause: "\u66ab\u505c",
-    resume: "\u7e7c\u7e8c",
-    stop: "\u505c\u6b62",
-    runtime: "\u57f7\u884c\u72c0\u614b",
-    startedAt: "\u958b\u59cb\u6642\u9593",
-    elapsed: "\u5df2\u57f7\u884c",
-    currentStage: "\u76ee\u524d\u968e\u6bb5",
-    pauseCount: "\u66ab\u505c\u6b21\u6578",
-    stageElapsed: "\u968e\u6bb5\u8017\u6642",
-    performance: "\u6548\u80fd",
-    performanceChecksTitle: "\u6548\u80fd\u6aa2\u67e5",
-    performanceChecksHelp: "TTFB\u3001HTML \u5927\u5c0f\u3001\u8173\u672c\u3001\u6a23\u5f0f\u3001\u5716\u7247\u548c\u8f15\u91cf CWV \u6e96\u5099\u5ea6\u8a0a\u865f",
-    backgroundModeTitle: "\u80cc\u666f worker \u6a21\u5f0f",
-    backgroundModeHelp: "\u5c07\u6383\u63cf\u4e0a\u9650\u63d0\u9ad8\u5230 2000 \u500b URL\uff0c\u4e26\u5ef6\u9577 job \u4fdd\u7559\u6642\u9593",
-    internalCrawlTitle: "\u905e\u8ff4\u767c\u73fe\u7ad9\u5167\u7db2\u5740",
-    internalCrawlHelp: "\u8ddf\u96a8\u540c\u7ad9\u9023\u7d50\u6aa2\u7d22\u5230\u7b2c 2 \u5c64\uff0c\u7368\u7acb\u9650\u5236\u70ba 100 \u500b URL\uff0c\u80cc\u666f\u6a21\u5f0f\u70ba 500 \u500b",
-    urlPolicyTitle: "URL \u5c0d\u6bd4\u7b56\u7565",
-    urlPolicyHelp: "\u50c5\u5f71\u97ff\u7db2\u5740\u6bd4\u5c0d\u8207\u8b8a\u9ad4\u8a3a\u65b7\uff0c\u4e0d\u6703\u6539\u5beb\u5be6\u969b\u6aa2\u7d22\u8acb\u6c42\u3002",
-    queryPolicy: "\u67e5\u8a62\u53c3\u6578",
-    queryPreserve: "\u4fdd\u7559\u5168\u90e8",
-    queryStripTracking: "\u79fb\u9664\u5df2\u77e5\u8ffd\u8e64\u53c3\u6578",
-    queryDropAll: "\u5ffd\u7565\u5168\u90e8\u67e5\u8a62\u53c3\u6578",
-    trailingSlashPolicy: "\u5c3e\u659c\u7dda",
-    slashPreserve: "\u4fdd\u6301\u539f\u6a23",
-    slashRemove: "\u7d71\u4e00\u4e0d\u5e36\u659c\u7dda",
-    slashAdd: "\u7d71\u4e00\u5e36\u659c\u7dda",
-    progressDiscovering: "\u905e\u8ff4\u767c\u73fe\u7ad9\u5167\u7db2\u5740",
-    discoveredUrls: "\u767c\u73fe\u7db2\u5740",
-    internalDiscoveryTitle: "\u905e\u8ff4\u7ad9\u5167\u767c\u73fe",
-    internalDiscoveryHelp: "\u900f\u904e\u540c\u7ad9\u9023\u7d50\u767c\u73fe\u7684 sitemap \u5916\u9801\u9762\uff0c\u4e0d\u6703\u6539\u8b8a sitemap \u5065\u5eb7\u5206\u3002",
-    crawlDepth: "\u6df1\u5ea6",
-    discoveredFrom: "\u767c\u73fe\u4f86\u6e90",
-    noDiscoveredUrls: "\u672a\u6aa2\u7d22\u5230\u984d\u5916\u7ad9\u5167\u9801\u9762\u3002",
-    internalCrawlLimit: "\u905e\u8ff4\u7ad9\u5167\u767c\u73fe\u5df2\u9054\u5230\u7368\u7acb URL \u9810\u7b97\uff0c\u7d50\u679c\u50c5\u6db5\u84cb\u5df2\u6aa2\u7d22\u96c6\u5408\u3002",
-    linkGraphTitle: "\u7ad9\u5167\u9023\u7d50\u5716\u8b5c",
-    linkGraphHelp: "\u5efa\u7acb\u5df2\u6383\u63cf\u9801\u9762\u7684\u6709\u5411\u9023\u7d50\uff0c\u4e26\u5728\u7ad9\u9ede\u6839\u9801\u5df2\u6383\u63cf\u6642\u8a08\u7b97\u5f9e\u6839\u9801\u51fa\u767c\u7684\u6700\u77ed\u9ede\u64ca\u8def\u5f91\u3002",
-    linkGraphExport: "\u532f\u51fa\u9023\u7d50\u5716\u8b5c",
-    graphNodes: "\u500b\u7bc0\u9ede",
-    graphEdges: "\u689d\u9023\u908a",
-    graphAll: "\u5168\u90e8\u9801\u9762",
-    graphUnreachable: "\u5f9e\u7ad9\u9ede\u6839\u9801\u4e0d\u53ef\u9054",
-    graphOrphan: "Sitemap \u5b64\u7acb\u9801",
-    graphDeep: "\u9ede\u64ca\u8def\u5f91\u904e\u6df1",
-    graphWeak: "\u5165\u93c8\u504f\u5c11",
-    graphDeadEnd: "\u7121\u5df2\u6383\u63cf\u51fa\u93c8",
-    graphHealthy: "\u9023\u7d50\u5065\u5eb7",
-    inboundCount: "\u5165\u93c8",
-    outboundCount: "\u51fa\u93c8",
-    graphSource: "\u4f86\u6e90",
-    graphSourceSitemap: "Sitemap",
-    graphSourceInternal: "\u905e\u8ff4\u767c\u73fe",
-    clickDepth: "\u9ede\u64ca\u6df1\u5ea6",
-    reachablePages: "\u500b\u53ef\u9054\u9801\u9762",
-    maxClickDepth: "\u6700\u5927\u9ede\u64ca\u6df1\u5ea6",
-    rootNotScanned: "\u672c\u6b21\u672a\u6383\u63cf\u7ad9\u9ede\u6839\u9801\uff0c\u7121\u6cd5\u8a08\u7b97\u5f9e\u9996\u9801\u51fa\u767c\u7684\u9ede\u64ca\u6df1\u5ea6\u548c\u4e0d\u53ef\u9054\u72c0\u614b\u3002",
-    status: "\u72c0\u614b",
-    robotsAnalysis: "Robots \u5206\u6790",
-    robotsContent: "robots.txt \u5167\u5bb9",
-    sitemapDirectives: "Sitemap \u6307\u4ee4",
-    rules: "\u689d\u898f\u5247",
-    googleGroups: "Google \u898f\u5247\u7d44",
-    robotsImpact: "Robots \u5f71\u97ff",
-    blockedSubmittedUrls: "\u88ab\u6514\u622a\u7684\u63d0\u4ea4\u7db2\u5740",
-    blockedCanonicalTargets: "\u88ab\u6514\u622a\u7684 canonical \u76ee\u6a19",
-    blockedAlternateTargets: "\u88ab\u6514\u622a\u7684 alternate \u76ee\u6a19",
-    sampleUrls: "\u793a\u4f8b\u7db2\u5740",
-    sitemapSignals: "Sitemap \u8a0a\u865f",
-    redirectUrlsInSitemap: "sitemap \u4e2d\u4ecd\u5b58\u5728\u8df3\u8f49\u7db2\u5740",
-    noindexUrlsInSitemap: "sitemap \u4e2d\u4ecd\u5b58\u5728 noindex \u7db2\u5740",
-    canonicalizedElsewhere: "\u63d0\u4ea4\u7db2\u5740 canonical \u5230\u5225\u8655",
-    canonicalMissingFromSitemap: "canonical \u76ee\u6a19\u672a\u5305\u542b\u5728 sitemap \u4e2d",
-    brokenUrlsInSitemap: "sitemap \u4e2d\u4ecd\u5b58\u5728\u932f\u8aa4\u7db2\u5740",
-    relatedTargets: "\u76f8\u95dc\u76ee\u6a19",
-    internationalSignals: "\u570b\u969b\u5316\u8a0a\u865f",
-    alternateNotReciprocal: "alternate \u9801\u9762\u6c92\u6709\u56de\u6307",
-    alternateCanonicalMismatch: "alternate \u76ee\u6a19 canonical \u5230\u5225\u8655",
-    invalidHreflangValues: "\u7121\u6548\u7684 hreflang \u503c",
-  },
-};
 
-function formatText(template, values) {
-  return template.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? "");
-}
-
-function detectLanguage() {
-  const lang = (navigator.language || navigator.userLanguage || "en").toLowerCase();
-  if (lang.includes("tw") || lang.includes("hk") || lang.includes("hant")) return "zh-TW";
-  if (lang.startsWith("zh")) return "zh-CN";
-  return "en";
-}
 
 function Badge({ severity, children }) {
   const Icon = severityIcons[severity] || CheckCircle2;
@@ -1871,131 +1335,7 @@ function summarizeGscRows(report, rows) {
   };
 }
 
-const gscUiText = {
-  en: {
-    propertyUrl: "Property URL",
-    propertyHelp: "URL-prefix: use the exact Search Console property. Domain property: use sc-domain:example.com.",
-    oauthHelpTitle: "How to connect Google Search Console",
-    oauthHelpSteps: [
-      "Click Connect Google Search Console.",
-      "Choose the Google account that has access to the Search Console property.",
-      "If Google shows “This app isn’t verified”, open the advanced option and continue to soos.",
-      "On the Sign in to soos screen, click Continue.",
-      "Under what soos can access, select “View Search Console data for your verified sites”, then click Continue.",
-    ],
-    docsLabel: "Search Console users and permissions",
-    connect: "Connect Google Search Console",
-    apiTitle: "Search Console API",
-    connected: "OAuth connected",
-    tokenExpired: "Token likely expired",
-    tokenSaved: "Token saved",
-    noToken: "No token saved",
-    notConfigured: "not configured",
-    connectedRefreshed: "OAuth connected. Search Console status refreshed.",
-    oauthRefreshed: "OAuth status refreshed. Automatic token refresh is ready.",
-    statusRefreshed: "Status refreshed.",
-    connectedAs: "Connected as",
-    connectedAccountFallback: "Google account connected",
-    reconnect: "Reconnect",
-    opening: "Opening...",
-    refresh: "Refresh status",
-    test: "Test API connection",
-    testing: "Testing...",
-    clear: "Disconnect",
-    serverlessHelp: "Vercel mode: set DATABASE_URL so each visitor can save their own Search Console connection.",
-    startServerlessError: "Set DATABASE_URL before starting OAuth on Vercel.",
-    missingOAuthError: "The server OAuth app is not configured yet.",
-    missingApiError: "Connect Google Search Console before testing the API connection.",
-    missingPropertyError: "Enter the Search Console Property URL before testing the API connection.",
-    openingMessage: "Opening Google OAuth.",
-    disconnectedMessage: "Search Console connection removed for this browser.",
-    revokeNotConfirmed: "Google token revoke was not confirmed.",
-    reconnectHint: "Reconnect once if the account email is not shown.",
-    privacyNote: "Your Search Console connection is isolated to this browser session. Disconnect removes the stored connection and attempts to revoke Google access.",
-  },
-  "zh-CN": {
-    propertyUrl: "Property URL",
-    propertyHelp: "URL-prefix 属性必须和 Search Console 完全一致；Domain 属性使用 sc-domain:example.com。",
-    oauthHelpTitle: "Search Console 连接步骤",
-    oauthHelpSteps: [
-      "点击“连接 Google Search Console”。",
-      "选择拥有该 Search Console property 权限的 Google 账号。",
-      "如果显示“此应用未经 Google 验证”，请打开高级选项并继续前往 soos。",
-      "在“登录 soos”页面点击“继续”。",
-      "在“选择 soos 可访问哪些服务”中，选中“查看您的已验证网站的 Search Console 数据”，然后点击“继续”。",
-    ],
-    docsLabel: "Search Console 用户和权限说明",
-    connect: "连接 Google Search Console",
-    apiTitle: "Search Console API",
-    connected: "OAuth 已连接",
-    tokenExpired: "Token 可能已过期",
-    tokenSaved: "Token 已保存",
-    noToken: "尚未保存 token",
-    notConfigured: "未配置",
-    connectedRefreshed: "OAuth 已连接，Search Console 状态已刷新。",
-    oauthRefreshed: "OAuth 状态已刷新，可自动更新 access token。",
-    statusRefreshed: "状态已刷新。",
-    connectedAs: "已连接账号",
-    connectedAccountFallback: "Google 账号已连接",
-    reconnect: "重新连接",
-    opening: "打开中...",
-    refresh: "刷新状态",
-    test: "测试 API 连接",
-    testing: "测试中...",
-    clear: "断开连接",
-    serverlessHelp: "Vercel 模式：设置 DATABASE_URL 后，每个访客都可以保存自己的 Search Console 连接。",
-    startServerlessError: "请先在 Vercel 设置 DATABASE_URL，再开始 OAuth。",
-    missingOAuthError: "服务端 OAuth App 尚未配置。",
-    missingApiError: "请先连接 Google Search Console，再测试 API 连接。",
-    missingPropertyError: "测试 API 连接前，请先输入 Search Console Property URL。",
-    openingMessage: "正在打开 Google OAuth。",
-    disconnectedMessage: "已清除此浏览器的 Search Console 连接。",
-    revokeNotConfirmed: "Google token 撤销未确认。",
-    reconnectHint: "如果未显示账号邮箱，请重新连接一次。",
-    privacyNote: "Search Console 授权仅用于当前浏览器会话。断开连接会删除已保存的连接，并尝试撤销 Google 授权。",
-  },
-  "zh-TW": {
-    propertyUrl: "Property URL",
-    propertyHelp: "URL-prefix 資源必須和 Search Console 完全一致；Domain 資源使用 sc-domain:example.com。",
-    oauthHelpTitle: "Search Console 連線步驟",
-    oauthHelpSteps: [
-      "點擊「連接 Google Search Console」。",
-      "選擇擁有該 Search Console property 權限的 Google 帳號。",
-      "如果顯示「此應用程式未經 Google 驗證」，請開啟進階選項並繼續前往 soos。",
-      "在「登入 soos」頁面點擊「繼續」。",
-      "在「選擇 soos 可存取哪些服務」中，選取「查看已驗證網站的 Search Console 資料」，然後點擊「繼續」。",
-    ],
-    docsLabel: "Search Console 使用者和權限說明",
-    connect: "連接 Google Search Console",
-    apiTitle: "Search Console API",
-    connected: "OAuth 已連接",
-    tokenExpired: "Token 可能已過期",
-    tokenSaved: "Token 已儲存",
-    noToken: "尚未儲存 token",
-    notConfigured: "未設定",
-    connectedRefreshed: "OAuth 已連接，Search Console 狀態已重新整理。",
-    oauthRefreshed: "OAuth 狀態已重新整理，可自動更新 access token。",
-    statusRefreshed: "狀態已重新整理。",
-    connectedAs: "已連接帳號",
-    connectedAccountFallback: "Google 帳號已連接",
-    reconnect: "重新連接",
-    opening: "開啟中...",
-    refresh: "重新整理狀態",
-    test: "測試 API 連線",
-    testing: "測試中...",
-    clear: "中斷連線",
-    serverlessHelp: "Vercel 模式：設定 DATABASE_URL 後，每位訪客都可以儲存自己的 Search Console 連線。",
-    startServerlessError: "請先在 Vercel 設定 DATABASE_URL，再開始 OAuth。",
-    missingOAuthError: "服務端 OAuth App 尚未設定。",
-    missingApiError: "請先連接 Google Search Console，再測試 API 連線。",
-    missingPropertyError: "測試 API 連線前，請先輸入 Search Console Property URL。",
-    openingMessage: "正在開啟 Google OAuth。",
-    disconnectedMessage: "已清除此瀏覽器的 Search Console 連線。",
-    revokeNotConfirmed: "Google token 撤銷未確認。",
-    reconnectHint: "如果未顯示帳號信箱，請重新連接一次。",
-    privacyNote: "Search Console 授權僅用於目前瀏覽器工作階段。中斷連線會刪除已儲存的連線，並嘗試撤銷 Google 授權。",
-  },
-};
+
 
 function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, language }) {
   const copy = gscUiText[language] || gscUiText.en;
@@ -2045,13 +1385,9 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
     setMessage("");
     setError("");
     try {
-      const response = await fetch("/api/gsc/clear", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+      const body = await apiPost("/api/gsc/clear", {}, {
+        fallbackMessage: "Could not clear Search Console config",
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Could not clear Search Console config");
       onStatus(body);
       setMessage(body.revoke?.revoked ? copy.disconnectedMessage : `${copy.disconnectedMessage} ${copy.revokeNotConfirmed}`);
     } catch (err) {
@@ -2074,13 +1410,9 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
     setMessage("");
     setError("");
     try {
-      const response = await fetch("/api/gsc/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteUrl }),
+      const body = await apiPost("/api/gsc/test", { siteUrl }, {
+        fallbackMessage: "Search Console API test failed",
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Search Console API test failed");
       if (body.status) onStatus(body.status);
       setMessage(body.permissionLevel ? `${body.message} Permission: ${body.permissionLevel}.` : body.message);
     } catch (err) {
@@ -2094,9 +1426,9 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
     setMessage("");
     setError("");
     try {
-      const response = await fetch("/api/gsc/status");
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Could not refresh Search Console API status");
+      const body = await apiGet("/api/gsc/status", {
+        fallbackMessage: "Could not refresh Search Console API status",
+      });
       onStatus(body);
       setMessage(reason === "oauth-connected" ? copy.connectedRefreshed : body.refreshToken ? copy.oauthRefreshed : copy.statusRefreshed);
     } catch (err) {
@@ -2127,13 +1459,9 @@ function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, la
     }
     let popupPoll = null;
     try {
-      const response = await fetch("/api/gsc/oauth/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteUrl }),
+      const body = await apiPost("/api/gsc/oauth/start", { siteUrl }, {
+        fallbackMessage: "Could not start OAuth",
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Could not start OAuth");
       setMessage(copy.openingMessage);
       if (oauthWindow) {
         oauthWindow.location.href = body.authUrl;
@@ -2241,410 +1569,15 @@ function defaultGscDateRange() {
   };
 }
 
-const gscDataText = {
-  en: {
-    analyticsTitle: "Search Analytics API", ready: "ready", configureFirst: "configure GSC first",
-    startDate: "Start date", endDate: "End date", dimension: "Dimension", page: "Page", query: "Query",
-    pageQuery: "Page + Query", country: "Country", device: "Device", load: "Load Search Analytics",
-    loading: "Loading...", export: "Export keyword opportunities", rowsLoaded: "rows loaded", clicks: "clicks",
-    impressions: "impressions", analyticsHelp: "Loads clicks, impressions, CTR, and average position for GSC opportunity analysis.",
-    pageOnly: "Only Page rows update GSC opportunities. Other dimensions are shown below for exploration.",
-    noOpportunities: "No high-confidence Page + Query opportunities found with the current thresholds.",
-    position: "Position", connectFirst: "Connect Google Search Console first, then load Search Analytics.",
-    propertyFirst: "Enter the Search Console Property URL before loading Search Analytics.",
-    inspectionTitle: "URL Inspection", inspectStatus: "Inspect real Google index status",
-    inspectionHelp: "Checks prioritized anomalies across sitemap URLs, Search Analytics pages, and internal URLs, up to 25 per batch.",
-    inspect: "Inspect URLs", inspectNext: "Inspect next 25", inspectionComplete: "All scanned URLs inspected",
-    remaining: "remaining", inspecting: "Inspecting...", inspected: "Inspected", review: "Needs review",
-    critical: "critical", warnings: "warnings", notices: "notices", noCoverage: "No coverage state",
-    indexing: "Indexing", robots: "Robots", fetch: "Fetch", crawledAs: "Crawled as", lastCrawl: "Last crawl",
-    sitemap: "Seen in sitemap", referrers: "Referrers", googleCanonical: "Google canonical",
-    userCanonical: "User canonical", mobile: "Mobile", richResults: "Rich results",
-    alignmentTitle: "Google URL alignment", alignmentHelp: "Compares the sitemap URL, fetched URL, HTML canonical and Google's selected canonical.",
-    alignmentAll: "All states", submittedUrl: "Submitted URL", fetchedUrl: "Fetched URL", htmlCanonical: "HTML canonical",
-    alignmentState: "Diagnosis", alignedIndexed: "Aligned and indexed", alignedNotIndexed: "Aligned but not indexed",
-    submittedRedirects: "Submitted URL redirects", htmlCanonicalDiffers: "HTML canonical differs",
-    googleCanonicalDiffers: "Google selected another canonical", crawlBlocked: "Crawl or indexing blocker",
-    inspectionFailed: "Inspection failed", unknownAlignment: "Needs review", exportAlignment: "Export URL alignment",
-    coverageTitle: "Index coverage priorities", coverageHelp: "Groups Google indexing outcomes and prioritizes fixable URLs with Search Analytics demand.",
-    coverageExport: "Export coverage diagnosis", needsFix: "Needs fix", expectedExclusion: "Expected exclusion", indexedState: "Indexed",
-    priorityHigh: "High priority", priorityMedium: "Medium priority", priorityLow: "Low priority",
-    affectedUrls: "URLs", staleCrawl: "Stale crawl", noPerformanceData: "No page performance data",
-    reasonDiscovered: "Discovered, not crawled", reasonCrawled: "Crawled, not indexed", reasonDuplicate: "Duplicate or alternate",
-    reasonCanonical: "Canonical conflict", reasonBlocked: "Blocked from indexing", reasonSoft404: "Soft 404",
-    reasonFetch: "Fetch or server problem", reasonOther: "Other indexing reason",
-    freshnessTitle: "Important page crawl freshness", freshnessHelp: "Shows indexed pages with Search Analytics demand and how long ago Google last crawled them.",
-    freshnessExport: "Export crawl freshness", freshnessSortRisk: "Sort by risk", freshnessSortDemand: "Sort by demand",
-    freshnessSortAge: "Sort by crawl age", freshnessFresh: "Recently crawled", freshnessWatch: "Watch",
-    freshnessStale: "Stale", freshnessCritical: "Very stale", freshnessUnknown: "Unknown crawl time",
-    demandHigh: "High demand", demandMedium: "Medium demand", demandLow: "Low demand",
-    crawlAge: "Crawl age", days: "days", indexedWithDemand: "Indexed pages with demand",
-    urlSetsTitle: "URL set comparison", urlSetsHelp: "Compares sitemap URLs with links found on scanned pages, Search Analytics pages, and Google discovery signals.",
-    urlSetsExport: "Export URL set diagnosis", urlSetsAll: "All findings", urlSetsFindings: "findings",
-    urlSetsPartial: "Internal-link results only cover pages completed in this audit.",
-    urlPolicyActive: "Comparison policy", queryPreserve: "Preserve all query parameters",
-    queryStripTracking: "Remove known tracking parameters", queryDropAll: "Ignore all query parameters",
-    slashPreserve: "Preserve trailing slash", slashRemove: "Normalize without trailing slash",
-    slashAdd: "Normalize with trailing slash",
-    internalMissingSitemap: "Internal URL missing from sitemap", gscMissingSitemap: "GSC page missing from sitemap",
-    sitemapOrphan: "Sitemap page with no scanned inbound links", googleMissingSitemap: "Google reports no sitemap source",
-    googleMissingReferrer: "Google reports no referring URL",
-    urlVariantReasonable: "Reasonable duplicate variants", urlVariantNormalize: "URL variants should be unified",
-    urlVariantConflict: "Serious URL variant conflict",
-    variantProtocol: "HTTP/HTTPS mixed", variantHostname: "www/non-www mixed",
-    variantPathCase: "Path letter case differs", variantDefaultDocument: "Default document path differs",
-    variantTrailingSlash: "Trailing slash differs", variantQueryOrder: "Query parameter order differs",
-    variantTrackingQuery: "Tracking parameters differ", variantPaginationQuery: "Pagination parameters differ",
-    variantFunctionalQuery: "Functional parameters differ", variantUnknownQuery: "Unknown parameters differ",
-    sourceInternal: "Internal links", sourceGsc: "Search Analytics", sourceSitemap: "Sitemap",
-    sourceGoogle: "Google Inspection", sourceVariants: "Multiple sources", inboundLinks: "scanned inbound links",
-    structuredTitle: "Structured data diagnosis", structuredHelp: "Combines local JSON-LD graph validation with Google rich results findings.",
-    structuredExport: "Export structured data diagnosis", structuredAll: "All marked-up pages",
-    structuredErrors: "Required or graph errors", structuredRecommendations: "Recommended improvements",
-    structuredGoogle: "Google rich result issues", structuredNodes: "nodes", structuredTypes: "Types",
-    structuredLocalIssues: "Local issues", structuredGoogleVerdict: "Google verdict", structuredNoIssues: "No detected issues",
-    structuredCoverage: "Rule coverage", structuredValidated: "Google-specific validation", structuredParsedOnly: "Parsed only",
-    noIssue: "No immediate index issue", noIssueDetail: "Google reports this URL as passing URL Inspection checks.",
-    noIssueAction: "Keep monitoring performance data and canonical consistency.",
-    inspectPropertyFirst: "Enter the Search Console Property URL before running URL Inspection.",
-    inspectionQueue: "Priority inspection queue", inspectionCandidates: "candidates", inspectionAnomalies: "anomalies first",
-    inspectionNextBatch: "Next batch", inspectionSources: "Sources", sourceSitemapShort: "Sitemap",
-    sourceGscShort: "GSC", sourceInternalShort: "Internal", candidateTechnical: "Technical blocker",
-    candidateSignals: "Redirect or canonical mismatch", candidateGscMissing: "GSC page missing from sitemap",
-    candidateInternalMissing: "Internal URL missing from sitemap", candidateNoGsc: "Sitemap URL without GSC impressions",
-    candidateBaseline: "Sitemap baseline", candidateUnreachable: "Unreachable from site root",
-    candidateDeepPath: "Deep homepage click path",
-    sitemapsTitle: "Google sitemap status", sitemapsLoad: "Load sitemap status", sitemapsLoading: "Loading...",
-    sitemapsHelp: "Shows sitemaps submitted to this Search Console property, Google's last download, and reported errors or warnings.",
-    sitemapsTotal: "submitted sitemaps", sitemapsPending: "pending", sitemapsErrors: "with errors",
-    sitemapsWarnings: "with warnings", sitemapsSubmittedUrls: "submitted URLs", sitemapsLastRead: "Last read",
-    sitemapsLastSubmitted: "Last submitted", sitemapsCurrentFound: "Current audit sitemap is listed by Google",
-    sitemapsCurrentMissing: "Current audit sitemap is not listed for this property", sitemapsNoData: "Google returned no submitted sitemaps.",
-    sitemapsIndex: "Sitemap index", sitemapsFile: "Sitemap", sitemapsDeprecatedNote: "URL-level index coverage is not inferred from deprecated sitemap indexed totals.",
-  },
-  "zh-CN": {
-    analyticsTitle: "Search Analytics API", ready: "已就绪", configureFirst: "请先连接 GSC",
-    startDate: "开始日期", endDate: "结束日期", dimension: "维度", page: "网页", query: "查询词",
-    pageQuery: "网页 + 查询词", country: "国家/地区", device: "设备", load: "加载 Search Analytics",
-    loading: "加载中...", export: "导出关键词机会", rowsLoaded: "行已加载", clicks: "点击", impressions: "展示",
-    analyticsHelp: "加载点击、展示、CTR 和平均排名，用于 GSC 机会分析。",
-    pageOnly: "只有“网页”维度会更新 GSC 机会；其他维度仅在下方用于分析。",
-    noOpportunities: "按当前阈值未发现高置信度的“网页 + 查询词”机会。",
-    position: "排名", connectFirst: "请先连接 Google Search Console，再加载 Search Analytics。",
-    propertyFirst: "加载 Search Analytics 前，请先输入 Search Console Property URL。",
-    inspectionTitle: "网址检查", inspectStatus: "检查 Google 中的真实收录状态",
-    inspectionHelp: "优先检查 sitemap、Search Analytics 页面和站内网址的异常并集，每批最多 25 个。",
-    inspect: "检查网址", inspectNext: "检查接下来 25 个", inspectionComplete: "已检查全部扫描网址",
-    remaining: "个待检查", inspecting: "检查中...", inspected: "已检查", review: "需要处理",
-    critical: "严重", warnings: "警告", notices: "提示", noCoverage: "没有覆盖状态",
-    indexing: "索引", robots: "Robots", fetch: "抓取", crawledAs: "抓取类型", lastCrawl: "最后抓取",
-    sitemap: "所在 sitemap", referrers: "来源网址", googleCanonical: "Google 规范网址",
-    userCanonical: "用户规范网址", mobile: "移动端", richResults: "富媒体结果",
-    alignmentTitle: "Google 网址对照诊断", alignmentHelp: "对照 sitemap 提交网址、实际抓取网址、HTML canonical 与 Google 选择的 canonical。",
-    alignmentAll: "全部状态", submittedUrl: "Sitemap 提交网址", fetchedUrl: "实际抓取网址", htmlCanonical: "HTML canonical",
-    alignmentState: "诊断", alignedIndexed: "信号一致且已收录", alignedNotIndexed: "信号一致但未收录",
-    submittedRedirects: "提交网址发生跳转", htmlCanonicalDiffers: "HTML canonical 不一致",
-    googleCanonicalDiffers: "Google 选择了其它 canonical", crawlBlocked: "存在抓取或索引阻挡",
-    inspectionFailed: "网址检查失败", unknownAlignment: "需要检查", exportAlignment: "导出网址对照",
-    coverageTitle: "收录覆盖优先级", coverageHelp: "按 Google 收录原因分组，并结合 Search Analytics 需求确定修复优先级。",
-    coverageExport: "导出收录诊断", needsFix: "需要修复", expectedExclusion: "合理排除", indexedState: "已收录",
-    priorityHigh: "高优先级", priorityMedium: "中优先级", priorityLow: "低优先级",
-    affectedUrls: "网址", staleCrawl: "长期未抓取", noPerformanceData: "没有网页表现数据",
-    reasonDiscovered: "已发现但尚未抓取", reasonCrawled: "已抓取但尚未收录", reasonDuplicate: "重复页或替代页",
-    reasonCanonical: "Canonical 冲突", reasonBlocked: "被阻止收录", reasonSoft404: "软 404",
-    reasonFetch: "抓取或服务器问题", reasonOther: "其它收录原因",
-    freshnessTitle: "重要页面抓取时效", freshnessHelp: "显示已有 Search Analytics 需求的已收录页面，以及 Google 距离上次抓取的时间。",
-    freshnessExport: "导出抓取时效", freshnessSortRisk: "按风险排序", freshnessSortDemand: "按需求排序",
-    freshnessSortAge: "按抓取时间排序", freshnessFresh: "近期已抓取", freshnessWatch: "需要关注",
-    freshnessStale: "长期未抓取", freshnessCritical: "严重过期", freshnessUnknown: "抓取时间未知",
-    demandHigh: "高搜索需求", demandMedium: "中搜索需求", demandLow: "低搜索需求",
-    crawlAge: "距上次抓取", days: "天", indexedWithDemand: "有搜索需求的已收录页面",
-    urlSetsTitle: "网址集合对比", urlSetsHelp: "对比 sitemap、已扫描页面发现的站内链接、Search Analytics 页面和 Google 发现信号。",
-    urlSetsExport: "导出网址集合诊断", urlSetsAll: "全部问题", urlSetsFindings: "项问题",
-    urlSetsPartial: "站内链接结果仅覆盖本次检查中已完成扫描的页面。",
-    urlPolicyActive: "对比策略", queryPreserve: "保留全部查询参数",
-    queryStripTracking: "移除已知跟踪参数", queryDropAll: "忽略全部查询参数",
-    slashPreserve: "保持尾斜杠原样", slashRemove: "统一不带尾斜杠",
-    slashAdd: "统一带尾斜杠",
-    internalMissingSitemap: "站内发现网址未进入 sitemap", gscMissingSitemap: "GSC 网页未进入 sitemap",
-    sitemapOrphan: "Sitemap 页面没有已扫描入链", googleMissingSitemap: "Google 未报告 sitemap 来源",
-    googleMissingReferrer: "Google 未报告来源网址",
-    urlVariantReasonable: "合理重复网址变体", urlVariantNormalize: "建议统一网址变体",
-    urlVariantConflict: "严重网址变体冲突",
-    variantProtocol: "HTTP/HTTPS 混用", variantHostname: "www/non-www 混用",
-    variantPathCase: "路径字母大小写不同", variantDefaultDocument: "默认文档路径不同",
-    variantTrailingSlash: "尾斜杠不同", variantQueryOrder: "查询参数顺序不同",
-    variantTrackingQuery: "跟踪参数不同", variantPaginationQuery: "分页参数不同",
-    variantFunctionalQuery: "功能参数不同", variantUnknownQuery: "未知参数不同",
-    sourceInternal: "站内链接", sourceGsc: "Search Analytics", sourceSitemap: "Sitemap",
-    sourceGoogle: "Google 网址检查", sourceVariants: "多个来源", inboundLinks: "条已扫描入链",
-    structuredTitle: "结构化数据诊断", structuredHelp: "合并本地 JSON-LD graph 验证与 Google 富媒体结果问题。",
-    structuredExport: "导出结构化数据诊断", structuredAll: "全部标记页面",
-    structuredErrors: "必填字段或 graph 错误", structuredRecommendations: "建议完善项",
-    structuredGoogle: "Google 富媒体结果问题", structuredNodes: "个节点", structuredTypes: "类型",
-    structuredLocalIssues: "本地问题", structuredGoogleVerdict: "Google 结果", structuredNoIssues: "未发现问题",
-    structuredCoverage: "规则覆盖", structuredValidated: "已按 Google 规则验证", structuredParsedOnly: "仅解析，未配置专属规则",
-    noIssue: "没有明显索引问题", noIssueDetail: "Google 报告该网址通过了网址检查。",
-    noIssueAction: "继续监控表现数据和 canonical 一致性。",
-    inspectPropertyFirst: "运行网址检查前，请先输入 Search Console Property URL。",
-    inspectionQueue: "优先网址检查队列", inspectionCandidates: "个候选网址", inspectionAnomalies: "异常优先",
-    inspectionNextBatch: "下一批", inspectionSources: "来源", sourceSitemapShort: "Sitemap",
-    sourceGscShort: "GSC", sourceInternalShort: "站内发现", candidateTechnical: "存在技术阻挡",
-    candidateSignals: "跳转或 canonical 不一致", candidateGscMissing: "GSC 页面未进入 sitemap",
-    candidateInternalMissing: "站内网址未进入 sitemap", candidateNoGsc: "Sitemap 网址没有 GSC 展示",
-    candidateBaseline: "Sitemap 基线检查", candidateUnreachable: "从站点根页不可达",
-    candidateDeepPath: "首页点击路径过深",
-    sitemapsTitle: "Google Sitemap 状态", sitemapsLoad: "加载 Sitemap 状态", sitemapsLoading: "加载中...",
-    sitemapsHelp: "显示该 Search Console property 已提交的 sitemap、Google 最后读取时间以及错误和警告。",
-    sitemapsTotal: "个已提交 sitemap", sitemapsPending: "个待处理", sitemapsErrors: "个有错误",
-    sitemapsWarnings: "个有警告", sitemapsSubmittedUrls: "个已提交网址", sitemapsLastRead: "最后读取",
-    sitemapsLastSubmitted: "最后提交", sitemapsCurrentFound: "Google 列表中包含当前扫描 sitemap",
-    sitemapsCurrentMissing: "该 property 的 Google 列表中没有当前扫描 sitemap", sitemapsNoData: "Google 没有返回已提交的 sitemap。",
-    sitemapsIndex: "Sitemap 索引", sitemapsFile: "Sitemap", sitemapsDeprecatedNote: "不会使用已弃用的 sitemap indexed 汇总数量推断单个网址的收录状态。",
-  },
-  "zh-TW": {
-    analyticsTitle: "Search Analytics API", ready: "已就緒", configureFirst: "請先連接 GSC",
-    startDate: "開始日期", endDate: "結束日期", dimension: "維度", page: "網頁", query: "查詢字詞",
-    pageQuery: "網頁 + 查詢字詞", country: "國家/地區", device: "裝置", load: "載入 Search Analytics",
-    loading: "載入中...", export: "匯出關鍵字機會", rowsLoaded: "列已載入", clicks: "點擊", impressions: "曝光",
-    analyticsHelp: "載入點擊、曝光、CTR 和平均排名，用於 GSC 機會分析。",
-    pageOnly: "只有「網頁」維度會更新 GSC 機會；其他維度僅在下方用於分析。",
-    noOpportunities: "依目前門檻未發現高可信度的「網頁 + 查詢字詞」機會。",
-    position: "排名", connectFirst: "請先連接 Google Search Console，再載入 Search Analytics。",
-    propertyFirst: "載入 Search Analytics 前，請先輸入 Search Console Property URL。",
-    inspectionTitle: "網址檢查", inspectStatus: "檢查 Google 中的真實收錄狀態",
-    inspectionHelp: "優先檢查 sitemap、Search Analytics 頁面和站內網址的異常聯集，每批最多 25 個。",
-    inspect: "檢查網址", inspectNext: "檢查接下來 25 個", inspectionComplete: "已檢查全部掃描網址",
-    remaining: "個待檢查", inspecting: "檢查中...", inspected: "已檢查", review: "需要處理",
-    critical: "嚴重", warnings: "警告", notices: "提示", noCoverage: "沒有涵蓋狀態",
-    indexing: "索引", robots: "Robots", fetch: "擷取", crawledAs: "檢索類型", lastCrawl: "最後檢索",
-    sitemap: "所在 sitemap", referrers: "來源網址", googleCanonical: "Google 標準網址",
-    userCanonical: "使用者標準網址", mobile: "行動裝置", richResults: "複合式搜尋結果",
-    alignmentTitle: "Google 網址對照診斷", alignmentHelp: "對照 sitemap 提交網址、實際檢索網址、HTML canonical 與 Google 選擇的 canonical。",
-    alignmentAll: "全部狀態", submittedUrl: "Sitemap 提交網址", fetchedUrl: "實際檢索網址", htmlCanonical: "HTML canonical",
-    alignmentState: "診斷", alignedIndexed: "訊號一致且已收錄", alignedNotIndexed: "訊號一致但未收錄",
-    submittedRedirects: "提交網址發生重新導向", htmlCanonicalDiffers: "HTML canonical 不一致",
-    googleCanonicalDiffers: "Google 選擇了其它 canonical", crawlBlocked: "存在檢索或索引阻擋",
-    inspectionFailed: "網址檢查失敗", unknownAlignment: "需要檢查", exportAlignment: "匯出網址對照",
-    coverageTitle: "收錄涵蓋優先級", coverageHelp: "依 Google 收錄原因分組，並結合 Search Analytics 需求決定修復優先級。",
-    coverageExport: "匯出收錄診斷", needsFix: "需要修復", expectedExclusion: "合理排除", indexedState: "已收錄",
-    priorityHigh: "高優先級", priorityMedium: "中優先級", priorityLow: "低優先級",
-    affectedUrls: "網址", staleCrawl: "長期未檢索", noPerformanceData: "沒有網頁成效資料",
-    reasonDiscovered: "已發現但尚未檢索", reasonCrawled: "已檢索但尚未收錄", reasonDuplicate: "重複頁或替代頁",
-    reasonCanonical: "Canonical 衝突", reasonBlocked: "被阻止收錄", reasonSoft404: "軟 404",
-    reasonFetch: "檢索或伺服器問題", reasonOther: "其它收錄原因",
-    freshnessTitle: "重要頁面檢索時效", freshnessHelp: "顯示已有 Search Analytics 需求的已收錄頁面，以及 Google 距離上次檢索的時間。",
-    freshnessExport: "匯出檢索時效", freshnessSortRisk: "依風險排序", freshnessSortDemand: "依需求排序",
-    freshnessSortAge: "依檢索時間排序", freshnessFresh: "近期已檢索", freshnessWatch: "需要關注",
-    freshnessStale: "長期未檢索", freshnessCritical: "嚴重過期", freshnessUnknown: "檢索時間未知",
-    demandHigh: "高搜尋需求", demandMedium: "中搜尋需求", demandLow: "低搜尋需求",
-    crawlAge: "距上次檢索", days: "天", indexedWithDemand: "有搜尋需求的已收錄頁面",
-    urlSetsTitle: "網址集合對比", urlSetsHelp: "對比 sitemap、已掃描頁面發現的站內連結、Search Analytics 頁面和 Google 發現訊號。",
-    urlSetsExport: "匯出網址集合診斷", urlSetsAll: "全部問題", urlSetsFindings: "項問題",
-    urlSetsPartial: "站內連結結果僅涵蓋本次檢查中已完成掃描的頁面。",
-    urlPolicyActive: "對比策略", queryPreserve: "保留全部查詢參數",
-    queryStripTracking: "移除已知追蹤參數", queryDropAll: "忽略全部查詢參數",
-    slashPreserve: "保持尾斜線原樣", slashRemove: "統一不帶尾斜線",
-    slashAdd: "統一帶尾斜線",
-    internalMissingSitemap: "站內發現網址未進入 sitemap", gscMissingSitemap: "GSC 網頁未進入 sitemap",
-    sitemapOrphan: "Sitemap 頁面沒有已掃描入鏈", googleMissingSitemap: "Google 未回報 sitemap 來源",
-    googleMissingReferrer: "Google 未回報來源網址",
-    urlVariantReasonable: "合理重複網址變體", urlVariantNormalize: "建議統一網址變體",
-    urlVariantConflict: "嚴重網址變體衝突",
-    variantProtocol: "HTTP/HTTPS 混用", variantHostname: "www/non-www 混用",
-    variantPathCase: "路徑字母大小寫不同", variantDefaultDocument: "預設文件路徑不同",
-    variantTrailingSlash: "尾斜線不同", variantQueryOrder: "查詢參數順序不同",
-    variantTrackingQuery: "追蹤參數不同", variantPaginationQuery: "分頁參數不同",
-    variantFunctionalQuery: "功能參數不同", variantUnknownQuery: "未知參數不同",
-    sourceInternal: "站內連結", sourceGsc: "Search Analytics", sourceSitemap: "Sitemap",
-    sourceGoogle: "Google 網址檢查", sourceVariants: "多個來源", inboundLinks: "條已掃描入鏈",
-    structuredTitle: "結構化資料診斷", structuredHelp: "合併本地 JSON-LD graph 驗證與 Google 複合式搜尋結果問題。",
-    structuredExport: "匯出結構化資料診斷", structuredAll: "全部標記頁面",
-    structuredErrors: "必填欄位或 graph 錯誤", structuredRecommendations: "建議完善項",
-    structuredGoogle: "Google 複合式搜尋結果問題", structuredNodes: "個節點", structuredTypes: "類型",
-    structuredLocalIssues: "本地問題", structuredGoogleVerdict: "Google 結果", structuredNoIssues: "未發現問題",
-    structuredCoverage: "規則涵蓋", structuredValidated: "已依 Google 規則驗證", structuredParsedOnly: "僅解析，未設定專屬規則",
-    noIssue: "沒有明顯索引問題", noIssueDetail: "Google 回報該網址通過網址檢查。",
-    noIssueAction: "繼續監控成效資料和 canonical 一致性。",
-    inspectPropertyFirst: "執行網址檢查前，請先輸入 Search Console Property URL。",
-    inspectionQueue: "優先網址檢查佇列", inspectionCandidates: "個候選網址", inspectionAnomalies: "異常優先",
-    inspectionNextBatch: "下一批", inspectionSources: "來源", sourceSitemapShort: "Sitemap",
-    sourceGscShort: "GSC", sourceInternalShort: "站內發現", candidateTechnical: "存在技術阻擋",
-    candidateSignals: "重新導向或 canonical 不一致", candidateGscMissing: "GSC 頁面未進入 sitemap",
-    candidateInternalMissing: "站內網址未進入 sitemap", candidateNoGsc: "Sitemap 網址沒有 GSC 曝光",
-    candidateBaseline: "Sitemap 基線檢查", candidateUnreachable: "從站點根頁不可達",
-    candidateDeepPath: "首頁點擊路徑過深",
-    sitemapsTitle: "Google Sitemap 狀態", sitemapsLoad: "載入 Sitemap 狀態", sitemapsLoading: "載入中...",
-    sitemapsHelp: "顯示該 Search Console property 已提交的 sitemap、Google 最後讀取時間以及錯誤和警告。",
-    sitemapsTotal: "個已提交 sitemap", sitemapsPending: "個待處理", sitemapsErrors: "個有錯誤",
-    sitemapsWarnings: "個有警告", sitemapsSubmittedUrls: "個已提交網址", sitemapsLastRead: "最後讀取",
-    sitemapsLastSubmitted: "最後提交", sitemapsCurrentFound: "Google 清單中包含目前掃描 sitemap",
-    sitemapsCurrentMissing: "該 property 的 Google 清單中沒有目前掃描 sitemap", sitemapsNoData: "Google 沒有回傳已提交的 sitemap。",
-    sitemapsIndex: "Sitemap 索引", sitemapsFile: "Sitemap", sitemapsDeprecatedNote: "不會使用已棄用的 sitemap indexed 彙總數量推斷單一網址的收錄狀態。",
-  },
-};
 
-const inspectionDiagnosisText = {
-  "zh-CN": {
-    inspection_error: ["检查请求失败", "检查 API 连接、property 权限，并确认该网址属于已配置的 property。"],
-    not_indexed: ["Google 尚未收录", "检查可抓取性、canonical、内容质量、内部链接和 sitemap 收录情况。"],
-    discovered_not_crawled: ["已发现但尚未抓取", "加强内部链接和抓取预算信号，保留在 sitemap 中，并确保服务器响应快速。"],
-    duplicate_or_alternate: ["Google 将其视为重复或替代页面", "确认 canonical 目标是否正确；若该网址需要排名，请统一 canonical、sitemap 和内部链接信号。"],
-    soft_404: ["检测到软 404", "补充有价值的实质内容；如果页面不应存在，请返回真正的 404 或 410。"],
-    robots_blocked: ["被 robots.txt 阻挡", "如果页面应被收录，请删除对应的 robots.txt 阻挡规则。"],
-    fetch_problem: ["Google 抓取存在问题", "检查服务器可用性、跳转、状态码、防火墙和渲染稳定性。"],
-    canonical_mismatch: ["Google 选择了不同的 canonical", "围绕首选 canonical 统一标签、内部链接、跳转和 sitemap URL。"],
-    not_seen_in_sitemap: ["Google 未报告 sitemap 来源", "将规范网址保留在已提交的 sitemap，并确保 robots.txt 可发现 sitemap。"],
-    no_referrers: ["未报告来源网址", "从相关且已收录的页面增加内部链接，帮助 Google 发现并优先抓取。"],
-    mobile_usability: ["移动端可用性问题", "在 Search Console 中查看移动端问题，并修复布局、点击目标和 viewport。"],
-    rich_results: ["富媒体结果需要检查", "使用 Google 富媒体结果工具验证结构化数据，并修复无效项目。"],
-    indexing_state: ["索引状态需要检查", "结合 meta robots、canonical 和抓取诊断分析该状态。"],
-  },
-  "zh-TW": {
-    inspection_error: ["檢查請求失敗", "檢查 API 連線、property 權限，並確認該網址屬於已設定的 property。"],
-    not_indexed: ["Google 尚未收錄", "檢查可檢索性、canonical、內容品質、內部連結和 sitemap 收錄情況。"],
-    discovered_not_crawled: ["已發現但尚未檢索", "加強內部連結和檢索預算訊號，保留在 sitemap 中，並確保伺服器快速回應。"],
-    duplicate_or_alternate: ["Google 將其視為重複或替代頁面", "確認 canonical 目標是否正確；若該網址需要排名，請統一 canonical、sitemap 和內部連結訊號。"],
-    soft_404: ["偵測到軟 404", "補充有價值的實質內容；如果頁面不應存在，請回傳真正的 404 或 410。"],
-    robots_blocked: ["被 robots.txt 阻擋", "如果頁面應被收錄，請移除對應的 robots.txt 阻擋規則。"],
-    fetch_problem: ["Google 擷取存在問題", "檢查伺服器可用性、重新導向、狀態碼、防火牆和轉譯穩定性。"],
-    canonical_mismatch: ["Google 選擇了不同的 canonical", "圍繞首選 canonical 統一標籤、內部連結、重新導向和 sitemap URL。"],
-    not_seen_in_sitemap: ["Google 未回報 sitemap 來源", "將標準網址保留在已提交的 sitemap，並確保 robots.txt 可發現 sitemap。"],
-    no_referrers: ["未回報來源網址", "從相關且已收錄的頁面增加內部連結，協助 Google 發現並優先檢索。"],
-    mobile_usability: ["行動裝置可用性問題", "在 Search Console 中查看行動裝置問題，並修正版面、點擊目標和 viewport。"],
-    rich_results: ["複合式搜尋結果需要檢查", "使用 Google 複合式搜尋結果工具驗證結構化資料，並修正無效項目。"],
-    indexing_state: ["索引狀態需要檢查", "結合 meta robots、canonical 和檢索診斷分析該狀態。"],
-  },
-};
 
-const structuredDiagnosticText = {
-  en: {
-    json_syntax: "Invalid JSON syntax", missing_context: "Missing @context", unresolved_reference: "Broken graph reference",
-    missing_required: "Missing required field", missing_required_any: "Missing required alternative",
-    missing_recommended: "Recommended field missing", invalid_breadcrumb: "Invalid breadcrumb list",
-    invalid_url: "Invalid URL", page_url_mismatch: "Page URL mismatch", name_mismatch: "Name and title differ",
-    name_not_visible: "Name not found in visible text", image_not_visible: "Image not found in page signals",
-    invalid_value: "Invalid value", invalid_length: "Invalid text length", invalid_count: "Invalid item count",
-    duplicate_value: "Duplicate value", non_sequential: "Non-sequential positions", invalid_date: "Invalid date",
-    invalid_number: "Invalid number", type_not_validated: "No type-specific Google rule", insufficient_images: "Too few images",
-  },
-  "zh-CN": {
-    json_syntax: "JSON 语法无效", missing_context: "缺少 @context", unresolved_reference: "Graph 引用断裂",
-    missing_required: "缺少必填字段", missing_required_any: "缺少必填的备选字段",
-    missing_recommended: "缺少建议字段", invalid_breadcrumb: "面包屑列表无效",
-    invalid_url: "网址无效", page_url_mismatch: "结构化网址与页面不一致", name_mismatch: "名称与页面标题不一致",
-    name_not_visible: "名称未出现在可见内容", image_not_visible: "图片未出现在页面信号中",
-    invalid_value: "字段值无效", invalid_length: "文本长度无效", invalid_count: "项目数量无效",
-    duplicate_value: "存在重复值", non_sequential: "顺序编号不连续", invalid_date: "日期格式无效",
-    invalid_number: "数字格式无效", type_not_validated: "尚无 Google 类型专属规则", insufficient_images: "图片数量偏少",
-  },
-  "zh-TW": {
-    json_syntax: "JSON 語法無效", missing_context: "缺少 @context", unresolved_reference: "Graph 參照中斷",
-    missing_required: "缺少必填欄位", missing_required_any: "缺少必填的替代欄位",
-    missing_recommended: "缺少建議欄位", invalid_breadcrumb: "麵包屑清單無效",
-    invalid_url: "網址無效", page_url_mismatch: "結構化網址與頁面不一致", name_mismatch: "名稱與頁面標題不一致",
-    name_not_visible: "名稱未出現在可見內容", image_not_visible: "圖片未出現在頁面訊號中",
-    invalid_value: "欄位值無效", invalid_length: "文字長度無效", invalid_count: "項目數量無效",
-    duplicate_value: "存在重複值", non_sequential: "順序編號不連續", invalid_date: "日期格式無效",
-    invalid_number: "數字格式無效", type_not_validated: "尚無 Google 類型專屬規則", insufficient_images: "圖片數量偏少",
-  },
-};
 
-const googlebotLogText = {
-  en: {
-    title: "Googlebot log analysis", optional: "optional", import: "Import access log", clear: "Clear log",
-    help: "Parses Nginx, Apache, Cloudflare, Vercel, JSON/NDJSON, CSV, and TSV logs locally. Only candidate crawler IPs are sent for DNS verification.",
-    privacy: "Raw log lines stay in this browser and are not saved to Neon.",
-    reading: "Reading log...", verifying: "Verifying crawler IPs...", failed: "Could not analyze log",
-    requests: "candidate requests", verified: "verified Google requests", fake: "unverified requests",
-    uniqueUrls: "unique URLs", serverErrors: "server errors", outsideSitemap: "outside sitemap",
-    waste: "crawl waste candidates", missingCrawl: "sitemap URLs not crawled in this log period",
-    firstRequest: "First request", lastRequest: "Last request", format: "Detected format",
-    all: "All findings", errors: "HTTP errors", nonSitemap: "Outside sitemap", parameters: "Query URLs",
-    assets: "Static assets", unverified: "Unverified crawler", missing: "Not crawled",
-    blocked: "Robots-blocked crawl",
-    export: "Export Googlebot log diagnosis", noFindings: "No findings for this filter.",
-    truncated: "Only the first 200,000 log lines were processed.", verificationHelp: "Verified using reverse DNS and matching forward DNS.",
-    sourceUrl: "URL", status: "Status", hits: "Hits", lastSeen: "Last seen", detail: "Detail",
-    noCandidates: "No Google crawler user agents were found in this file.",
-  },
-  "zh-CN": {
-    title: "Googlebot 日志分析", optional: "可选", import: "导入访问日志", clear: "清除日志",
-    help: "在浏览器本地解析 Nginx、Apache、Cloudflare、Vercel、JSON/NDJSON、CSV 和 TSV 日志，仅发送疑似爬虫 IP 做 DNS 验证。",
-    privacy: "日志原文只保留在当前浏览器，不会保存到 Neon。",
-    reading: "正在读取日志...", verifying: "正在验证爬虫 IP...", failed: "无法分析日志",
-    requests: "条疑似请求", verified: "条已验证 Google 请求", fake: "条未验证请求",
-    uniqueUrls: "个唯一网址", serverErrors: "个服务器错误", outsideSitemap: "个 sitemap 外网址",
-    waste: "个抓取浪费候选", missingCrawl: "个 sitemap 网址在日志周期内未抓取",
-    firstRequest: "最早请求", lastRequest: "最后请求", format: "识别格式",
-    all: "全部问题", errors: "HTTP 错误", nonSitemap: "Sitemap 外网址", parameters: "参数网址",
-    assets: "静态资源", unverified: "未验证爬虫", missing: "未抓取",
-    blocked: "抓取了 Robots 阻挡网址",
-    export: "导出 Googlebot 日志诊断", noFindings: "当前筛选没有问题。",
-    truncated: "仅处理日志中的前 200,000 行。", verificationHelp: "使用反向 DNS，并通过正向 DNS 匹配原始 IP。",
-    sourceUrl: "网址", status: "状态", hits: "次数", lastSeen: "最后出现", detail: "详情",
-    noCandidates: "文件中没有发现 Google crawler User-Agent。",
-  },
-  "zh-TW": {
-    title: "Googlebot 日誌分析", optional: "選用", import: "匯入存取日誌", clear: "清除日誌",
-    help: "在瀏覽器本機解析 Nginx、Apache、Cloudflare、Vercel、JSON/NDJSON、CSV 和 TSV 日誌，只傳送疑似檢索器 IP 進行 DNS 驗證。",
-    privacy: "日誌原文只保留在目前瀏覽器，不會儲存到 Neon。",
-    reading: "正在讀取日誌...", verifying: "正在驗證檢索器 IP...", failed: "無法分析日誌",
-    requests: "筆疑似請求", verified: "筆已驗證 Google 請求", fake: "筆未驗證請求",
-    uniqueUrls: "個唯一網址", serverErrors: "個伺服器錯誤", outsideSitemap: "個 sitemap 外網址",
-    waste: "個檢索浪費候選", missingCrawl: "個 sitemap 網址在日誌期間內未檢索",
-    firstRequest: "最早請求", lastRequest: "最後請求", format: "辨識格式",
-    all: "全部問題", errors: "HTTP 錯誤", nonSitemap: "Sitemap 外網址", parameters: "參數網址",
-    assets: "靜態資源", unverified: "未驗證檢索器", missing: "未檢索",
-    blocked: "檢索了 Robots 阻擋網址",
-    export: "匯出 Googlebot 日誌診斷", noFindings: "目前篩選沒有問題。",
-    truncated: "僅處理日誌中的前 200,000 列。", verificationHelp: "使用反向 DNS，並透過正向 DNS 比對原始 IP。",
-    sourceUrl: "網址", status: "狀態", hits: "次數", lastSeen: "最後出現", detail: "詳細資料",
-    noCandidates: "檔案中沒有發現 Google crawler User-Agent。",
-  },
-};
 
-const gscSupportingText = {
-  en: {
-    csvTitle: "Search Console CSV", optional: "optional", rowsLoaded: "rows loaded",
-    importTitle: "Import page performance", importHelp: "Use a Search Console Performance export by Pages. CSV, TSV, and semicolon-separated files are supported.",
-    importButton: "Import CSV", clearButton: "Clear GSC data", reading: "Reading", imported: "rows imported",
-    parsed: "rows parsed", importFailed: "import failed", cleared: "Imported CSV data cleared",
-    noRows: "No page rows found. Export Search Console Performance by Pages with Page, Clicks, Impressions, CTR, and Position columns.",
-    opportunities: "GSC opportunities", sampleUrls: "Sample URLs",
-    indexableNoImpressions: ["Technically indexable, no GSC impressions", "These URLs look indexable in this audit but do not appear in the imported GSC performance rows."],
-    lowRanking: ["Visible but ranking low", "These URLs have impressions but average position is worse than 20."],
-    lowCtr: ["Visible but CTR is low", "These URLs have at least 100 impressions and less than 1% calculated CTR."],
-    blockedVisibility: ["GSC visibility with technical blockers", "These URLs have GSC impressions but also have crawl, indexability, or canonical blockers in this audit."],
-    missingSitemap: ["GSC pages missing from sitemap", "These URLs appear in GSC performance data but are not in the scanned sitemap set."],
-  },
-  "zh-CN": {
-    csvTitle: "Search Console CSV", optional: "可选", rowsLoaded: "行已加载",
-    importTitle: "导入网页表现", importHelp: "请使用 Search Console“效果”报告中的“网页”导出文件，支持 CSV、TSV 和分号分隔格式。",
-    importButton: "导入 CSV", clearButton: "清除 GSC 数据", reading: "正在读取", imported: "行已导入",
-    parsed: "行已解析", importFailed: "导入失败", cleared: "已清除导入的 CSV 数据",
-    noRows: "未找到网页数据行。请从 Search Console“效果 > 网页”导出，并包含网页、点击、展示、CTR 和排名列。",
-    opportunities: "GSC 优化机会", sampleUrls: "示例网址",
-    indexableNoImpressions: ["技术上可收录，但没有 GSC 展示", "这些网址在本次检查中看起来可以收录，但未出现在导入的 GSC 表现数据中。"],
-    lowRanking: ["已有展示但排名较低", "这些网址已有展示，但平均排名低于第 20 位。"],
-    lowCtr: ["已有展示但点击率较低", "这些网址至少有 100 次展示，计算出的 CTR 低于 1%。"],
-    blockedVisibility: ["已有 GSC 展示但存在技术阻挡", "这些网址已有 GSC 展示，同时存在抓取、索引或 canonical 阻挡。"],
-    missingSitemap: ["GSC 网页未出现在 sitemap", "这些网址出现在 GSC 表现数据中，但不在本次扫描的 sitemap URL 集合内。"],
-  },
-  "zh-TW": {
-    csvTitle: "Search Console CSV", optional: "選用", rowsLoaded: "列已載入",
-    importTitle: "匯入網頁成效", importHelp: "請使用 Search Console「成效」報表中的「網頁」匯出檔，支援 CSV、TSV 和分號分隔格式。",
-    importButton: "匯入 CSV", clearButton: "清除 GSC 資料", reading: "正在讀取", imported: "列已匯入",
-    parsed: "列已解析", importFailed: "匯入失敗", cleared: "已清除匯入的 CSV 資料",
-    noRows: "未找到網頁資料列。請從 Search Console「成效 > 網頁」匯出，並包含網頁、點擊、曝光、CTR 和排名欄位。",
-    opportunities: "GSC 優化機會", sampleUrls: "範例網址",
-    indexableNoImpressions: ["技術上可收錄，但沒有 GSC 曝光", "這些網址在本次檢查中看起來可以收錄，但未出現在匯入的 GSC 成效資料中。"],
-    lowRanking: ["已有曝光但排名較低", "這些網址已有曝光，但平均排名低於第 20 位。"],
-    lowCtr: ["已有曝光但點閱率較低", "這些網址至少有 100 次曝光，計算出的 CTR 低於 1%。"],
-    blockedVisibility: ["已有 GSC 曝光但存在技術阻擋", "這些網址已有 GSC 曝光，同時存在檢索、索引或 canonical 阻擋。"],
-    missingSitemap: ["GSC 網頁未出現在 sitemap", "這些網址出現在 GSC 成效資料中，但不在本次掃描的 sitemap URL 集合內。"],
-  },
-};
+
+
+
+
+
 
 function buildSearchAnalyticsInsights(rows, dimension, language = "en") {
   const locale = language === "zh-CN" ? "zh-CN" : language === "zh-TW" ? "zh-TW" : "en";
@@ -2823,13 +1756,14 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows, language }) {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/gsc/search-analytics", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ startDate, endDate, siteUrl, dimension }),
+      const body = await apiPost("/api/gsc/search-analytics", {
+        startDate,
+        endDate,
+        siteUrl,
+        dimension,
+      }, {
+        fallbackMessage: "Search Analytics failed",
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Search Analytics failed");
       if (body.dimension === "page") onRows(body.rows || []);
       setRows(body.rows || []);
       setSummary({
@@ -4030,13 +2964,9 @@ function GscSitemapsPanel({ status, siteUrl, currentSitemapUrl, language }) {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/gsc/sitemaps", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteUrl }),
+      const body = await apiPost("/api/gsc/sitemaps", { siteUrl }, {
+        fallbackMessage: "Could not load Search Console sitemaps",
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Could not load Search Console sitemaps");
       setResult(body);
     } catch (err) {
       setError(err.message || String(err));
@@ -4170,13 +3100,9 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/gsc/inspect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls: nextUrls, siteUrl }),
+      const body = await apiPost("/api/gsc/inspect", { urls: nextUrls, siteUrl }, {
+        fallbackMessage: "URL Inspection failed",
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "URL Inspection failed");
       const candidateByKey = new Map(nextCandidates.map((candidate) => [candidate.key, candidate]));
       setResult((current) => ({
         ...body,
@@ -4453,13 +3379,9 @@ function GooglebotLogAnalysis({ report, language, gscRows }) {
       }
       setMessage(copy.verifying);
       const ips = [...new Set(parsed.records.map((record) => record.ip).filter(Boolean))];
-      const response = await fetch("/api/googlebot/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ips }),
+      const body = await apiPost("/api/googlebot/verify", { ips }, {
+        fallbackMessage: "Googlebot verification failed",
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Googlebot verification failed");
       setAnalysis({ fileName: file.name, ...parsed, verifications: body.results || [], verifiedAt: body.verifiedAt });
       setMessage("");
     } catch (err) {
@@ -4920,8 +3842,7 @@ function App() {
   const t = dictionaries[language];
 
     useEffect(() => {
-    fetch("/api/gsc/status")
-      .then((response) => response.json())
+    apiGet("/api/gsc/status", { fallbackMessage: "Search Console API status is unavailable." })
       .then((status) => {
         setGscStatus(status);
         if (status?.siteUrl) setGscSiteUrl(status.siteUrl);
@@ -4984,9 +3905,9 @@ useEffect(() => {
   async function loadRetainedJobs() {
     setRetainedJobsLoading(true);
     try {
-      const response = await fetch("/api/audit-jobs?limit=20");
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Could not load retained tasks");
+      const body = await apiGet("/api/audit-jobs?limit=20", {
+        fallbackMessage: "Could not load retained tasks",
+      });
       setRetainedJobs(body.items || []);
     } finally {
       setRetainedJobsLoading(false);
@@ -4994,9 +3915,9 @@ useEffect(() => {
   }
 
   async function openRetainedReport(jobId) {
-    const response = await fetch(`/api/audit-jobs/${jobId}`);
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error || "Could not open retained report");
+    const body = await apiGet(`/api/audit-jobs/${jobId}`, {
+      fallbackMessage: "Could not open retained report",
+    });
     if (!body.result) throw new Error("This task does not have a completed report.");
     saveCompletedReport(body.result);
   }
@@ -5012,13 +3933,9 @@ useEffect(() => {
     window.localStorage.setItem(ACTIVE_AUDIT_JOB_KEY, JSON.stringify({ id: job.id, startedAt }));
     try {
       if (["stopped", "error", "interrupted"].includes(job.status)) {
-        const response = await fetch(`/api/audit-jobs/${job.id}/control`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "restart" }),
+        await apiPost(`/api/audit-jobs/${job.id}/control`, { action: "restart" }, {
+          fallbackMessage: "Could not restart retained task",
         });
-        const body = await response.json();
-        if (!response.ok) throw new Error(body.error || "Could not restart retained task");
       } else if (job.status === "paused") {
         await controlRetainedJob(job.id, "resume");
       }
@@ -5030,48 +3947,38 @@ useEffect(() => {
   }
 
   async function controlRetainedJob(jobId, action) {
-    const response = await fetch(`/api/audit-jobs/${jobId}/control`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+    return apiPost(`/api/audit-jobs/${jobId}/control`, { action }, {
+      fallbackMessage: "Could not control retained task",
     });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error || "Could not control retained task");
-    return body;
   }
 
   async function deleteRetainedJob(jobId) {
-    const response = await fetch(`/api/audit-jobs/${jobId}`, { method: "DELETE" });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error || "Could not delete retained task");
+    await apiDelete(`/api/audit-jobs/${jobId}`, {
+      fallbackMessage: "Could not delete retained task",
+    });
     setRetainedJobs((items) => items.filter((item) => item.id !== jobId));
     if (currentJobId === jobId) window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
   }
 
   async function controlJob(action) {
     if (!currentJobId) return;
-    const response = await fetch(`/api/audit-jobs/${currentJobId}/control`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+    const body = await apiPost(`/api/audit-jobs/${currentJobId}/control`, { action }, {
+      fallbackMessage: "Could not control audit",
     });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error || "Could not control audit");
     if (action === "pause" && body.status === "paused") setPauseCount((count) => count + 1);
     setJobStatus(body.status);
   }
 
   async function pollAuditJob(jobId) {
     while (true) {
-      const pollResponse = await fetch(`/api/audit-jobs/${jobId}/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const pollBody = await pollResponse.json();
-      if (!pollResponse.ok) {
+      let pollBody;
+      try {
+        pollBody = await apiPost(`/api/audit-jobs/${jobId}/run`, {}, {
+          fallbackMessage: "Audit failed",
+        });
+      } catch (error) {
         window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
-        throw new Error(pollBody.error || "Audit failed");
+        throw error;
       }
       setJobStatus(pollBody.status);
 
@@ -5133,25 +4040,21 @@ useEffect(() => {
     setElapsedNow(0);
     setProgress({ label: t.progressPreparing, value: 5, meta: "" });
     try {
-      const startResponse = await fetch("/api/audit-jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sitemapUrl,
-          options: {
-            contentChecks,
-            performanceChecks,
-            backgroundMode,
-            internalCrawl,
-            urlQueryPolicy,
-            trailingSlashPolicy,
-            robotsSource: directoryRobots ? "sitemap-directory" : "root",
-            proxyEnabled: false,
-          },
-        }),
+      const startBody = await apiPost("/api/audit-jobs", {
+        sitemapUrl,
+        options: {
+          contentChecks,
+          performanceChecks,
+          backgroundMode,
+          internalCrawl,
+          urlQueryPolicy,
+          trailingSlashPolicy,
+          robotsSource: directoryRobots ? "sitemap-directory" : "root",
+          proxyEnabled: false,
+        },
+      }, {
+        fallbackMessage: "Audit failed",
       });
-      const startBody = await startResponse.json();
-      if (!startResponse.ok) throw new Error(startBody.error || "Audit failed");
       setCurrentJobId(startBody.id);
       setJobStatus(startBody.status);
       const startedAt = Date.now();
@@ -5333,5 +4236,9 @@ useEffect(() => {
   );
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+createRoot(document.getElementById("root")).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>,
+);
 
