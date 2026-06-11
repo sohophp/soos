@@ -11,6 +11,7 @@ All notable changes to soos will be documented in this file.
 
 ### Added
 
+- An internal link graph across sitemap and recursively discovered pages with inbound/outbound counts, discovery depth, orphan/weak/deep/dead-end classifications, filters, and CSV export.
 - Optional bounded recursive internal discovery with same-site filtering, depth and URL budgets, checkpoint recovery, and a separate discovered-page report.
 - Recursive discoveries feed URL-set comparison and prioritized URL Inspection without changing sitemap health scoring.
 - A prioritized URL Inspection queue combining sitemap anomalies, Search Analytics pages missing from sitemap, and internally discovered URLs missing from sitemap.

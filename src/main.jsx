@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { absoluteLogUrl, parseAccessLog, STATIC_ASSET_PATH } from "./googlebot-log.js";
 import { buildUrlInspectionCandidates, inspectionCandidateKey } from "./url-inspection-candidates.js";
+import { buildInternalLinkGraph } from "./link-graph.js";
 import "./styles.css";
 
 const severityLabels = { critical: "Critical", warning: "Warning", notice: "Notice" };
@@ -143,6 +144,22 @@ const dictionaries = {
     discoveredFrom: "Found from",
     noDiscoveredUrls: "No additional internal pages were crawled.",
     internalCrawlLimit: "Internal discovery reached its separate URL budget. Results cover the crawled subset.",
+    linkGraphTitle: "Internal link graph",
+    linkGraphHelp: "Counts links between scanned sitemap and recursively discovered pages. Depth is discovery depth from a sitemap page, not guaranteed homepage click depth.",
+    linkGraphExport: "Export link graph",
+    graphNodes: "nodes",
+    graphEdges: "edges",
+    graphAll: "All pages",
+    graphOrphan: "Sitemap orphan",
+    graphDeep: "Deep discovery",
+    graphWeak: "Weak inbound links",
+    graphDeadEnd: "No scanned outbound links",
+    graphHealthy: "Healthy linkage",
+    inboundCount: "Inbound",
+    outboundCount: "Outbound",
+    graphSource: "Source",
+    graphSourceSitemap: "Sitemap",
+    graphSourceInternal: "Recursive discovery",
     status: "Status",
     robotsAnalysis: "Robots analysis",
     robotsContent: "robots.txt content",
@@ -289,6 +306,22 @@ const dictionaries = {
     discoveredFrom: "\u53d1\u73b0\u6765\u6e90",
     noDiscoveredUrls: "\u672a\u6293\u53d6\u5230\u989d\u5916\u7ad9\u5185\u9875\u9762\u3002",
     internalCrawlLimit: "\u9012\u5f52\u7ad9\u5185\u53d1\u73b0\u5df2\u8fbe\u5230\u72ec\u7acb URL \u9884\u7b97\uff0c\u7ed3\u679c\u4ec5\u8986\u76d6\u5df2\u6293\u53d6\u96c6\u5408\u3002",
+    linkGraphTitle: "\u7ad9\u5185\u94fe\u63a5\u56fe\u8c31",
+    linkGraphHelp: "\u7edf\u8ba1\u5df2\u626b\u63cf sitemap \u9875\u9762\u4e0e\u9012\u5f52\u53d1\u73b0\u9875\u9762\u4e4b\u95f4\u7684\u94fe\u63a5\u3002\u6df1\u5ea6\u662f\u4ece\u67d0\u4e2a sitemap \u9875\u9762\u5f00\u59cb\u7684\u53d1\u73b0\u5c42\u7ea7\uff0c\u4e0d\u7b49\u540c\u4e8e\u4ece\u9996\u9875\u5f00\u59cb\u7684\u70b9\u51fb\u6df1\u5ea6\u3002",
+    linkGraphExport: "\u5bfc\u51fa\u94fe\u63a5\u56fe\u8c31",
+    graphNodes: "\u4e2a\u8282\u70b9",
+    graphEdges: "\u6761\u8fde\u8fb9",
+    graphAll: "\u5168\u90e8\u9875\u9762",
+    graphOrphan: "Sitemap \u5b64\u7acb\u9875",
+    graphDeep: "\u6df1\u5c42\u53d1\u73b0",
+    graphWeak: "\u5165\u94fe\u504f\u5c11",
+    graphDeadEnd: "\u65e0\u5df2\u626b\u63cf\u51fa\u94fe",
+    graphHealthy: "\u94fe\u63a5\u5065\u5eb7",
+    inboundCount: "\u5165\u94fe",
+    outboundCount: "\u51fa\u94fe",
+    graphSource: "\u6765\u6e90",
+    graphSourceSitemap: "Sitemap",
+    graphSourceInternal: "\u9012\u5f52\u53d1\u73b0",
     status: "\u72b6\u6001",
     robotsAnalysis: "Robots \u5206\u6790",
     robotsContent: "robots.txt \u5185\u5bb9",
@@ -435,6 +468,22 @@ const dictionaries = {
     discoveredFrom: "\u767c\u73fe\u4f86\u6e90",
     noDiscoveredUrls: "\u672a\u6aa2\u7d22\u5230\u984d\u5916\u7ad9\u5167\u9801\u9762\u3002",
     internalCrawlLimit: "\u905e\u8ff4\u7ad9\u5167\u767c\u73fe\u5df2\u9054\u5230\u7368\u7acb URL \u9810\u7b97\uff0c\u7d50\u679c\u50c5\u6db5\u84cb\u5df2\u6aa2\u7d22\u96c6\u5408\u3002",
+    linkGraphTitle: "\u7ad9\u5167\u9023\u7d50\u5716\u8b5c",
+    linkGraphHelp: "\u7d71\u8a08\u5df2\u6383\u63cf sitemap \u9801\u9762\u8207\u905e\u8ff4\u767c\u73fe\u9801\u9762\u4e4b\u9593\u7684\u9023\u7d50\u3002\u6df1\u5ea6\u662f\u5f9e\u67d0\u500b sitemap \u9801\u9762\u958b\u59cb\u7684\u767c\u73fe\u5c64\u7d1a\uff0c\u4e0d\u7b49\u540c\u65bc\u5f9e\u9996\u9801\u958b\u59cb\u7684\u9ede\u64ca\u6df1\u5ea6\u3002",
+    linkGraphExport: "\u532f\u51fa\u9023\u7d50\u5716\u8b5c",
+    graphNodes: "\u500b\u7bc0\u9ede",
+    graphEdges: "\u689d\u9023\u908a",
+    graphAll: "\u5168\u90e8\u9801\u9762",
+    graphOrphan: "Sitemap \u5b64\u7acb\u9801",
+    graphDeep: "\u6df1\u5c64\u767c\u73fe",
+    graphWeak: "\u5165\u93c8\u504f\u5c11",
+    graphDeadEnd: "\u7121\u5df2\u6383\u63cf\u51fa\u93c8",
+    graphHealthy: "\u9023\u7d50\u5065\u5eb7",
+    inboundCount: "\u5165\u93c8",
+    outboundCount: "\u51fa\u93c8",
+    graphSource: "\u4f86\u6e90",
+    graphSourceSitemap: "Sitemap",
+    graphSourceInternal: "\u905e\u8ff4\u767c\u73fe",
     status: "\u72c0\u614b",
     robotsAnalysis: "Robots \u5206\u6790",
     robotsContent: "robots.txt \u5167\u5bb9",
@@ -4475,6 +4524,76 @@ function InternalDiscovery({ report, t }) {
   );
 }
 
+function InternalLinkGraph({ report, t }) {
+  const [filter, setFilter] = useState("all");
+  const graph = useMemo(() => buildInternalLinkGraph(report), [report]);
+  if (!report?.options?.internalCrawl || !graph.rows.length) return null;
+  const labels = {
+    orphan: t.graphOrphan,
+    deep: t.graphDeep,
+    weak: t.graphWeak,
+    dead_end: t.graphDeadEnd,
+    healthy: t.graphHealthy,
+  };
+  const visibleRows = filter === "all" ? graph.rows : graph.rows.filter((row) => row.state === filter);
+
+  function exportGraph() {
+    downloadCsvFile("soos-internal-link-graph.csv", [
+      ["state", "url", "source", "discovery_depth", "inbound_count", "outbound_count", "inbound_urls", "outbound_urls"],
+      ...graph.rows.map((row) => [
+        labels[row.state] || row.state,
+        row.url,
+        row.source,
+        row.crawlDepth,
+        row.inboundCount,
+        row.outboundCount,
+        row.inboundUrls.join(" | "),
+        row.outboundUrls.join(" | "),
+      ]),
+    ]);
+  }
+
+  return (
+    <section className="panel internal-link-graph">
+      <div className="panel-head">
+        <h2>{t.linkGraphTitle}</h2>
+        <span>{graph.rows.length} {t.graphNodes} / {graph.edgeCount} {t.graphEdges}</span>
+      </div>
+      <div className="link-graph-toolbar">
+        <small>{t.linkGraphHelp}</small>
+        <div className="url-alignment-actions">
+          <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+            <option value="all">{t.graphAll} ({graph.rows.length})</option>
+            {Object.entries(labels).map(([state, label]) => (
+              <option value={state} key={state}>{label} ({graph.counts[state] || 0})</option>
+            ))}
+          </select>
+          <button className="export-button" type="button" onClick={exportGraph}>{t.linkGraphExport}</button>
+        </div>
+      </div>
+      <div className="coverage-disposition-summary link-graph-summary">
+        {Object.entries(labels).map(([state, label]) => (
+          <span key={state}>{label}: {graph.counts[state] || 0}</span>
+        ))}
+      </div>
+      <div className="link-graph-list">
+        {visibleRows.map((row) => (
+          <article className="link-graph-row" key={row.url}>
+            <Badge severity={row.state === "orphan" ? "critical" : row.state === "deep" || row.state === "weak" ? "warning" : row.state === "dead_end" ? "notice" : "ok"}>
+              {labels[row.state]}
+            </Badge>
+            <strong title={row.url}>{row.url}</strong>
+            <span>{t.graphSource}: {row.source === "sitemap" ? t.graphSourceSitemap : t.graphSourceInternal}</span>
+            <span>{t.crawlDepth}: {row.crawlDepth}</span>
+            <span>{t.inboundCount}: {row.inboundCount}</span>
+            <span>{t.outboundCount}: {row.outboundCount}</span>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
@@ -4524,6 +4643,7 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
       <GooglebotLogAnalysis report={report} language={language} gscRows={gscRows} />
       <UrlInspectionPanel report={report} gscStatus={gscStatus} siteUrl={gscSiteUrl} language={language} gscRows={gscRows} />
       <InternalDiscovery report={report} t={t} />
+      <InternalLinkGraph report={report} t={t} />
       <section className="summary">
         <Stat label={t.urls} value={report.summary.urlCount} />
         {report.options?.internalCrawl ? <Stat label={t.discoveredUrls} value={report.summary.discoveredUrlCount || 0} /> : null}
