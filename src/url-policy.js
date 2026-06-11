@@ -51,6 +51,17 @@ export function comparisonUrl(value, policy = {}) {
   return url.toString();
 }
 
+export function normalizeReportUrl(value) {
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    url.search = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return String(value || "").trim().replace(/\/$/, "");
+  }
+}
+
 function variantParts(value) {
   const normalized = canonicalAuditUrl(value);
   if (!normalized) return null;

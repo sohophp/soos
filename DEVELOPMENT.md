@@ -484,6 +484,7 @@ soos 的目标关系链是：
 - 主界面、GSC、Inspection、结构化数据和 Googlebot 文案迁移到独立 `i18n.js`，并增加三语言键一致性与乱码测试。
 - 增加基于真实随机端口 HTTP server 的 API 路由测试，覆盖预检、404、非法 JSON、任务创建、会话隔离、暂停/恢复和删除。
 - 审计任务端点、活动任务 localStorage 与进度快照转换已迁移到独立 `audit-jobs.js`，并覆盖损坏存储和阶段标签测试。
+- 所有 Search Console API 路由集中到 `gsc-client.js`；OAuth 配置和 Sitemap 状态面板已从 `main.jsx` 拆出，并增加请求契约测试。
 
 ## 12. 历史完成度基线
 

@@ -5,6 +5,7 @@ import {
   canonicalAuditUrl,
   comparisonUrl,
   isRedirectStatus,
+  normalizeReportUrl,
   urlVariantFamily,
 } from "../src/url-policy.js";
 
@@ -12,6 +13,7 @@ assert.equal(canonicalAuditUrl("/page?x=1#part", "HTTPS://Example.COM:443/base")
 assert.equal(canonicalAuditUrl("mailto:test@example.com"), "");
 assert.equal(isRedirectStatus(301), true);
 assert.equal(isRedirectStatus(304), false);
+assert.equal(normalizeReportUrl("https://example.com/page/?x=1#part"), "https://example.com/page");
 assert.equal(
   comparisonUrl("https://Example.com/page/?utm_source=x&id=2#part", {
     queryPolicy: "strip_tracking",

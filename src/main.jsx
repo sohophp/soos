@@ -16,8 +16,13 @@ import {
 import { absoluteLogUrl, parseAccessLog, STATIC_ASSET_PATH } from "./googlebot-log.js";
 import { buildUrlInspectionCandidates, inspectionCandidateKey } from "./url-inspection-candidates.js";
 import { buildInternalLinkGraph } from "./link-graph.js";
-import { analyzeUrlVariantGroup, comparisonUrl, urlVariantFamily } from "./url-policy.js";
-import { apiGet, apiPost } from "./api-client.js";
+import { analyzeUrlVariantGroup, comparisonUrl, normalizeReportUrl, urlVariantFamily } from "./url-policy.js";
+import { apiPost } from "./api-client.js";
+import {
+  getGscStatus,
+  inspectGscUrls,
+  loadGscSearchAnalytics,
+} from "./gsc-client.js";
 import {
   auditProgressView,
   clearActiveAuditJob,
@@ -31,6 +36,8 @@ import {
   startAuditJob,
 } from "./audit-jobs.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
+import { GscSitemapsPanel } from "./components/GscSitemapsPanel.jsx";
+import { SearchConsoleApiConfig } from "./components/SearchConsoleApiConfig.jsx";
 import {
   detectLanguage,
   dictionaries,
@@ -1217,16 +1224,7 @@ function ComparisonPanel({ comparisonEntry, report, t }) {
   );
 }
 
-function normalizeReportUrl(value) {
-  try {
-    const url = new URL(value);
-    url.hash = "";
-    url.search = "";
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return String(value || "").trim().replace(/\/$/, "");
-  }
-}
+
 
 function detectCsvDelimiter(text) {
   const firstLine = text.split(/\r?\n/).find((line) => line.trim()) || "";
@@ -1349,227 +1347,7 @@ function summarizeGscRows(report, rows) {
 
 
 
-function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, language }) {
-  const copy = gscUiText[language] || gscUiText.en;
-  const [showOauthHelp, setShowOauthHelp] = useState(true);
-  const [testing, setTesting] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (status?.siteUrl) onSiteUrlChange(status.siteUrl);
-  }, [onSiteUrlChange, status?.siteUrl]);
-
-  useEffect(() => {
-    function handleMessage(event) {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== "soos:gsc-oauth-connected") return;
-      refreshStatus("oauth-connected");
-    }
-    function handleStorage(event) {
-      if (event.key !== "soos:gsc-oauth-connected" || !event.newValue) return;
-      refreshStatus("oauth-connected");
-    }
-    window.addEventListener("message", handleMessage);
-    window.addEventListener("storage", handleStorage);
-    return () => {
-      window.removeEventListener("message", handleMessage);
-      window.removeEventListener("storage", handleStorage);
-    };
-  }, []);
-
-  const tokenState = status?.refreshToken
-    ? copy.connected
-    : status?.token
-      ? status.tokenLikelyExpired
-      ? copy.tokenExpired
-      : copy.tokenSaved
-      : copy.noToken;
-  const connectedAccount = status?.googleAccountEmail || status?.googleAccountName || "";
-
-  async function clearConfig() {
-    if (status?.serverless && !status?.databaseConfigured) {
-      setError(copy.startServerlessError);
-      return;
-    }
-    setOauthLoading(true);
-    setMessage("");
-    setError("");
-    try {
-      const body = await apiPost("/api/gsc/clear", {}, {
-        fallbackMessage: "Could not clear Search Console config",
-      });
-      onStatus(body);
-      setMessage(body.revoke?.revoked ? copy.disconnectedMessage : `${copy.disconnectedMessage} ${copy.revokeNotConfirmed}`);
-    } catch (err) {
-      setError(err.message || String(err));
-    } finally {
-      setOauthLoading(false);
-    }
-  }
-
-  async function testConfig() {
-    if (!status?.configured) {
-      setError(copy.missingApiError);
-      return;
-    }
-    if (!siteUrl.trim()) {
-      setError(copy.missingPropertyError);
-      return;
-    }
-    setTesting(true);
-    setMessage("");
-    setError("");
-    try {
-      const body = await apiPost("/api/gsc/test", { siteUrl }, {
-        fallbackMessage: "Search Console API test failed",
-      });
-      if (body.status) onStatus(body.status);
-      setMessage(body.permissionLevel ? `${body.message} Permission: ${body.permissionLevel}.` : body.message);
-    } catch (err) {
-      setError(err.message || String(err));
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  async function refreshStatus(reason = "") {
-    setMessage("");
-    setError("");
-    try {
-      const body = await apiGet("/api/gsc/status", {
-        fallbackMessage: "Could not refresh Search Console API status",
-      });
-      onStatus(body);
-      setMessage(reason === "oauth-connected" ? copy.connectedRefreshed : body.refreshToken ? copy.oauthRefreshed : copy.statusRefreshed);
-    } catch (err) {
-      setError(err.message || String(err));
-    }
-  }
-
-  async function startOAuth() {
-    if (status?.serverless && !status?.databaseConfigured) {
-      setError(copy.startServerlessError);
-      return;
-    }
-    if (!status?.oauthConfigured) {
-      setError(copy.missingOAuthError);
-      return;
-    }
-    if (!siteUrl.trim()) {
-      setError(copy.missingPropertyError);
-      return;
-    }
-    setOauthLoading(true);
-    setMessage("");
-    setError("");
-    const oauthWindow = window.open("", "soos-gsc-oauth", "popup,width=620,height=760");
-    if (oauthWindow) {
-      oauthWindow.document.title = "Connecting Google Search Console";
-      oauthWindow.document.body.innerHTML = "<p style=\"font-family:system-ui;padding:24px\">Opening Google OAuth...</p>";
-    }
-    let popupPoll = null;
-    try {
-      const body = await apiPost("/api/gsc/oauth/start", { siteUrl }, {
-        fallbackMessage: "Could not start OAuth",
-      });
-      setMessage(copy.openingMessage);
-      if (oauthWindow) {
-        oauthWindow.location.href = body.authUrl;
-        popupPoll = window.setInterval(() => {
-          if (!oauthWindow.closed) return;
-          window.clearInterval(popupPoll);
-          popupPoll = null;
-          refreshStatus("oauth-closed");
-        }, 600);
-      } else {
-        window.location.href = body.authUrl;
-      }
-    } catch (err) {
-      if (popupPoll) window.clearInterval(popupPoll);
-      oauthWindow?.close();
-      setError(err.message || String(err));
-    } finally {
-      setOauthLoading(false);
-    }
-  }
-
-  return (
-    <section className="panel gsc-api-config">
-      <div className="panel-head">
-        <h2>{copy.apiTitle}</h2>
-        <span>{status?.configured ? tokenState : copy.notConfigured}</span>
-      </div>
-      <form className="gsc-api-body" onSubmit={(event) => event.preventDefault()}>
-        <div className="gsc-api-fields">
-          <label>
-            <strong className="gsc-label-row">
-              {copy.propertyUrl}
-              {!status?.configured ? (
-                <button className="gsc-help-button" type="button" onClick={() => setShowOauthHelp((value) => !value)} aria-label={copy.oauthHelpTitle}>
-                  ?
-                </button>
-              ) : null}
-            </strong>
-            <input type="text" placeholder="https://example.com/ or sc-domain:example.com" value={siteUrl} onChange={(event) => onSiteUrlChange(event.target.value)} disabled={status?.configured} />
-            {!status?.configured ? <small>{copy.propertyHelp}</small> : null}
-          </label>
-        </div>
-        {status?.configured ? (
-          <div className="gsc-oauth-help">
-            <strong>{copy.connectedAs}</strong>
-            <span>{connectedAccount || copy.connectedAccountFallback}</span>
-            {!connectedAccount ? <small>{copy.reconnectHint}</small> : null}
-          </div>
-        ) : null}
-        {showOauthHelp && !status?.configured ? (
-          <div className="gsc-oauth-help">
-            <strong>{copy.oauthHelpTitle}</strong>
-            <ol>
-              {copy.oauthHelpSteps.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
-            <a href="https://support.google.com/webmasters/answer/7687615" target="_blank" rel="noreferrer">
-              {copy.docsLabel}
-            </a>
-          </div>
-        ) : null}
-        <div className="gsc-api-actions">
-          {!status?.configured ? (
-            <button className="export-button" type="button" onClick={startOAuth} disabled={oauthLoading}>
-              {oauthLoading ? copy.opening : copy.connect}
-            </button>
-          ) : null}
-          {status?.configured && !connectedAccount ? (
-            <button className="export-button" type="button" onClick={startOAuth} disabled={oauthLoading}>
-              {oauthLoading ? copy.opening : copy.reconnect}
-            </button>
-          ) : null}
-          <button className="export-button" type="button" onClick={refreshStatus} disabled={testing || oauthLoading}>
-            {copy.refresh}
-          </button>
-          <button className="export-button" type="button" onClick={testConfig} disabled={testing || oauthLoading}>
-            {testing ? copy.testing : copy.test}
-          </button>
-          {status?.configured ? (
-            <button className="export-button" type="button" onClick={clearConfig} disabled={testing || oauthLoading}>
-              {copy.clear}
-            </button>
-          ) : null}
-        </div>
-        <div className="gsc-api-help">
-          {!status?.configured ? <small>{status?.note || "CSV import works now. API configuration enables URL Inspection and Search Analytics."}</small> : null}
-          {status?.serverless ? <small>{copy.serverlessHelp}</small> : null}
-          <small>{copy.privacyNote}</small>
-        </div>
-        {message ? <small className="gsc-api-message">{message}</small> : null}
-        {error ? <small className="gsc-api-error">{error}</small> : null}
-      </form>
-    </section>
-  );
-}
 function defaultGscDateRange() {
   const end = new Date();
   end.setDate(end.getDate() - 2);
@@ -1768,13 +1546,11 @@ function SearchAnalyticsPanel({ status, siteUrl, onRows, language }) {
     setLoading(true);
     setError("");
     try {
-      const body = await apiPost("/api/gsc/search-analytics", {
+      const body = await loadGscSearchAnalytics({
         startDate,
         endDate,
         siteUrl,
         dimension,
-      }, {
-        fallbackMessage: "Search Analytics failed",
       });
       if (body.dimension === "page") onRows(body.rows || []);
       setRows(body.rows || []);
@@ -2953,98 +2729,7 @@ function StructuredDataDiagnostics({ report, inspectionResults, copy, language }
   );
 }
 
-function GscSitemapsPanel({ status, siteUrl, currentSitemapUrl, language }) {
-  const copy = gscDataText[language] || gscDataText.en;
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
 
-  useEffect(() => {
-    setResult(null);
-    setError("");
-  }, [siteUrl]);
-
-  async function loadSitemaps() {
-    if (!status?.configured) {
-      setError(copy.connectFirst);
-      return;
-    }
-    if (!siteUrl.trim()) {
-      setError(copy.propertyFirst);
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const body = await apiPost("/api/gsc/sitemaps", { siteUrl }, {
-        fallbackMessage: "Could not load Search Console sitemaps",
-      });
-      setResult(body);
-    } catch (err) {
-      setError(err.message || String(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const currentKey = normalizeReportUrl(currentSitemapUrl || "");
-  const currentFound = currentKey
-    ? (result?.sitemaps || []).some((item) => normalizeReportUrl(item.path) === currentKey)
-    : null;
-
-  return (
-    <section className="panel gsc-sitemaps-panel">
-      <div className="panel-head">
-        <h2>{copy.sitemapsTitle}</h2>
-        <span>{status?.configured ? copy.ready : copy.configureFirst}</span>
-      </div>
-      <div className="gsc-sitemaps-actions">
-        <div>
-          <strong>{copy.sitemapsTitle}</strong>
-          <small>{copy.sitemapsHelp}</small>
-        </div>
-        <button className="export-button" type="button" onClick={loadSitemaps} disabled={loading || !status?.configured}>
-          {loading ? copy.sitemapsLoading : copy.sitemapsLoad}
-        </button>
-      </div>
-      {error ? <div className="url-inspection-error">{error}</div> : null}
-      {result ? (
-        <div className="gsc-sitemaps-body">
-          <div className="coverage-disposition-summary">
-            <span>{result.summary?.total || 0} {copy.sitemapsTotal}</span>
-            <span>{result.summary?.pending || 0} {copy.sitemapsPending}</span>
-            <span>{result.summary?.withErrors || 0} {copy.sitemapsErrors}</span>
-            <span>{result.summary?.withWarnings || 0} {copy.sitemapsWarnings}</span>
-            <span>{result.summary?.submittedUrls || 0} {copy.sitemapsSubmittedUrls}</span>
-          </div>
-          {currentFound !== null ? (
-            <div className={`gsc-sitemap-current ${currentFound ? "found" : "missing"}`}>
-              {currentFound ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-              <span>{currentFound ? copy.sitemapsCurrentFound : copy.sitemapsCurrentMissing}</span>
-            </div>
-          ) : null}
-          {(result.sitemaps || []).length ? (
-            <div className="gsc-sitemap-list">
-              {result.sitemaps.map((item) => (
-                <article className="gsc-sitemap-row" key={item.path}>
-                  <div>
-                    <strong title={item.path}>{item.path}</strong>
-                    <small>{item.sitemapIndex ? copy.sitemapsIndex : copy.sitemapsFile}{item.type ? ` / ${item.type}` : ""}</small>
-                  </div>
-                  <span>{copy.sitemapsLastRead}: {item.lastDownloaded || "-"}</span>
-                  <span>{copy.sitemapsLastSubmitted}: {item.lastSubmitted || "-"}</span>
-                  <span>{item.submittedUrls} {copy.sitemapsSubmittedUrls}</span>
-                  <span>{item.errors} {copy.sitemapsErrors} / {item.warnings} {copy.sitemapsWarnings}</span>
-                </article>
-              ))}
-            </div>
-          ) : <small>{copy.sitemapsNoData}</small>}
-          <small className="gsc-sitemaps-note">{copy.sitemapsDeprecatedNote}</small>
-        </div>
-      ) : null}
-    </section>
-  );
-}
 
 function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
   const copy = gscDataText[language] || gscDataText.en;
@@ -3112,9 +2797,7 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
     setLoading(true);
     setError("");
     try {
-      const body = await apiPost("/api/gsc/inspect", { urls: nextUrls, siteUrl }, {
-        fallbackMessage: "URL Inspection failed",
-      });
+      const body = await inspectGscUrls(nextUrls, siteUrl);
       const candidateByKey = new Map(nextCandidates.map((candidate) => [candidate.key, candidate]));
       setResult((current) => ({
         ...body,
@@ -3852,7 +3535,7 @@ function App() {
   const t = dictionaries[language];
 
     useEffect(() => {
-    apiGet("/api/gsc/status", { fallbackMessage: "Search Console API status is unavailable." })
+    getGscStatus()
       .then((status) => {
         setGscStatus(status);
         if (status?.siteUrl) setGscSiteUrl(status.siteUrl);
