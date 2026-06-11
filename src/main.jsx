@@ -17,7 +17,19 @@ import { absoluteLogUrl, parseAccessLog, STATIC_ASSET_PATH } from "./googlebot-l
 import { buildUrlInspectionCandidates, inspectionCandidateKey } from "./url-inspection-candidates.js";
 import { buildInternalLinkGraph } from "./link-graph.js";
 import { analyzeUrlVariantGroup, comparisonUrl, urlVariantFamily } from "./url-policy.js";
-import { apiDelete, apiGet, apiPost } from "./api-client.js";
+import { apiGet, apiPost } from "./api-client.js";
+import {
+  auditProgressView,
+  clearActiveAuditJob,
+  controlAuditJob,
+  getAuditJob,
+  listAuditJobs,
+  readActiveAuditJob,
+  removeAuditJob,
+  runAuditJobBatch,
+  saveActiveAuditJob,
+  startAuditJob,
+} from "./audit-jobs.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
 import {
   detectLanguage,
@@ -3810,8 +3822,6 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
   );
 }
 
-const ACTIVE_AUDIT_JOB_KEY = "soos:active-audit-job";
-
 function App() {
   const [sitemapUrl, setSitemapUrl] = useState("");
   const [language, setLanguage] = useState(() => detectLanguage());
@@ -3856,22 +3866,17 @@ useEffect(() => {
   }, [loading, currentJobStartedAt]);
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(window.localStorage.getItem(ACTIVE_AUDIT_JOB_KEY) || "null");
-      if (!saved?.id) return;
-      const startedAt = Number(saved.startedAt) || Date.now();
-      setLoading(true);
-      setError("");
-      setCurrentJobId(saved.id);
-      setCurrentJobStartedAt(startedAt);
-      setElapsedNow(Date.now() - startedAt);
-      setProgress({ label: t.progressPreparing, value: 5, meta: "" });
-      pollAuditJob(saved.id)
-        .catch((err) => setError(err.message || String(err)))
-        .finally(resetJobUi);
-    } catch {
-      window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
-    }
+    const saved = readActiveAuditJob();
+    if (!saved) return;
+    setLoading(true);
+    setError("");
+    setCurrentJobId(saved.id);
+    setCurrentJobStartedAt(saved.startedAt);
+    setElapsedNow(Date.now() - saved.startedAt);
+    setProgress({ label: t.progressPreparing, value: 5, meta: "" });
+    pollAuditJob(saved.id)
+      .catch((err) => setError(err.message || String(err)))
+      .finally(resetJobUi);
   }, []);
   useEffect(() => {
     loadRetainedJobs().catch(() => {});
@@ -3905,9 +3910,7 @@ useEffect(() => {
   async function loadRetainedJobs() {
     setRetainedJobsLoading(true);
     try {
-      const body = await apiGet("/api/audit-jobs?limit=20", {
-        fallbackMessage: "Could not load retained tasks",
-      });
+      const body = await listAuditJobs(20);
       setRetainedJobs(body.items || []);
     } finally {
       setRetainedJobsLoading(false);
@@ -3915,9 +3918,7 @@ useEffect(() => {
   }
 
   async function openRetainedReport(jobId) {
-    const body = await apiGet(`/api/audit-jobs/${jobId}`, {
-      fallbackMessage: "Could not open retained report",
-    });
+    const body = await getAuditJob(jobId);
     if (!body.result) throw new Error("This task does not have a completed report.");
     saveCompletedReport(body.result);
   }
@@ -3930,12 +3931,10 @@ useEffect(() => {
     const startedAt = Number(job.createdAt) || Date.now();
     setCurrentJobStartedAt(startedAt);
     setElapsedNow(Date.now() - startedAt);
-    window.localStorage.setItem(ACTIVE_AUDIT_JOB_KEY, JSON.stringify({ id: job.id, startedAt }));
+    saveActiveAuditJob({ id: job.id, startedAt });
     try {
       if (["stopped", "error", "interrupted"].includes(job.status)) {
-        await apiPost(`/api/audit-jobs/${job.id}/control`, { action: "restart" }, {
-          fallbackMessage: "Could not restart retained task",
-        });
+        await controlAuditJob(job.id, "restart", "Could not restart retained task");
       } else if (job.status === "paused") {
         await controlRetainedJob(job.id, "resume");
       }
@@ -3947,24 +3946,18 @@ useEffect(() => {
   }
 
   async function controlRetainedJob(jobId, action) {
-    return apiPost(`/api/audit-jobs/${jobId}/control`, { action }, {
-      fallbackMessage: "Could not control retained task",
-    });
+    return controlAuditJob(jobId, action, "Could not control retained task");
   }
 
   async function deleteRetainedJob(jobId) {
-    await apiDelete(`/api/audit-jobs/${jobId}`, {
-      fallbackMessage: "Could not delete retained task",
-    });
+    await removeAuditJob(jobId);
     setRetainedJobs((items) => items.filter((item) => item.id !== jobId));
-    if (currentJobId === jobId) window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
+    if (currentJobId === jobId) clearActiveAuditJob();
   }
 
   async function controlJob(action) {
     if (!currentJobId) return;
-    const body = await apiPost(`/api/audit-jobs/${currentJobId}/control`, { action }, {
-      fallbackMessage: "Could not control audit",
-    });
+    const body = await controlAuditJob(currentJobId, action);
     if (action === "pause" && body.status === "paused") setPauseCount((count) => count + 1);
     setJobStatus(body.status);
   }
@@ -3973,56 +3966,28 @@ useEffect(() => {
     while (true) {
       let pollBody;
       try {
-        pollBody = await apiPost(`/api/audit-jobs/${jobId}/run`, {}, {
-          fallbackMessage: "Audit failed",
-        });
+        pollBody = await runAuditJobBatch(jobId);
       } catch (error) {
-        window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
+        clearActiveAuditJob();
         throw error;
       }
       setJobStatus(pollBody.status);
 
-      const progressLabel =
-        pollBody.status === "paused"
-          ? t.progressPaused
-          : pollBody.status === "stopped"
-            ? t.progressStopped
-            : pollBody.status === "interrupted"
-              ? t.progressInterrupted
-              : pollBody.progress?.stage === "fetching"
-                ? t.progressFetching
-                : pollBody.progress?.stage === "inspecting"
-                  ? t.progressInspecting
-                  : pollBody.progress?.stage === "discovering"
-                    ? t.progressDiscovering
-                  : pollBody.progress?.stage === "finalizing"
-                    ? t.progressFinalizing
-                    : t.progressPreparing;
-      const metaParts = [];
-      if (pollBody.progress?.discoveredSitemaps) {
-        metaParts.push(`${pollBody.progress.processedSitemaps || 0}/${pollBody.progress.discoveredSitemaps} sitemap`);
-      }
-      if (pollBody.progress?.totalUrls) {
-        metaParts.push(`${pollBody.progress.processedUrls || 0}/${pollBody.progress.totalUrls} URLs`);
-      }
-      setProgress({
-        label: progressLabel,
-        value: pollBody.progress?.percent || 0,
-        meta: metaParts.join(" | "),
-      });
+      const progressView = auditProgressView(pollBody, t);
+      setProgress(progressView);
 
       if (pollBody.status === "done") {
-        window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
-        setProgress({ label: t.progressFinalizing, value: 100, meta: metaParts.join(" | ") });
+        clearActiveAuditJob();
+        setProgress({ label: t.progressFinalizing, value: 100, meta: progressView.meta });
         saveCompletedReport(pollBody.result);
         return;
       }
       if (pollBody.status === "stopped") {
-        window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
-        setProgress({ label: t.progressStopped, value: pollBody.progress?.percent || 0, meta: metaParts.join(" | ") });
+        clearActiveAuditJob();
+        setProgress({ label: t.progressStopped, value: pollBody.progress?.percent || 0, meta: progressView.meta });
         return;
       } else if (pollBody.status === "error") {
-        window.localStorage.removeItem(ACTIVE_AUDIT_JOB_KEY);
+        clearActiveAuditJob();
         throw new Error(pollBody.error || "Audit failed");
       }
 
@@ -4040,7 +4005,7 @@ useEffect(() => {
     setElapsedNow(0);
     setProgress({ label: t.progressPreparing, value: 5, meta: "" });
     try {
-      const startBody = await apiPost("/api/audit-jobs", {
+      const startBody = await startAuditJob({
         sitemapUrl,
         options: {
           contentChecks,
@@ -4052,14 +4017,12 @@ useEffect(() => {
           robotsSource: directoryRobots ? "sitemap-directory" : "root",
           proxyEnabled: false,
         },
-      }, {
-        fallbackMessage: "Audit failed",
       });
       setCurrentJobId(startBody.id);
       setJobStatus(startBody.status);
       const startedAt = Date.now();
       setCurrentJobStartedAt(startedAt);
-      window.localStorage.setItem(ACTIVE_AUDIT_JOB_KEY, JSON.stringify({ id: startBody.id, startedAt }));
+      saveActiveAuditJob({ id: startBody.id, startedAt });
       await pollAuditJob(startBody.id);
     } catch (err) {
       setError(err.message || String(err));

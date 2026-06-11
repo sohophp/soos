@@ -15,6 +15,7 @@ All notable changes to soos will be documented in this file.
 - A three-language React error boundary that keeps one render failure from producing a blank page.
 - Extracted frontend translation resources with automated language-key parity and mojibake checks.
 - HTTP-level API route tests for CORS preflight, unknown routes, malformed JSON, audit task lifecycle, and browser-session isolation.
+- A dedicated audit-task client for route calls, active-job storage, and localized progress snapshot conversion.
 - Controlled redirect tracing with per-hop status and destination, loop/invalid/overlong/cross-host/HTTPS-downgrade diagnostics, CSV output, and URL Inspection prioritization.
 - A shared HTTP(S) URL policy used by crawling, link graphs, redirect analysis, and Inspection candidate deduplication.
 - Three-language URL comparison settings for query parameters and trailing slashes, persisted with each audit and shown in URL set diagnosis.

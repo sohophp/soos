@@ -18,7 +18,8 @@
     "test:api-client": "node tests/api-client.test.js",
     "test:i18n": "node tests/i18n.test.js",
     "test:api-routes": "node tests/api-routes.test.js",
-    "check": "node --check server/api.js && node --check api/index.js && npm run test:structured-data && npm run test:googlebot-log && npm run test:gsc-sitemaps && npm run test:url-inspection-candidates && npm run test:internal-crawl && npm run test:link-graph && npm run test:url-policy && npm run test:api-client && npm run test:i18n && npm run test:api-routes && npm run build",
+    "test:audit-jobs": "node tests/audit-jobs.test.js",
+    "check": "node --check server/api.js && node --check api/index.js && npm run test:structured-data && npm run test:googlebot-log && npm run test:gsc-sitemaps && npm run test:url-inspection-candidates && npm run test:internal-crawl && npm run test:link-graph && npm run test:url-policy && npm run test:api-client && npm run test:i18n && npm run test:api-routes && npm run test:audit-jobs && npm run build",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
