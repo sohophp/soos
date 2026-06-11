@@ -1394,6 +1394,26 @@ main {
 .performance-signals {
   margin-top: 0;
 }
+
+.redirect-chain {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid #f0dab0;
+  border-radius: 6px;
+  background: #fffaf0;
+}
+
+.redirect-chain strong {
+  color: #172018;
+  font-size: 13px;
+}
+
+.redirect-chain small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #687169;
+}
 .gsc-opportunities {
   border-color: #dfe6dd;
 }

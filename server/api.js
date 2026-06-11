@@ -9,6 +9,7 @@ import { ProxyAgent } from "undici";
 import { neon } from "@neondatabase/serverless";
 import { normalizeGscSitemapResponse } from "../src/gsc-sitemaps.js";
 import { enqueueInternalLinks, internalCrawlKey } from "../src/internal-crawl.js";
+import { analyzeRedirectChain, canonicalAuditUrl, isRedirectStatus } from "../src/url-policy.js";
 
 const PORT = Number(process.env.SOOS_API_PORT || 4177);
 const USER_AGENT = "soos/0.2 SEO audit";
@@ -217,13 +218,7 @@ async function waitForJob(job) {
 }
 
 function normalizeUrl(value, base) {
-  try {
-    const url = new URL(value, base);
-    url.hash = "";
-    return url.toString();
-  } catch {
-    return null;
-  }
+  return canonicalAuditUrl(value, base) || null;
 }
 
 function directoryUrl(url) {
@@ -305,21 +300,47 @@ async function fetchText(url, fetchContext = {}) {
   const requestStartedAt = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  const requestOptions = {
-    signal: controller.signal,
-    redirect: "follow",
-    headers: { "User-Agent": USER_AGENT },
-  };
-  if (fetchContext.dispatcher) requestOptions.dispatcher = fetchContext.dispatcher;
   try {
-    const response = await fetch(url, requestOptions);
+    const startUrl = normalizeUrl(url);
+    if (!startUrl) throw new Error("Invalid HTTP(S) URL.");
+    const hops = [];
+    let currentUrl = startUrl;
+    let response;
+    let stoppedOnRedirect = false;
+    for (let redirectIndex = 0; redirectIndex <= 10; redirectIndex += 1) {
+      const requestOptions = {
+        signal: controller.signal,
+        redirect: "manual",
+        headers: { "User-Agent": USER_AGENT },
+      };
+      if (fetchContext.dispatcher) requestOptions.dispatcher = fetchContext.dispatcher;
+      response = await fetch(currentUrl, requestOptions);
+      if (!isRedirectStatus(response.status)) break;
+      const location = response.headers.get("location") || "";
+      hops.push({ url: currentUrl, status: response.status, location });
+      const analysis = analyzeRedirectChain(startUrl, hops);
+      if (analysis.loop || analysis.invalidLocation || analysis.limitReached) {
+        stoppedOnRedirect = true;
+        await response.body?.cancel();
+        break;
+      }
+      await response.body?.cancel();
+      currentUrl = analysis.finalTarget;
+    }
+    const redirect = analyzeRedirectChain(startUrl, hops);
     return {
       ok: response.ok,
       status: response.status,
-      finalUrl: response.url,
+      finalUrl: redirect.redirectCount ? redirect.finalTarget : normalizeUrl(response.url) || currentUrl,
       contentType: response.headers.get("content-type") || "",
       durationMs: Date.now() - requestStartedAt,
-      text: await response.text(),
+      text: stoppedOnRedirect ? "" : await response.text(),
+      redirectChain: redirect.chain,
+      redirectLoop: redirect.loop,
+      redirectInvalidLocation: redirect.invalidLocation,
+      redirectLimitReached: redirect.limitReached,
+      redirectCrossHost: redirect.crossHost,
+      redirectProtocolDowngrade: redirect.protocolDowngrade,
     };
   } finally {
     clearTimeout(timer);
@@ -1447,6 +1468,9 @@ function classifyGoogleReasons(page) {
   if (issueTypes.has("redirect")) {
     add("submitted_redirects", "Submitted URL redirects", "Sitemaps should contain final canonical URLs, not redirected URLs.", "warning");
   }
+  if (["redirect_loop", "redirect_invalid_location", "redirect_limit", "redirect_https_downgrade"].some((type) => issueTypes.has(type))) {
+    add("redirect_failure", "Redirect chain cannot resolve safely", "Google may be unable or unwilling to reach a stable HTTPS destination.", "critical");
+  }
   if (issueTypes.has("not_html")) {
     add("not_html", "Submitted URL is not an HTML page", "Non-HTML resources are usually not indexed like normal landing pages.", "warning");
   }
@@ -1485,6 +1509,42 @@ function buildBacklog(pages, sitemaps) {
       title: "Fix fetch failures",
       severity: "critical",
       action: "Check DNS, TLS, firewall, bot protection, and server timeout behavior.",
+    },
+    {
+      key: "redirect_loop",
+      title: "Fix redirect loops",
+      severity: "critical",
+      action: "Make every submitted URL resolve to one stable final destination without revisiting an earlier URL.",
+    },
+    {
+      key: "redirect_invalid_location",
+      title: "Fix invalid redirect destinations",
+      severity: "critical",
+      action: "Return a valid absolute or relative HTTP(S) Location value.",
+    },
+    {
+      key: "redirect_limit",
+      title: "Shorten excessive redirect chains",
+      severity: "critical",
+      action: "Resolve submitted URLs within a small number of redirect hops.",
+    },
+    {
+      key: "redirect_https_downgrade",
+      title: "Remove HTTPS to HTTP redirects",
+      severity: "critical",
+      action: "Keep the entire redirect chain on HTTPS.",
+    },
+    {
+      key: "redirect_chain",
+      title: "Shorten multi-hop redirects",
+      severity: "warning",
+      action: "Redirect submitted URLs directly to their final canonical destination.",
+    },
+    {
+      key: "redirect_cross_host",
+      title: "Review cross-host redirects",
+      severity: "warning",
+      action: "Confirm hostname changes are intentional and use the preferred host in sitemap and internal links.",
     },
     {
       key: "canonical_blocked",
@@ -1797,11 +1857,39 @@ async function inspectPage(url, robots, sitemapUrlSet, options, fetchContext, jo
   }
 
   if (response.status >= 400) addIssue(issues, "critical", "http_error", `HTTP ${response.status}`, response.finalUrl);
-  else if (response.status >= 300) addIssue(issues, "warning", "redirect", `Redirected with HTTP ${response.status}`, response.finalUrl);
+  if (response.redirectChain?.length) {
+    const chainDetail = response.redirectChain
+      .map((hop) => `${hop.status} ${hop.url} -> ${hop.targetUrl || hop.location || "invalid"}`)
+      .join(" | ");
+    addIssue(issues, "warning", "redirect", `${response.redirectChain.length} redirect(s) before final URL`, chainDetail);
+    if (response.redirectChain.length > 1) {
+      addIssue(issues, "warning", "redirect_chain", "Multiple redirect hops", chainDetail);
+    }
+    if (response.redirectLoop) addIssue(issues, "critical", "redirect_loop", "Redirect loop detected", chainDetail);
+    if (response.redirectInvalidLocation) addIssue(issues, "critical", "redirect_invalid_location", "Redirect has an invalid Location", chainDetail);
+    if (response.redirectLimitReached) addIssue(issues, "critical", "redirect_limit", "Redirect chain exceeded 10 hops", chainDetail);
+    if (response.redirectCrossHost) addIssue(issues, "warning", "redirect_cross_host", "Redirect chain changes hostname", chainDetail);
+    if (response.redirectProtocolDowngrade) addIssue(issues, "critical", "redirect_https_downgrade", "Redirect chain downgrades HTTPS to HTTP", chainDetail);
+  }
+  if (response.redirectLoop || response.redirectInvalidLocation || response.redirectLimitReached) {
+    return {
+      url,
+      status: response.status,
+      finalUrl: response.finalUrl,
+      redirectChain: response.redirectChain,
+      issues,
+    };
+  }
 
   if (!/html/i.test(response.contentType) && !/<html[\s>]/i.test(response.text)) {
     addIssue(issues, "warning", "not_html", "URL does not look like HTML", response.contentType || "unknown content type");
-    return { url, status: response.status, finalUrl: response.finalUrl, issues };
+    return {
+      url,
+      status: response.status,
+      finalUrl: response.finalUrl,
+      redirectChain: response.redirectChain,
+      issues,
+    };
   }
 
   if (hasNoindex(response.text)) addIssue(issues, "critical", "noindex", "Page has noindex directive", "robots/googlebot meta tag");
@@ -1886,6 +1974,7 @@ async function inspectPage(url, robots, sitemapUrlSet, options, fetchContext, jo
     url,
     status: response.status,
     finalUrl: response.finalUrl,
+    redirectChain: response.redirectChain,
     title,
     description,
     h1Count,

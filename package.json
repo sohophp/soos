@@ -14,7 +14,8 @@
     "test:url-inspection-candidates": "node tests/url-inspection-candidates.test.js",
     "test:internal-crawl": "node tests/internal-crawl.test.js",
     "test:link-graph": "node tests/link-graph.test.js",
-    "check": "node --check server/api.js && node --check api/index.js && npm run test:structured-data && npm run test:googlebot-log && npm run test:gsc-sitemaps && npm run test:url-inspection-candidates && npm run test:internal-crawl && npm run test:link-graph && npm run build",
+    "test:url-policy": "node tests/url-policy.test.js",
+    "check": "node --check server/api.js && node --check api/index.js && npm run test:structured-data && npm run test:googlebot-log && npm run test:gsc-sitemaps && npm run test:url-inspection-candidates && npm run test:internal-crawl && npm run test:link-graph && npm run test:url-policy && npm run build",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

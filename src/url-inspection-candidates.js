@@ -1,3 +1,6 @@
+import { buildInternalLinkGraph } from "./link-graph.js";
+import { canonicalAuditUrl } from "./url-policy.js";
+
 const SITEMAP_BLOCKERS = new Set([
   "robots_disallow",
   "noindex",
@@ -6,6 +9,10 @@ const SITEMAP_BLOCKERS = new Set([
   "canonical_blocked",
   "canonical_cross_host",
   "not_html",
+  "redirect_loop",
+  "redirect_invalid_location",
+  "redirect_limit",
+  "redirect_https_downgrade",
 ]);
 
 const SITEMAP_SIGNAL_ISSUES = new Set([
@@ -13,17 +20,12 @@ const SITEMAP_SIGNAL_ISSUES = new Set([
   "canonical_mismatch",
   "canonical_not_in_sitemap",
   "canonical_missing",
+  "redirect_chain",
+  "redirect_cross_host",
 ]);
 
 export function inspectionCandidateKey(value) {
-  try {
-    const url = new URL(value);
-    if (!["http:", "https:"].includes(url.protocol)) return "";
-    url.hash = "";
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return "";
-  }
+  return canonicalAuditUrl(value).replace(/\/$/, "");
 }
 
 function gscPage(row) {
@@ -111,4 +113,3 @@ export function buildUrlInspectionCandidates(report, gscRows = []) {
     || a.url.localeCompare(b.url)
   ));
 }
-import { buildInternalLinkGraph } from "./link-graph.js";

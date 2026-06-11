@@ -220,8 +220,8 @@ soos 的目标关系链是：
 - 已增加可选的站内递归发现队列：仅同站 HTTP(S)，最大深度 2，交互模式独立限制 100 个 URL、后台模式 500 个，并支持 checkpoint 恢复。
 - 已建立扫描范围内的 URL 节点与链接边；站点根页存在时通过 BFS 计算首页最短点击深度、不可达 sitemap 页面和深层页面，同时保留入链、出链、递归发现深度与弱链接诊断。
 - 对比 sitemap URL、内部链接 URL、重定向目标、canonical 目标和 Google 已知 URL。
-- 建立统一 URL 标准化策略，并允许配置查询参数、尾斜杠和常见跟踪参数。
-- 展示重定向链、循环、跨域跳转和最终可索引目标。
+- 已建立共享抓取 URL 规范化策略：仅 HTTP(S)、移除 fragment、主机小写、移除默认端口并保留 query；查询参数、尾斜杠和跟踪参数的用户配置仍待加入。
+- 已展示逐跳重定向链并诊断多跳、循环、无效 Location、超过 10 跳、跨主机和 HTTPS 降级；最终可索引目标继续结合 canonical 与 URL Inspection 判断。
 - 扩充 robots、canonical、hreflang、noindex、状态码和 content-type 测试矩阵。
 - 明确区分原始 HTML 检查与渲染后页面检查；后者作为可选能力。
 - 可选接入 PageSpeed Insights、CrUX 或 Lighthouse，优先支持用户自备 API key 和免费额度。
@@ -470,6 +470,9 @@ soos 的目标关系链是：
 - 根页未扫描时不推断不可达状态，并在界面明确显示数据边界。
 - 将首页不可达 sitemap 页面和点击深度 3 以上页面加入 URL Inspection 优先候选队列。
 - 扩展图谱与候选队列测试，覆盖不可达组件、深层路径、根页缺失和 Inspection 优先级。
+- 将自动跟随跳转改为最多 10 跳的受控逐跳请求，记录每一跳状态、Location 和规范目标。
+- 增加重定向循环、无效 Location、过长链、跨主机、HTTPS 降级和多跳诊断，并写入页面详情、CSV、修复清单与 Inspection 优先级。
+- 新增共享 URL policy，统一服务端抓取、递归发现、链接图谱和 Inspection 候选的 URL 身份规则。
 
 ## 12. 历史完成度基线
 

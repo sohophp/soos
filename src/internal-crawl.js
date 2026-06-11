@@ -1,14 +1,9 @@
+import { canonicalAuditUrl } from "./url-policy.js";
+
 const STATIC_PATH = /\.(?:avif|bmp|css|csv|docx?|eot|gif|ico|jpe?g|js|json|map|mp3|mp4|pdf|png|pptx?|rar|rss|svg|tar|tgz|tiff?|txt|webm|webp|woff2?|xlsx?|xml|zip)$/i;
 
 export function internalCrawlKey(value) {
-  try {
-    const url = new URL(value);
-    if (!["http:", "https:"].includes(url.protocol)) return "";
-    url.hash = "";
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return "";
-  }
+  return canonicalAuditUrl(value).replace(/\/$/, "");
 }
 
 function comparableHost(value) {

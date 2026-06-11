@@ -1,12 +1,7 @@
+import { canonicalAuditUrl } from "./url-policy.js";
+
 export function linkGraphKey(value) {
-  try {
-    const url = new URL(value);
-    if (!["http:", "https:"].includes(url.protocol)) return "";
-    url.hash = "";
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return "";
-  }
+  return canonicalAuditUrl(value).replace(/\/$/, "");
 }
 
 export function buildInternalLinkGraph(report = {}) {

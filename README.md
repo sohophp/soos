@@ -21,6 +21,7 @@ Paid scheduled scans such as Vercel Cron are intentionally excluded.
 - Optional recursive same-site discovery to depth 2 with separate URL budgets and resumable background checkpoints.
 - Internal link graph diagnostics for inbound/outbound links, homepage shortest paths, unreachable sitemap pages, weak linkage, and deep click paths.
 - Audits canonical, hreflang/alternate, title, description, H1, lang, viewport, JSON-LD, robots rules, and sitemap consistency.
+- Traces redirects hop by hop and detects loops, long chains, invalid destinations, hostname changes, and HTTPS downgrades.
 - Optional page content checks and lightweight performance checks.
 - Pause, resume, stop, background worker scans, history, CSV export, and summary export.
 - Neon-backed background jobs, completed reports, and URL-batch checkpoints with automatic recovery after page refresh.

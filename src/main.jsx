@@ -93,6 +93,8 @@ const dictionaries = {
     copyBlockedUrls: "Copy blocked URLs",
     copiedBlockedUrls: "Copied",
     final: "Final",
+    redirectChain: "Redirect chain",
+    redirectHops: "hops",
     canonical: "Canonical",
     alternates: "Alternates",
     hreflangLinks: "hreflang links",
@@ -260,6 +262,8 @@ const dictionaries = {
     copyBlockedUrls: "复制被阻挡网址",
     copiedBlockedUrls: "已复制",
     final: "\u6700\u7ec8\u5730\u5740",
+    redirectChain: "\u91cd\u5b9a\u5411\u94fe",
+    redirectHops: "\u8df3",
     canonical: "Canonical",
     alternates: "Alternates",
     hreflangLinks: "\u4e2a hreflang \u94fe\u63a5",
@@ -427,6 +431,8 @@ const dictionaries = {
     copyBlockedUrls: "複製被阻擋網址",
     copiedBlockedUrls: "已複製",
     final: "\u6700\u7d42\u5730\u5740",
+    redirectChain: "\u91cd\u65b0\u5c0e\u5411\u93c8",
+    redirectHops: "\u8df3",
     canonical: "Canonical",
     alternates: "Alternates",
     hreflangLinks: "\u500b hreflang \u9023\u7d50",
@@ -722,6 +728,7 @@ function PageRow({ page, t }) {
         <div className="url-cell">
           <span>{page.url}</span>
           {page.finalUrl && page.finalUrl !== page.url ? <small>{t.final}: {page.finalUrl}</small> : null}
+          {page.redirectChain?.length ? <small>{t.redirectChain}: {page.redirectChain.length} {t.redirectHops}</small> : null}
         </div>
         <div className="row-status">
           <span className="http">{page.status || "ERR"}</span>
@@ -730,6 +737,16 @@ function PageRow({ page, t }) {
       </button>
       {open ? (
         <div className="row-detail">
+          {page.redirectChain?.length ? (
+            <div className="redirect-chain">
+              <strong>{t.redirectChain}</strong>
+              {page.redirectChain.map((hop, index) => (
+                <small key={`${hop.url}-${hop.status}-${index}`}>
+                  {index + 1}. HTTP {hop.status} / {hop.url} {"->"} {hop.targetUrl || hop.location || t.unknown}
+                </small>
+              ))}
+            </div>
+          ) : null}
           {hasSignals ? (
             <div className="signals">
               <div>
@@ -1165,6 +1182,8 @@ function downloadCsv(report, gscRows = []) {
     [
       "url",
       "final_url",
+      "redirect_count",
+      "redirect_chain",
       "status",
       "categories",
       "severity",
@@ -1187,6 +1206,8 @@ function downloadCsv(report, gscRows = []) {
     const baseRow = [
       page.url,
       page.finalUrl || "",
+      page.redirectChain?.length || 0,
+      (page.redirectChain || []).map((hop) => `${hop.status} ${hop.url} -> ${hop.targetUrl || hop.location || ""}`).join(" | "),
       page.status || "",
       issueCategories(page),
     ];
@@ -1222,6 +1243,8 @@ function downloadCsv(report, gscRows = []) {
   for (const row of (gscRows || []).filter((item) => !sitemapKeys.has(item.key))) {
     rows.push([
       row.page,
+      "",
+      "",
       "",
       "",
       "gsc",
