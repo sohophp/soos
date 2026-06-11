@@ -13,6 +13,7 @@ All notable changes to soos will be documented in this file.
 
 - Controlled redirect tracing with per-hop status and destination, loop/invalid/overlong/cross-host/HTTPS-downgrade diagnostics, CSV output, and URL Inspection prioritization.
 - A shared HTTP(S) URL policy used by crawling, link graphs, redirect analysis, and Inspection candidate deduplication.
+- Three-language URL comparison settings for query parameters and trailing slashes, persisted with each audit and shown in URL set diagnosis.
 - Homepage shortest-path analysis with reachable counts, maximum click depth, unreachable sitemap detection, and URL Inspection prioritization for unreachable or deep pages.
 - An internal link graph across sitemap and recursively discovered pages with inbound/outbound counts, discovery depth, orphan/weak/deep/dead-end classifications, filters, and CSV export.
 - Optional bounded recursive internal discovery with same-site filtering, depth and URL budgets, checkpoint recovery, and a separate discovered-page report.

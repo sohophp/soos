@@ -32,6 +32,7 @@ Paid scheduled scans such as Vercel Cron are intentionally excluded.
 - Search Console Sitemaps API status for submitted files, last download time, pending state, errors, warnings, and current-audit sitemap matching.
 - URL set comparison across sitemap, scanned internal links, Search Analytics, and Google sitemap/referrer signals.
 - Sitemap orphan detection and HTTP/HTTPS, www, trailing-slash, and query URL variant diagnosis.
+- Configurable URL comparison rules for preserving queries, removing tracking parameters, ignoring queries, and normalizing trailing slashes without rewriting crawl requests.
 - JSON-LD graph parsing, common Google field rules, page-signal consistency checks, and rich results issue comparison.
 - Local access-log analysis with verified Googlebot IPs and sitemap crawl comparison.
 - Neon retained-task management and URL-level regression comparisons across repeated scans.

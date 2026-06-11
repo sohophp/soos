@@ -16,6 +16,7 @@ import {
 import { absoluteLogUrl, parseAccessLog, STATIC_ASSET_PATH } from "./googlebot-log.js";
 import { buildUrlInspectionCandidates, inspectionCandidateKey } from "./url-inspection-candidates.js";
 import { buildInternalLinkGraph } from "./link-graph.js";
+import { comparisonUrl } from "./url-policy.js";
 import "./styles.css";
 
 const severityLabels = { critical: "Critical", warning: "Warning", notice: "Notice" };
@@ -138,6 +139,16 @@ const dictionaries = {
     backgroundModeHelp: "Raise the scan limit to 2000 URLs and keep the job available longer",
     internalCrawlTitle: "Recursive internal discovery",
     internalCrawlHelp: "Crawl same-site links to depth 2, separately limited to 100 URLs or 500 in background mode",
+    urlPolicyTitle: "URL comparison policy",
+    urlPolicyHelp: "Changes URL matching and variant diagnosis only. Actual crawl requests are not rewritten.",
+    queryPolicy: "Query parameters",
+    queryPreserve: "Preserve all",
+    queryStripTracking: "Remove known tracking parameters",
+    queryDropAll: "Ignore all query parameters",
+    trailingSlashPolicy: "Trailing slash",
+    slashPreserve: "Preserve",
+    slashRemove: "Normalize without slash",
+    slashAdd: "Normalize with slash",
     progressDiscovering: "Discovering internal URLs",
     discoveredUrls: "Discovered URLs",
     internalDiscoveryTitle: "Recursive internal discovery",
@@ -307,6 +318,16 @@ const dictionaries = {
     backgroundModeHelp: "\u5c06\u626b\u63cf\u4e0a\u9650\u63d0\u9ad8\u5230 2000 \u4e2a URL\uff0c\u5e76\u5ef6\u957f job \u4fdd\u7559\u65f6\u95f4",
     internalCrawlTitle: "\u9012\u5f52\u53d1\u73b0\u7ad9\u5185\u7f51\u5740",
     internalCrawlHelp: "\u8ddf\u968f\u540c\u7ad9\u94fe\u63a5\u6293\u53d6\u5230\u7b2c 2 \u5c42\uff0c\u72ec\u7acb\u9650\u5236\u4e3a 100 \u4e2a URL\uff0c\u540e\u53f0\u6a21\u5f0f\u4e3a 500 \u4e2a",
+    urlPolicyTitle: "URL \u5bf9\u6bd4\u7b56\u7565",
+    urlPolicyHelp: "\u4ec5\u5f71\u54cd\u7f51\u5740\u5339\u914d\u4e0e\u53d8\u4f53\u8bca\u65ad\uff0c\u4e0d\u4f1a\u6539\u5199\u5b9e\u9645\u6293\u53d6\u8bf7\u6c42\u3002",
+    queryPolicy: "\u67e5\u8be2\u53c2\u6570",
+    queryPreserve: "\u4fdd\u7559\u5168\u90e8",
+    queryStripTracking: "\u79fb\u9664\u5df2\u77e5\u8ddf\u8e2a\u53c2\u6570",
+    queryDropAll: "\u5ffd\u7565\u5168\u90e8\u67e5\u8be2\u53c2\u6570",
+    trailingSlashPolicy: "\u5c3e\u659c\u6760",
+    slashPreserve: "\u4fdd\u6301\u539f\u6837",
+    slashRemove: "\u7edf\u4e00\u4e0d\u5e26\u659c\u6760",
+    slashAdd: "\u7edf\u4e00\u5e26\u659c\u6760",
     progressDiscovering: "\u9012\u5f52\u53d1\u73b0\u7ad9\u5185\u7f51\u5740",
     discoveredUrls: "\u53d1\u73b0\u7f51\u5740",
     internalDiscoveryTitle: "\u9012\u5f52\u7ad9\u5185\u53d1\u73b0",
@@ -476,6 +497,16 @@ const dictionaries = {
     backgroundModeHelp: "\u5c07\u6383\u63cf\u4e0a\u9650\u63d0\u9ad8\u5230 2000 \u500b URL\uff0c\u4e26\u5ef6\u9577 job \u4fdd\u7559\u6642\u9593",
     internalCrawlTitle: "\u905e\u8ff4\u767c\u73fe\u7ad9\u5167\u7db2\u5740",
     internalCrawlHelp: "\u8ddf\u96a8\u540c\u7ad9\u9023\u7d50\u6aa2\u7d22\u5230\u7b2c 2 \u5c64\uff0c\u7368\u7acb\u9650\u5236\u70ba 100 \u500b URL\uff0c\u80cc\u666f\u6a21\u5f0f\u70ba 500 \u500b",
+    urlPolicyTitle: "URL \u5c0d\u6bd4\u7b56\u7565",
+    urlPolicyHelp: "\u50c5\u5f71\u97ff\u7db2\u5740\u6bd4\u5c0d\u8207\u8b8a\u9ad4\u8a3a\u65b7\uff0c\u4e0d\u6703\u6539\u5beb\u5be6\u969b\u6aa2\u7d22\u8acb\u6c42\u3002",
+    queryPolicy: "\u67e5\u8a62\u53c3\u6578",
+    queryPreserve: "\u4fdd\u7559\u5168\u90e8",
+    queryStripTracking: "\u79fb\u9664\u5df2\u77e5\u8ffd\u8e64\u53c3\u6578",
+    queryDropAll: "\u5ffd\u7565\u5168\u90e8\u67e5\u8a62\u53c3\u6578",
+    trailingSlashPolicy: "\u5c3e\u659c\u7dda",
+    slashPreserve: "\u4fdd\u6301\u539f\u6a23",
+    slashRemove: "\u7d71\u4e00\u4e0d\u5e36\u659c\u7dda",
+    slashAdd: "\u7d71\u4e00\u5e36\u659c\u7dda",
     progressDiscovering: "\u905e\u8ff4\u767c\u73fe\u7ad9\u5167\u7db2\u5740",
     discoveredUrls: "\u767c\u73fe\u7db2\u5740",
     internalDiscoveryTitle: "\u905e\u8ff4\u7ad9\u5167\u767c\u73fe",
@@ -2251,6 +2282,10 @@ const gscDataText = {
     urlSetsTitle: "URL set comparison", urlSetsHelp: "Compares sitemap URLs with links found on scanned pages, Search Analytics pages, and Google discovery signals.",
     urlSetsExport: "Export URL set diagnosis", urlSetsAll: "All findings", urlSetsFindings: "findings",
     urlSetsPartial: "Internal-link results only cover pages completed in this audit.",
+    urlPolicyActive: "Comparison policy", queryPreserve: "Preserve all query parameters",
+    queryStripTracking: "Remove known tracking parameters", queryDropAll: "Ignore all query parameters",
+    slashPreserve: "Preserve trailing slash", slashRemove: "Normalize without trailing slash",
+    slashAdd: "Normalize with trailing slash",
     internalMissingSitemap: "Internal URL missing from sitemap", gscMissingSitemap: "GSC page missing from sitemap",
     sitemapOrphan: "Sitemap page with no scanned inbound links", googleMissingSitemap: "Google reports no sitemap source",
     googleMissingReferrer: "Google reports no referring URL", urlVariant: "Conflicting URL variants",
@@ -2320,6 +2355,10 @@ const gscDataText = {
     urlSetsTitle: "网址集合对比", urlSetsHelp: "对比 sitemap、已扫描页面发现的站内链接、Search Analytics 页面和 Google 发现信号。",
     urlSetsExport: "导出网址集合诊断", urlSetsAll: "全部问题", urlSetsFindings: "项问题",
     urlSetsPartial: "站内链接结果仅覆盖本次检查中已完成扫描的页面。",
+    urlPolicyActive: "对比策略", queryPreserve: "保留全部查询参数",
+    queryStripTracking: "移除已知跟踪参数", queryDropAll: "忽略全部查询参数",
+    slashPreserve: "保持尾斜杠原样", slashRemove: "统一不带尾斜杠",
+    slashAdd: "统一带尾斜杠",
     internalMissingSitemap: "站内发现网址未进入 sitemap", gscMissingSitemap: "GSC 网页未进入 sitemap",
     sitemapOrphan: "Sitemap 页面没有已扫描入链", googleMissingSitemap: "Google 未报告 sitemap 来源",
     googleMissingReferrer: "Google 未报告来源网址", urlVariant: "存在冲突的网址变体",
@@ -2389,6 +2428,10 @@ const gscDataText = {
     urlSetsTitle: "網址集合對比", urlSetsHelp: "對比 sitemap、已掃描頁面發現的站內連結、Search Analytics 頁面和 Google 發現訊號。",
     urlSetsExport: "匯出網址集合診斷", urlSetsAll: "全部問題", urlSetsFindings: "項問題",
     urlSetsPartial: "站內連結結果僅涵蓋本次檢查中已完成掃描的頁面。",
+    urlPolicyActive: "對比策略", queryPreserve: "保留全部查詢參數",
+    queryStripTracking: "移除已知追蹤參數", queryDropAll: "忽略全部查詢參數",
+    slashPreserve: "保持尾斜線原樣", slashRemove: "統一不帶尾斜線",
+    slashAdd: "統一帶尾斜線",
     internalMissingSitemap: "站內發現網址未進入 sitemap", gscMissingSitemap: "GSC 網頁未進入 sitemap",
     sitemapOrphan: "Sitemap 頁面沒有已掃描入鏈", googleMissingSitemap: "Google 未回報 sitemap 來源",
     googleMissingReferrer: "Google 未回報來源網址", urlVariant: "存在衝突的網址變體",
@@ -3575,15 +3618,8 @@ function ImportantPageFreshness({ inspectionResults, gscRows, copy }) {
   );
 }
 
-function normalizeSetUrl(value) {
-  try {
-    const url = new URL(value);
-    url.hash = "";
-    if (url.pathname !== "/") url.pathname = url.pathname.replace(/\/+$/, "");
-    return url.toString();
-  } catch {
-    return String(value || "").trim();
-  }
+function normalizeSetUrl(value, policy) {
+  return comparisonUrl(value, policy);
 }
 
 function normalizeVariantUrl(value) {
@@ -3596,25 +3632,28 @@ function normalizeVariantUrl(value) {
   }
 }
 
-function urlVariantFamily(value) {
+function urlVariantFamily(value, policy) {
   try {
-    const url = new URL(value);
+    const url = new URL(comparisonUrl(value, policy));
     const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
-    const pathname = url.pathname === "/" ? "/" : url.pathname.replace(/\/+$/, "");
-    return `${hostname}${url.port ? `:${url.port}` : ""}${pathname}`;
+    return `${hostname}${url.port ? `:${url.port}` : ""}${url.pathname}${url.search}`;
   } catch {
     return "";
   }
 }
 
 function buildUrlSetFindings(report, gscRows, inspectionResults, copy) {
+  const comparisonPolicy = {
+    queryPolicy: report?.options?.urlQueryPolicy || "preserve",
+    trailingSlashPolicy: report?.options?.trailingSlashPolicy || "preserve",
+  };
   const pages = report?.pages || [];
   const scannedPages = [...pages, ...(report?.discoveredPages || [])];
   const hasInternalLinkData = scannedPages.some((page) => Array.isArray(page.internalLinks));
   const sitemapUrls = new Map();
   const internalUrls = new Map(
     (report?.discoveredPages || []).flatMap((page) => [page.url, ...(page.internalLinks || [])])
-      .map((url) => [normalizeReportUrl(url), url])
+      .map((url) => [normalizeSetUrl(url, comparisonPolicy), url])
       .filter(([key]) => key),
   );
   const inboundSources = new Map();
@@ -3627,11 +3666,11 @@ function buildUrlSetFindings(report, gscRows, inspectionResults, copy) {
   };
 
   for (const page of pages) {
-    const pageUrl = normalizeSetUrl(page.url);
+    const pageUrl = normalizeSetUrl(page.url, comparisonPolicy);
     if (pageUrl) sitemapUrls.set(pageUrl, page.url);
     addSourceUrl(page.url, copy.sourceSitemap);
     for (const link of page.internalLinks || []) {
-      const linkUrl = normalizeSetUrl(link);
+      const linkUrl = normalizeSetUrl(link, comparisonPolicy);
       if (!linkUrl) continue;
       internalUrls.set(linkUrl, link);
       addSourceUrl(link, copy.sourceInternal);
@@ -3655,7 +3694,7 @@ function buildUrlSetFindings(report, gscRows, inspectionResults, copy) {
 
   for (const row of uniqueGscRows(gscRows)) {
     const url = row.page || row.key;
-    const key = normalizeSetUrl(url);
+    const key = normalizeSetUrl(url, comparisonPolicy);
     if (!key) continue;
     addSourceUrl(url, copy.sourceGsc);
     if (!sitemapUrls.has(key)) {
@@ -3688,7 +3727,7 @@ function buildUrlSetFindings(report, gscRows, inspectionResults, copy) {
 
   const variantGroups = new Map();
   for (const [url, sources] of sourceUrls) {
-    const family = urlVariantFamily(url);
+    const family = urlVariantFamily(url, comparisonPolicy);
     if (!family) continue;
     if (!variantGroups.has(family)) variantGroups.set(family, []);
     variantGroups.get(family).push({ url, sources: [...sources] });
@@ -3710,6 +3749,18 @@ function buildUrlSetFindings(report, gscRows, inspectionResults, copy) {
 
 function UrlSetComparison({ report, gscRows, inspectionResults, copy }) {
   const [filter, setFilter] = useState("all");
+  const queryPolicy = report?.options?.urlQueryPolicy || "preserve";
+  const trailingSlashPolicy = report?.options?.trailingSlashPolicy || "preserve";
+  const queryPolicyLabels = {
+    preserve: copy.queryPreserve,
+    strip_tracking: copy.queryStripTracking,
+    drop_all: copy.queryDropAll,
+  };
+  const slashPolicyLabels = {
+    preserve: copy.slashPreserve,
+    remove: copy.slashRemove,
+    add: copy.slashAdd,
+  };
   const findings = useMemo(
     () => buildUrlSetFindings(report, gscRows, inspectionResults, copy),
     [report, gscRows, inspectionResults, copy],
@@ -3755,6 +3806,9 @@ function UrlSetComparison({ report, gscRows, inspectionResults, copy }) {
         </div>
       </div>
       <small className="url-set-scope">{copy.urlSetsPartial}</small>
+      <small className="url-set-scope">
+        {copy.urlPolicyActive}: {queryPolicyLabels[queryPolicy]} / {slashPolicyLabels[trailingSlashPolicy]}
+      </small>
       <div className="coverage-disposition-summary">
         {Object.entries(typeLabels).map(([type, label]) => (
           <span key={type}>{label}: {counts[type] || 0}</span>
@@ -4817,6 +4871,8 @@ function App() {
   const [performanceChecks, setPerformanceChecks] = useState(false);
   const [backgroundMode, setBackgroundMode] = useState(false);
   const [internalCrawl, setInternalCrawl] = useState(false);
+  const [urlQueryPolicy, setUrlQueryPolicy] = useState("preserve");
+  const [trailingSlashPolicy, setTrailingSlashPolicy] = useState("preserve");
   const [gscRows, setGscRows] = useState([]);
   const [gscStatus, setGscStatus] = useState(null);
   const [gscSiteUrl, setGscSiteUrl] = useState("");
@@ -5060,6 +5116,8 @@ useEffect(() => {
             performanceChecks,
             backgroundMode,
             internalCrawl,
+            urlQueryPolicy,
+            trailingSlashPolicy,
             robotsSource: directoryRobots ? "sitemap-directory" : "root",
             proxyEnabled: false,
           },
@@ -5160,6 +5218,29 @@ useEffect(() => {
           <small>{t.internalCrawlHelp}</small>
         </span>
       </label>
+
+      <section className="url-policy-settings">
+        <div className="url-policy-copy">
+          <strong>{t.urlPolicyTitle}</strong>
+          <small>{t.urlPolicyHelp}</small>
+        </div>
+        <label>
+          <strong>{t.queryPolicy}</strong>
+          <select value={urlQueryPolicy} onChange={(event) => setUrlQueryPolicy(event.target.value)}>
+            <option value="preserve">{t.queryPreserve}</option>
+            <option value="strip_tracking">{t.queryStripTracking}</option>
+            <option value="drop_all">{t.queryDropAll}</option>
+          </select>
+        </label>
+        <label>
+          <strong>{t.trailingSlashPolicy}</strong>
+          <select value={trailingSlashPolicy} onChange={(event) => setTrailingSlashPolicy(event.target.value)}>
+            <option value="preserve">{t.slashPreserve}</option>
+            <option value="remove">{t.slashRemove}</option>
+            <option value="add">{t.slashAdd}</option>
+          </select>
+        </label>
+      </section>
 
       <label className="option-toggle">
         <input type="checkbox" checked={directoryRobots} onChange={(event) => setDirectoryRobots(event.target.checked)} />

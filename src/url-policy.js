@@ -1,4 +1,5 @@
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const TRACKING_PARAM = /^(?:utm_.+|gclid|dclid|fbclid|msclkid|_ga|_gl|mc_cid|mc_eid)$/i;
 
 export function canonicalAuditUrl(value, base) {
   try {
@@ -17,6 +18,32 @@ export function canonicalAuditUrl(value, base) {
 
 export function isRedirectStatus(status) {
   return REDIRECT_STATUSES.has(Number(status));
+}
+
+export function comparisonUrl(value, policy = {}) {
+  const normalized = canonicalAuditUrl(value);
+  if (!normalized) return "";
+  const url = new URL(normalized);
+  const queryPolicy = ["preserve", "strip_tracking", "drop_all"].includes(policy.queryPolicy)
+    ? policy.queryPolicy
+    : "preserve";
+  const trailingSlashPolicy = ["preserve", "remove", "add"].includes(policy.trailingSlashPolicy)
+    ? policy.trailingSlashPolicy
+    : "preserve";
+
+  if (queryPolicy === "drop_all") {
+    url.search = "";
+  } else if (queryPolicy === "strip_tracking") {
+    for (const key of [...url.searchParams.keys()]) {
+      if (TRACKING_PARAM.test(key)) url.searchParams.delete(key);
+    }
+  }
+
+  if (url.pathname !== "/") {
+    if (trailingSlashPolicy === "remove") url.pathname = url.pathname.replace(/\/+$/, "");
+    if (trailingSlashPolicy === "add" && !url.pathname.endsWith("/")) url.pathname += "/";
+  }
+  return url.toString();
 }
 
 export function analyzeRedirectChain(startUrl, hops = [], options = {}) {

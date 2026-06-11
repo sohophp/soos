@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   analyzeRedirectChain,
   canonicalAuditUrl,
+  comparisonUrl,
   isRedirectStatus,
 } from "../src/url-policy.js";
 
@@ -9,6 +10,27 @@ assert.equal(canonicalAuditUrl("/page?x=1#part", "HTTPS://Example.COM:443/base")
 assert.equal(canonicalAuditUrl("mailto:test@example.com"), "");
 assert.equal(isRedirectStatus(301), true);
 assert.equal(isRedirectStatus(304), false);
+assert.equal(
+  comparisonUrl("https://Example.com/page/?utm_source=x&id=2#part", {
+    queryPolicy: "strip_tracking",
+    trailingSlashPolicy: "remove",
+  }),
+  "https://example.com/page?id=2",
+);
+assert.equal(
+  comparisonUrl("https://example.com/page?id=2", {
+    queryPolicy: "drop_all",
+    trailingSlashPolicy: "add",
+  }),
+  "https://example.com/page/",
+);
+assert.equal(
+  comparisonUrl("https://example.com/page?id=2", {
+    queryPolicy: "preserve",
+    trailingSlashPolicy: "preserve",
+  }),
+  "https://example.com/page?id=2",
+);
 
 const normal = analyzeRedirectChain("https://example.com/old", [
   { url: "https://example.com/old", status: 301, location: "/middle" },

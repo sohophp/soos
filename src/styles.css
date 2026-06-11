@@ -167,6 +167,41 @@ main {
   color: #687169;
 }
 
+.url-policy-settings {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.4fr) repeat(2, minmax(190px, 1fr));
+  gap: 14px;
+  align-items: end;
+  width: min(900px, 100%);
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #dfe6dd;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.url-policy-copy strong,
+.url-policy-copy small,
+.url-policy-settings label strong {
+  display: block;
+}
+
+.url-policy-copy strong,
+.url-policy-settings label strong {
+  font-size: 14px;
+}
+
+.url-policy-copy small {
+  margin-top: 3px;
+  color: #687169;
+}
+
+.url-policy-settings select {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 6px;
+}
+
 .spin {
   animation: spin 0.8s linear infinite;
 }
@@ -1165,6 +1200,10 @@ main {
   .option-toggle {
     width: 100%;
     align-items: flex-start;
+  }
+
+  .url-policy-settings {
+    grid-template-columns: 1fr;
   }
 
   .panel-head,

@@ -2012,6 +2012,12 @@ async function audit(sitemapUrl, options = {}, onProgress, job = null, execution
     internalCrawl: Boolean(options.internalCrawl),
     internalCrawlMaxUrls: options.backgroundMode ? BACKGROUND_INTERNAL_CRAWL_MAX_URLS : INTERNAL_CRAWL_MAX_URLS,
     internalCrawlMaxDepth: INTERNAL_CRAWL_MAX_DEPTH,
+    urlQueryPolicy: ["preserve", "strip_tracking", "drop_all"].includes(options.urlQueryPolicy)
+      ? options.urlQueryPolicy
+      : "preserve",
+    trailingSlashPolicy: ["preserve", "remove", "add"].includes(options.trailingSlashPolicy)
+      ? options.trailingSlashPolicy
+      : "preserve",
     robotsSource: options.robotsSource === "sitemap-directory" ? "sitemap-directory" : "root",
     proxyEnabled: Boolean(options.proxyEnabled),
     proxyUrl: typeof options.proxyUrl === "string" && options.proxyUrl.trim() ? options.proxyUrl.trim() : "http://127.0.0.1:7890",
