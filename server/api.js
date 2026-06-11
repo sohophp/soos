@@ -2409,6 +2409,7 @@ function isServerlessRuntime() {
 let dotEnvCache = null;
 
 async function readDotEnvValues() {
+  if (process.env.SOOS_DISABLE_DOTENV === "1") return {};
   if (dotEnvCache) return dotEnvCache;
   try {
     dotEnvCache = parseEnvText(await fs.readFile(ENV_PATH, "utf8"));
