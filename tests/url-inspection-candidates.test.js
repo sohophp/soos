@@ -58,4 +58,18 @@ assert.notEqual(
 );
 assert.equal(inspectionCandidateKey("mailto:test@example.com"), "");
 
+const graphCandidates = buildUrlInspectionCandidates({
+  input: { siteRootUrl: "https://graph.example/" },
+  pages: [
+    { url: "https://graph.example/", issues: [], internalLinks: ["https://graph.example/a"] },
+    { url: "https://graph.example/a", issues: [], internalLinks: ["https://graph.example/b"] },
+    { url: "https://graph.example/b", issues: [], internalLinks: ["https://graph.example/deep"] },
+    { url: "https://graph.example/deep", issues: [], internalLinks: [] },
+    { url: "https://graph.example/unreachable", issues: [], internalLinks: [] },
+  ],
+}, []);
+assert.equal(graphCandidates.find((item) => item.url === "https://graph.example/unreachable").priority, 12);
+assert.ok(graphCandidates.find((item) => item.url === "https://graph.example/unreachable").reasons.includes("homepage_unreachable"));
+assert.equal(graphCandidates.find((item) => item.url === "https://graph.example/deep").priority, 35);
+
 console.log("url-inspection-candidates-tests-passed");

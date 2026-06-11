@@ -19,7 +19,7 @@ Paid scheduled scans such as Vercel Cron are intentionally excluded.
 - Accepts a website URL, sitemap URL, or robots.txt URL and detects the best audit target.
 - Reads `sitemap.xml` and `sitemapindex` files, including child sitemaps.
 - Optional recursive same-site discovery to depth 2 with separate URL budgets and resumable background checkpoints.
-- Internal link graph diagnostics for scanned inbound/outbound links, sitemap orphans, weak linkage, and deep discoveries.
+- Internal link graph diagnostics for inbound/outbound links, homepage shortest paths, unreachable sitemap pages, weak linkage, and deep click paths.
 - Audits canonical, hreflang/alternate, title, description, H1, lang, viewport, JSON-LD, robots rules, and sitemap consistency.
 - Optional page content checks and lightweight performance checks.
 - Pause, resume, stop, background worker scans, history, CSV export, and summary export.

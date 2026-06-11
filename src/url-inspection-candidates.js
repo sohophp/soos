@@ -74,6 +74,12 @@ export function buildUrlInspectionCandidates(report, gscRows = []) {
     if (signalTypes.length) add(page.url, 15, "sitemap", `url_signal:${signalTypes.join(",")}`, demand);
   }
 
+  const linkGraph = buildInternalLinkGraph(report);
+  for (const row of linkGraph.rows) {
+    if (row.state === "unreachable") add(row.url, 12, "internal", "homepage_unreachable");
+    else if (row.clickDepth != null && row.clickDepth >= 3) add(row.url, 35, "internal", "homepage_deep");
+  }
+
   for (const [key, row] of gscByKey) {
     if (!sitemapKeys.has(key)) {
       add(row.page, 20, "gsc", "gsc_missing_sitemap", row.impressions);
@@ -105,3 +111,4 @@ export function buildUrlInspectionCandidates(report, gscRows = []) {
     || a.url.localeCompare(b.url)
   ));
 }
+import { buildInternalLinkGraph } from "./link-graph.js";

@@ -40,18 +40,37 @@ export function buildInternalLinkGraph(report = {}) {
     }
   }
 
+  const rootAvailable = Boolean(siteRootKey && nodes.has(siteRootKey));
+  const clickDepths = new Map();
+  if (rootAvailable) {
+    const queue = [siteRootKey];
+    clickDepths.set(siteRootKey, 0);
+    for (let index = 0; index < queue.length; index += 1) {
+      const sourceKey = queue[index];
+      const nextDepth = clickDepths.get(sourceKey) + 1;
+      for (const targetKey of nodes.get(sourceKey)?.outbound || []) {
+        if (clickDepths.has(targetKey)) continue;
+        clickDepths.set(targetKey, nextDepth);
+        queue.push(targetKey);
+      }
+    }
+  }
+
   const rows = [...nodes.values()].map((node) => {
     const inboundCount = node.inbound.size;
     const outboundCount = node.outbound.size;
+    const clickDepth = rootAvailable && clickDepths.has(node.key) ? clickDepths.get(node.key) : null;
     let state = "healthy";
-    if (node.source === "sitemap" && inboundCount === 0 && node.key !== siteRootKey) state = "orphan";
-    else if (node.crawlDepth >= 2) state = "deep";
+    if (rootAvailable && node.source === "sitemap" && clickDepth == null) state = "unreachable";
+    else if (!rootAvailable && node.source === "sitemap" && inboundCount === 0 && node.key !== siteRootKey) state = "orphan";
+    else if (clickDepth != null && clickDepth >= 3) state = "deep";
     else if (node.key !== siteRootKey && inboundCount <= 1) state = "weak";
     else if (outboundCount === 0) state = "dead_end";
     return {
       url: node.url,
       source: node.source,
       crawlDepth: node.crawlDepth,
+      clickDepth,
       inboundCount,
       outboundCount,
       state,
@@ -59,18 +78,22 @@ export function buildInternalLinkGraph(report = {}) {
       outboundUrls: [...node.outbound].map((key) => nodes.get(key)?.url || key),
     };
   }).sort((a, b) => {
-    const order = { orphan: 0, deep: 1, weak: 2, dead_end: 3, healthy: 4 };
+    const order = { unreachable: 0, orphan: 1, deep: 2, weak: 3, dead_end: 4, healthy: 5 };
     return (order[a.state] ?? 5) - (order[b.state] ?? 5)
+      || (b.clickDepth ?? -1) - (a.clickDepth ?? -1)
       || a.inboundCount - b.inboundCount
       || a.url.localeCompare(b.url);
   });
 
   return {
     rows,
+    rootAvailable,
+    reachableCount: rows.filter((row) => row.clickDepth != null).length,
+    maxClickDepth: rows.reduce((max, row) => row.clickDepth == null ? max : Math.max(max, row.clickDepth), 0),
     edgeCount: rows.reduce((total, row) => total + row.outboundCount, 0),
     counts: rows.reduce((counts, row) => {
       counts[row.state] = (counts[row.state] || 0) + 1;
       return counts;
-    }, { orphan: 0, deep: 0, weak: 0, dead_end: 0, healthy: 0 }),
+    }, { unreachable: 0, orphan: 0, deep: 0, weak: 0, dead_end: 0, healthy: 0 }),
   };
 }

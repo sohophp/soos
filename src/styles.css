@@ -2413,7 +2413,9 @@ main {
   padding: 12px 16px;
 }
 
-.link-graph-toolbar > small {
+.link-graph-toolbar > small,
+.link-graph-toolbar > div > small {
+  display: block;
   max-width: 760px;
   color: #687169;
 }
@@ -2432,7 +2434,7 @@ main {
 
 .link-graph-row {
   display: grid;
-  grid-template-columns: 150px minmax(220px, 1.5fr) repeat(4, minmax(90px, 0.55fr));
+  grid-template-columns: 170px minmax(220px, 1.5fr) repeat(5, minmax(90px, 0.55fr));
   gap: 8px;
   align-items: center;
   padding: 9px 10px;
