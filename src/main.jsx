@@ -16,7 +16,7 @@ import {
 import { absoluteLogUrl, parseAccessLog, STATIC_ASSET_PATH } from "./googlebot-log.js";
 import { buildUrlInspectionCandidates, inspectionCandidateKey } from "./url-inspection-candidates.js";
 import { buildInternalLinkGraph } from "./link-graph.js";
-import { comparisonUrl } from "./url-policy.js";
+import { analyzeUrlVariantGroup, comparisonUrl, urlVariantFamily } from "./url-policy.js";
 import "./styles.css";
 
 const severityLabels = { critical: "Critical", warning: "Warning", notice: "Notice" };
@@ -2288,7 +2288,14 @@ const gscDataText = {
     slashAdd: "Normalize with trailing slash",
     internalMissingSitemap: "Internal URL missing from sitemap", gscMissingSitemap: "GSC page missing from sitemap",
     sitemapOrphan: "Sitemap page with no scanned inbound links", googleMissingSitemap: "Google reports no sitemap source",
-    googleMissingReferrer: "Google reports no referring URL", urlVariant: "Conflicting URL variants",
+    googleMissingReferrer: "Google reports no referring URL",
+    urlVariantReasonable: "Reasonable duplicate variants", urlVariantNormalize: "URL variants should be unified",
+    urlVariantConflict: "Serious URL variant conflict",
+    variantProtocol: "HTTP/HTTPS mixed", variantHostname: "www/non-www mixed",
+    variantPathCase: "Path letter case differs", variantDefaultDocument: "Default document path differs",
+    variantTrailingSlash: "Trailing slash differs", variantQueryOrder: "Query parameter order differs",
+    variantTrackingQuery: "Tracking parameters differ", variantPaginationQuery: "Pagination parameters differ",
+    variantFunctionalQuery: "Functional parameters differ", variantUnknownQuery: "Unknown parameters differ",
     sourceInternal: "Internal links", sourceGsc: "Search Analytics", sourceSitemap: "Sitemap",
     sourceGoogle: "Google Inspection", sourceVariants: "Multiple sources", inboundLinks: "scanned inbound links",
     structuredTitle: "Structured data diagnosis", structuredHelp: "Combines local JSON-LD graph validation with Google rich results findings.",
@@ -2361,7 +2368,14 @@ const gscDataText = {
     slashAdd: "统一带尾斜杠",
     internalMissingSitemap: "站内发现网址未进入 sitemap", gscMissingSitemap: "GSC 网页未进入 sitemap",
     sitemapOrphan: "Sitemap 页面没有已扫描入链", googleMissingSitemap: "Google 未报告 sitemap 来源",
-    googleMissingReferrer: "Google 未报告来源网址", urlVariant: "存在冲突的网址变体",
+    googleMissingReferrer: "Google 未报告来源网址",
+    urlVariantReasonable: "合理重复网址变体", urlVariantNormalize: "建议统一网址变体",
+    urlVariantConflict: "严重网址变体冲突",
+    variantProtocol: "HTTP/HTTPS 混用", variantHostname: "www/non-www 混用",
+    variantPathCase: "路径字母大小写不同", variantDefaultDocument: "默认文档路径不同",
+    variantTrailingSlash: "尾斜杠不同", variantQueryOrder: "查询参数顺序不同",
+    variantTrackingQuery: "跟踪参数不同", variantPaginationQuery: "分页参数不同",
+    variantFunctionalQuery: "功能参数不同", variantUnknownQuery: "未知参数不同",
     sourceInternal: "站内链接", sourceGsc: "Search Analytics", sourceSitemap: "Sitemap",
     sourceGoogle: "Google 网址检查", sourceVariants: "多个来源", inboundLinks: "条已扫描入链",
     structuredTitle: "结构化数据诊断", structuredHelp: "合并本地 JSON-LD graph 验证与 Google 富媒体结果问题。",
@@ -2434,7 +2448,14 @@ const gscDataText = {
     slashAdd: "統一帶尾斜線",
     internalMissingSitemap: "站內發現網址未進入 sitemap", gscMissingSitemap: "GSC 網頁未進入 sitemap",
     sitemapOrphan: "Sitemap 頁面沒有已掃描入鏈", googleMissingSitemap: "Google 未回報 sitemap 來源",
-    googleMissingReferrer: "Google 未回報來源網址", urlVariant: "存在衝突的網址變體",
+    googleMissingReferrer: "Google 未回報來源網址",
+    urlVariantReasonable: "合理重複網址變體", urlVariantNormalize: "建議統一網址變體",
+    urlVariantConflict: "嚴重網址變體衝突",
+    variantProtocol: "HTTP/HTTPS 混用", variantHostname: "www/non-www 混用",
+    variantPathCase: "路徑字母大小寫不同", variantDefaultDocument: "預設文件路徑不同",
+    variantTrailingSlash: "尾斜線不同", variantQueryOrder: "查詢參數順序不同",
+    variantTrackingQuery: "追蹤參數不同", variantPaginationQuery: "分頁參數不同",
+    variantFunctionalQuery: "功能參數不同", variantUnknownQuery: "未知參數不同",
     sourceInternal: "站內連結", sourceGsc: "Search Analytics", sourceSitemap: "Sitemap",
     sourceGoogle: "Google 網址檢查", sourceVariants: "多個來源", inboundLinks: "條已掃描入鏈",
     structuredTitle: "結構化資料診斷", structuredHelp: "合併本地 JSON-LD graph 驗證與 Google 複合式搜尋結果問題。",
@@ -3632,16 +3653,6 @@ function normalizeVariantUrl(value) {
   }
 }
 
-function urlVariantFamily(value, policy) {
-  try {
-    const url = new URL(comparisonUrl(value, policy));
-    const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
-    return `${hostname}${url.port ? `:${url.port}` : ""}${url.pathname}${url.search}`;
-  } catch {
-    return "";
-  }
-}
-
 function buildUrlSetFindings(report, gscRows, inspectionResults, copy) {
   const comparisonPolicy = {
     queryPolicy: report?.options?.urlQueryPolicy || "preserve",
@@ -3727,18 +3738,32 @@ function buildUrlSetFindings(report, gscRows, inspectionResults, copy) {
 
   const variantGroups = new Map();
   for (const [url, sources] of sourceUrls) {
-    const family = urlVariantFamily(url, comparisonPolicy);
+    const family = urlVariantFamily(url);
     if (!family) continue;
     if (!variantGroups.has(family)) variantGroups.set(family, []);
     variantGroups.get(family).push({ url, sources: [...sources] });
   }
   for (const variants of variantGroups.values()) {
     if (variants.length < 2) continue;
-    const detail = variants
+    const diagnosis = analyzeUrlVariantGroup(variants.map((variant) => variant.url));
+    if (!diagnosis?.reasons.length) continue;
+    const reasonLabels = {
+      protocol: copy.variantProtocol,
+      hostname: copy.variantHostname,
+      path_case: copy.variantPathCase,
+      default_document: copy.variantDefaultDocument,
+      trailing_slash: copy.variantTrailingSlash,
+      query_order: copy.variantQueryOrder,
+      tracking_query: copy.variantTrackingQuery,
+      pagination_query: copy.variantPaginationQuery,
+      functional_query: copy.variantFunctionalQuery,
+      unknown_query: copy.variantUnknownQuery,
+    };
+    const detail = `${diagnosis.reasons.map((reason) => reasonLabels[reason] || reason).join(", ")}: ${variants
       .slice(0, 6)
       .map((variant) => variant.url)
-      .join(" | ");
-    addFinding("url_variant", variants[0].url, copy.sourceVariants, detail);
+      .join(" | ")}`;
+    addFinding(`url_variant_${diagnosis.classification}`, variants[0].url, copy.sourceVariants, detail, diagnosis.severity);
   }
 
   return findings.sort((a, b) => {
@@ -3771,7 +3796,9 @@ function UrlSetComparison({ report, gscRows, inspectionResults, copy }) {
     sitemap_orphan: copy.sitemapOrphan,
     google_missing_sitemap: copy.googleMissingSitemap,
     google_missing_referrer: copy.googleMissingReferrer,
-    url_variant: copy.urlVariant,
+    url_variant_reasonable: copy.urlVariantReasonable,
+    url_variant_normalize: copy.urlVariantNormalize,
+    url_variant_conflict: copy.urlVariantConflict,
   };
   const counts = findings.reduce((result, item) => {
     result[item.type] = (result[item.type] || 0) + 1;

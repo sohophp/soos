@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import {
   analyzeRedirectChain,
+  analyzeUrlVariantGroup,
   canonicalAuditUrl,
   comparisonUrl,
   isRedirectStatus,
+  urlVariantFamily,
 } from "../src/url-policy.js";
 
 assert.equal(canonicalAuditUrl("/page?x=1#part", "HTTPS://Example.COM:443/base"), "https://example.com/page?x=1");
@@ -31,6 +33,62 @@ assert.equal(
   }),
   "https://example.com/page?id=2",
 );
+assert.equal(
+  comparisonUrl("https://example.com/page?b=2&a=1", {
+    queryPolicy: "preserve",
+    trailingSlashPolicy: "preserve",
+  }),
+  "https://example.com/page?a=1&b=2",
+);
+assert.equal(urlVariantFamily("https://www.example.com/Docs/index.html?utm_source=x"), "example.com/docs");
+
+const queryOrderVariant = analyzeUrlVariantGroup([
+  "https://example.com/page?a=1&b=2",
+  "https://example.com/page?b=2&a=1",
+]);
+assert.equal(queryOrderVariant.classification, "reasonable");
+assert.deepEqual(queryOrderVariant.reasons, ["query_order"]);
+
+const defaultDocumentVariant = analyzeUrlVariantGroup([
+  "https://example.com/docs/",
+  "https://example.com/docs/index.html",
+]);
+assert.equal(defaultDocumentVariant.classification, "normalize");
+assert.equal(defaultDocumentVariant.reasons.includes("default_document"), true);
+
+const caseVariant = analyzeUrlVariantGroup([
+  "https://example.com/Product/",
+  "https://example.com/product",
+]);
+assert.equal(caseVariant.classification, "conflict");
+assert.equal(caseVariant.reasons.includes("path_case"), true);
+assert.equal(caseVariant.reasons.includes("trailing_slash"), true);
+
+const paginationVariant = analyzeUrlVariantGroup([
+  "https://example.com/articles?page=1",
+  "https://example.com/articles?page=2",
+]);
+assert.equal(paginationVariant.classification, "reasonable");
+assert.equal(paginationVariant.reasons.includes("pagination_query"), true);
+
+const trackingVariant = analyzeUrlVariantGroup([
+  "https://example.com/article?id=8",
+  "https://example.com/article?id=8&utm_source=newsletter",
+]);
+assert.equal(trackingVariant.classification, "reasonable");
+assert.equal(trackingVariant.reasons.includes("tracking_query"), true);
+
+const functionalVariant = analyzeUrlVariantGroup([
+  "https://example.com/products?sort=price",
+  "https://example.com/products?sort=name",
+]);
+assert.equal(functionalVariant.classification, "conflict");
+assert.equal(functionalVariant.reasons.includes("functional_query"), true);
+
+assert.equal(analyzeUrlVariantGroup([
+  "https://example.com/product?id=1",
+  "https://example.com/product?id=2",
+]), null);
 
 const normal = analyzeRedirectChain("https://example.com/old", [
   { url: "https://example.com/old", status: 301, location: "/middle" },
