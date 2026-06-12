@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { inspectJsonLd } from "../server/api.js";
+import { inspectJsonLd } from "../server/structured-data.js";
 
 const wrap = (value) => `<script type="application/ld+json">${JSON.stringify(value)}</script>`;
 

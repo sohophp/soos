@@ -1,15 +1,21 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   AlertTriangle,
   Bot,
   CheckCircle2,
+  ChartNoAxesCombined,
   ChevronDown,
   ExternalLink,
   FileSearch,
   Globe2,
+  History,
+  Link,
+  ListChecks,
   Loader2,
   Search,
+  ScanSearch,
+  Settings,
   ShieldAlert,
   XCircle,
 } from "lucide-react";
@@ -17,11 +23,33 @@ import { absoluteLogUrl, parseAccessLog, STATIC_ASSET_PATH } from "./googlebot-l
 import { buildUrlInspectionCandidates, inspectionCandidateKey } from "./url-inspection-candidates.js";
 import { buildInternalLinkGraph } from "./link-graph.js";
 import { analyzeUrlVariantGroup, comparisonUrl, normalizeReportUrl, urlVariantFamily } from "./url-policy.js";
-import { apiPost } from "./api-client.js";
+import { apiPost, formatApiError } from "./api-client.js";
+import { downloadCsvFile, downloadTextFile } from "./downloads.js";
+import { buildStandaloneHtmlReport } from "./html-report.js";
+import {
+  buildUrlSourceSets,
+  pageMatchesUrlFilters,
+  urlFilterCounts,
+} from "./report-filters.js";
+import {
+  loadHistory,
+  loadHistoryLimit,
+  saveHistory,
+  saveHistoryLimit,
+  toHistoryEntry,
+} from "./history.js";
+import {
+  buildGscOpportunities,
+  buildGscRowMap,
+  buildSearchVisibility,
+  uniqueGscRows,
+} from "./gsc-summary.js";
+import {
+  diagnoseInspectionResult,
+} from "./url-inspection-diagnostics.js";
 import {
   getGscStatus,
   inspectGscUrls,
-  loadGscSearchAnalytics,
 } from "./gsc-client.js";
 import {
   auditProgressView,
@@ -37,7 +65,20 @@ import {
 } from "./audit-jobs.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
 import { GscSitemapsPanel } from "./components/GscSitemapsPanel.jsx";
+import { SearchAnalyticsPanel } from "./components/SearchAnalyticsPanel.jsx";
+import { SearchConsoleImport } from "./components/SearchConsoleImport.jsx";
 import { SearchConsoleApiConfig } from "./components/SearchConsoleApiConfig.jsx";
+import { PrivacyDataPanel } from "./components/PrivacyDataPanel.jsx";
+import {
+  ComparisonPanel,
+  HistoryPanel,
+  RetainedJobsPanel,
+} from "./components/HistoryPanels.jsx";
+import {
+  ImportantPageFreshness,
+  IndexCoveragePriorities,
+  UrlAlignmentMatrix,
+} from "./components/UrlInspectionDiagnostics.jsx";
 import {
   detectLanguage,
   dictionaries,
@@ -48,7 +89,9 @@ import {
   gscUiText,
   inspectionDiagnosisText,
   structuredDiagnosticText,
+  workspaceText,
 } from "./i18n.js";
+import { loadWorkspaceView, saveWorkspaceView } from "./workspace-views.js";
 import "./styles.css";
 
 const severityLabels = { critical: "Critical", warning: "Warning", notice: "Notice" };
@@ -77,7 +120,15 @@ function Stat({ label, value, tone }) {
 function ProgressBar({ progress }) {
   if (!progress) return null;
   return (
-    <section className="progress-panel">
+    <section
+      className="progress-panel"
+      role="progressbar"
+      aria-label={progress.label}
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow={Math.max(0, Math.min(100, Number(progress.value) || 0))}
+      aria-valuetext={`${progress.label}: ${progress.value}%`}
+    >
       <div className="progress-top">
         <strong>{progress.label}</strong>
         <span>{progress.value}%</span>
@@ -122,7 +173,7 @@ function RuntimePanel({ loading, jobStatus, progress, runtimeMeta, t }) {
       <div className="panel-head">
         <h2>{t.runtime}</h2>
       </div>
-      <div className="runtime-grid">
+      <div className="runtime-grid" aria-live="polite" aria-atomic="true">
         <div className="runtime-item">
           <strong>{t.status}</strong>
           <span>{jobStatus || "idle"}</span>
@@ -237,7 +288,12 @@ function PageRow({ page, t }) {
     page.structuredData != null;
   return (
     <article className="row">
-      <button className="row-main" type="button" onClick={() => setOpen((value) => !value)}>
+      <button
+        className="row-main"
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
         <ChevronDown className={open ? "rotated" : ""} size={18} />
         <div className="url-cell">
           <span>{page.url}</span>
@@ -620,12 +676,6 @@ function InternationalSignals({ signals, t, onSelectIssue }) {
   );
 }
 
-function csvCell(value) {
-  const text = String(value ?? "");
-  if (/[",\n]/.test(text)) return `"${text.replaceAll('"', '""')}"`;
-  return text;
-}
-
 function issueCategories(page) {
   const issueTypes = new Set((page.issues || []).map((issue) => issue.type));
   const categories = [];
@@ -677,21 +727,9 @@ function classifyGscForPage(page, gsc) {
   return "has_visibility";
 }
 
-function downloadCsvFile(filename, rows) {
-  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const href = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = href;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(href);
-}
-
-function downloadCsv(report, gscRows = []) {
+function downloadCsv(report, gscRows = [], filteredPages = null) {
   const gscByUrl = buildGscRowMap(gscRows);
+  const exportPages = filteredPages || report.pages || [];
   const rows = [
     [
       "url",
@@ -714,7 +752,7 @@ function downloadCsv(report, gscRows = []) {
     ],
   ];
 
-  for (const page of report.pages || []) {
+  for (const page of exportPages) {
     const gsc = gscByUrl.get(normalizeReportUrl(page.url));
     const gscClassification = classifyGscForPage(page, gsc);
     const baseRow = [
@@ -754,7 +792,7 @@ function downloadCsv(report, gscRows = []) {
   }
 
   const sitemapKeys = new Set((report.pages || []).map((page) => normalizeReportUrl(page.url)));
-  for (const row of (gscRows || []).filter((item) => !sitemapKeys.has(item.key))) {
+  for (const row of filteredPages ? [] : (gscRows || []).filter((item) => !sitemapKeys.has(item.key))) {
     rows.push([
       row.page,
       "",
@@ -778,16 +816,14 @@ function downloadCsv(report, gscRows = []) {
 
   downloadCsvFile(`soos-audit-${new Date().toISOString().slice(0, 19).replaceAll(":", "-")}.csv`, rows);
 }
-function downloadTextFile(filename, content) {
-  const blob = new Blob([content], { type: "text/plain;charset=utf-8;" });
-  const href = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = href;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(href);
+
+function downloadHtmlReport(report, gscRows, language) {
+  const timestamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
+  downloadTextFile(
+    `soos-report-${timestamp}.html`,
+    buildStandaloneHtmlReport(report, { language, gscRows }),
+    "text/html;charset=utf-8;",
+  );
 }
 
 function buildSummaryReport(report) {
@@ -861,470 +897,6 @@ function downloadSummary(report) {
   downloadTextFile(filename, buildSummaryReport(report));
 }
 
-const HISTORY_KEY = "soos.auditHistory.v1";
-const HISTORY_LIMIT_KEY = "soos.auditHistory.limit.v1";
-const HISTORY_LIMIT_OPTIONS = [5, 10, 12, 20, 30];
-
-function loadHistory() {
-  try {
-    const raw = window.localStorage.getItem(HISTORY_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveHistory(entries) {
-  try {
-    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
-  } catch {
-    // ignore storage failures
-  }
-}
-
-function loadHistoryLimit() {
-  try {
-    const raw = Number(window.localStorage.getItem(HISTORY_LIMIT_KEY) || 12);
-    return HISTORY_LIMIT_OPTIONS.includes(raw) ? raw : 12;
-  } catch {
-    return 12;
-  }
-}
-
-function saveHistoryLimit(limit) {
-  try {
-    window.localStorage.setItem(HISTORY_LIMIT_KEY, String(limit));
-  } catch {
-    // ignore storage failures
-  }
-}
-
-function toHistoryEntry(report) {
-  return {
-    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-    scannedAt: report.scannedAt,
-    input: report.input,
-    summary: report.summary,
-    executiveSummary: report.executiveSummary,
-    statusFlags: report.statusFlags,
-    issueFingerprints: (report.pages || []).flatMap((page) =>
-      (page.issues || []).map((issue) => ({
-        key: `${normalizeReportUrl(page.url)}|${issue.type}`,
-        url: page.url,
-        type: issue.type,
-        severity: issue.severity,
-      })),
-    ).slice(0, 10000),
-  };
-}
-
-function trendLabel(current, previous, t) {
-  if (previous == null || current == null) return null;
-  if (current > previous) return t.trendUp;
-  if (current < previous) return t.trendDown;
-  return t.trendFlat;
-}
-
-function buildIssueDelta(previousEntry, currentReport) {
-  if (!previousEntry || !currentReport) {
-    return { improved: [], worsened: [], regressions: [], resolved: [] };
-  }
-
-  const previousCounts = previousEntry.summary?.issueCounts || {};
-  const currentCounts = currentReport.summary?.issueCounts || {};
-  const severities = ["critical", "warning", "notice"];
-
-  const improved = [];
-  const worsened = [];
-
-  for (const severity of severities) {
-    const before = previousCounts[severity] || 0;
-    const after = currentCounts[severity] || 0;
-    if (after < before) {
-      improved.push({ severity, delta: before - after });
-    } else if (after > before) {
-      worsened.push({ severity, delta: after - before });
-    }
-  }
-
-  const previousIssues = new Map((previousEntry.issueFingerprints || []).map((item) => [item.key, item]));
-  const currentIssues = new Map(
-    (currentReport.pages || []).flatMap((page) =>
-      (page.issues || []).map((issue) => ({
-        key: `${normalizeReportUrl(page.url)}|${issue.type}`,
-        url: page.url,
-        type: issue.type,
-        severity: issue.severity,
-      })),
-    ).map((item) => [item.key, item]),
-  );
-  const regressions = [...currentIssues].filter(([key]) => !previousIssues.has(key)).map(([, item]) => item);
-  const resolved = [...previousIssues].filter(([key]) => !currentIssues.has(key)).map(([, item]) => item);
-  return { improved, worsened, regressions, resolved };
-}
-
-function summarizeCategoryCountsFromReportLike(reportLike) {
-  const flags = reportLike?.statusFlags || [];
-  const counts = {
-    robots: 0,
-    sitemap: 0,
-    canonical: 0,
-    international: 0,
-    content: 0,
-    fetch: 0,
-  };
-
-  for (const flag of flags) {
-    if (flag.key === "robots_blocked") counts.robots += 1;
-    if (flag.key === "sitemap_misaligned") counts.sitemap += 1;
-    if (flag.key === "canonical_conflict") counts.canonical += 1;
-    if (flag.key === "international_mismatch") counts.international += 1;
-  }
-
-  return counts;
-}
-
-function buildCategoryDelta(previousEntry, currentReport) {
-  const previous = summarizeCategoryCountsFromReportLike(previousEntry);
-  const current = summarizeCategoryCountsFromReportLike(currentReport);
-  const keys = ["robots", "sitemap", "canonical", "international", "content", "fetch"];
-
-  return keys
-    .map((key) => ({
-      key,
-      before: previous[key] || 0,
-      after: current[key] || 0,
-      delta: (current[key] || 0) - (previous[key] || 0),
-    }))
-    .filter((item) => item.before !== item.after);
-}
-
-function HistoryPanel({ history, currentReport, historyLimit, t, onRerun, onCompare, onDelete, onClear, onLimitChange }) {
-  const [expandedId, setExpandedId] = useState(null);
-
-  return (
-    <section className="panel history-panel">
-      <div className="panel-head">
-        <h2>{t.history}</h2>
-        <div className="history-head-actions">
-          <label className="history-limit">
-            <span>{t.keepRecent}</span>
-            <select value={historyLimit} onChange={(event) => onLimitChange(Number(event.target.value))}>
-              {HISTORY_LIMIT_OPTIONS.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className="export-button" type="button" onClick={onClear} disabled={!history.length}>
-            {t.clearHistory}
-          </button>
-          <span>{history.length}</span>
-        </div>
-      </div>
-      {!history.length ? (
-        <p className="none">{t.noHistory}</p>
-      ) : (
-        <div className="history-list">
-          {history.map((entry) => (
-            <article className="history-card" key={entry.id}>
-              <div className="history-top">
-                <strong>{entry.input?.originalUrl || entry.input?.sitemapUrl}</strong>
-                <small>{new Date(entry.scannedAt).toLocaleString()}</small>
-              </div>
-              <div className="history-stats">
-                <span>{t.historyScore}: {entry.summary?.healthScore ?? "-"}</span>
-                <span>{t.historyUrls}: {entry.summary?.urlCount ?? 0}</span>
-                <span>{t.historyAffected}: {entry.summary?.affectedUrlCount ?? 0}</span>
-              </div>
-              {currentReport && currentReport.scannedAt !== entry.scannedAt ? (
-                <div className="history-compare">
-                  <small>{t.historyScore}: {trendLabel(currentReport.summary?.healthScore, entry.summary?.healthScore, t) || "-"}</small>
-                  <small>
-                    {t.historyAffected}: {trendLabel(entry.summary?.affectedUrlCount, currentReport.summary?.affectedUrlCount, {
-                      ...t,
-                      trendUp: t.trendDown,
-                      trendDown: t.trendUp,
-                      trendFlat: t.trendFlat,
-                    }) || "-"}
-                  </small>
-                </div>
-              ) : null}
-              {expandedId === entry.id ? (
-                <div className="history-detail">
-                  {entry.statusFlags?.length ? (
-                    <div className="status-flag-list history-flags">
-                      {entry.statusFlags.map((flag) => (
-                        <Badge key={`${entry.id}-${flag.key}`} severity={flag.severity}>
-                          {flag.label}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : null}
-                  {entry.executiveSummary?.headline ? (
-                    <div className="executive-actions">
-                      <small>{entry.executiveSummary.headline}</small>
-                      {(entry.executiveSummary.topActions || []).map((action) => (
-                        <small key={`${entry.id}-${action}`}>{action}</small>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              <div className="history-actions">
-                <button
-                  className="export-button"
-                  type="button"
-                  onClick={() => setExpandedId((current) => (current === entry.id ? null : entry.id))}
-                >
-                  {expandedId === entry.id ? t.hideDetails : t.details}
-                </button>
-                <button className="export-button" type="button" onClick={() => onRerun(entry)}>
-                  {t.rerun}
-                </button>
-                <button className="export-button" type="button" onClick={() => onCompare(entry)}>
-                  {t.compareToCurrent}
-                </button>
-                <button className="export-button" type="button" onClick={() => onDelete(entry.id)}>
-                  {t.deleteHistory}
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function RetainedJobsPanel({ jobs, loading, t, onRefresh, onOpen, onContinue, onDelete }) {
-  return (
-    <section className="panel retained-jobs">
-      <div className="panel-head">
-        <div>
-          <h2>{t.retainedJobs}</h2>
-          <small>{t.retainedJobsHelp}</small>
-        </div>
-        <div className="history-head-actions">
-          <button className="export-button" type="button" onClick={onRefresh} disabled={loading}>
-            {t.refreshJobs}
-          </button>
-          <span>{jobs.length}</span>
-        </div>
-      </div>
-      {!jobs.length ? (
-        <p className="none">{t.noRetainedJobs}</p>
-      ) : (
-        <div className="retained-job-list">
-          {jobs.map((job) => {
-            const canContinue = ["queued", "paused", "stopped", "error", "interrupted"].includes(job.status);
-            return (
-              <article className="retained-job-row" key={job.id}>
-                <div>
-                  <strong>{job.request?.sitemapUrl || job.id}</strong>
-                  <small>{job.id}</small>
-                </div>
-                <Badge severity={job.status === "done" ? "ok" : job.status === "error" || job.status === "interrupted" ? "warning" : "notice"}>
-                  {job.status}
-                </Badge>
-                <div className="retained-job-meta">
-                  <small>{t.jobProgress}: {job.progress?.percent || 0}%</small>
-                  <small>{t.jobUpdated}: {new Date(job.updatedAt).toLocaleString()}</small>
-                  {job.summary ? <small>{t.historyScore}: {job.summary.healthScore ?? "-"} / {t.historyUrls}: {job.summary.urlCount ?? 0}</small> : null}
-                </div>
-                <div className="history-actions">
-                  {job.status === "done" ? (
-                    <button className="export-button" type="button" onClick={() => onOpen(job.id)}>{t.openReport}</button>
-                  ) : null}
-                  {canContinue ? (
-                    <button className="export-button" type="button" onClick={() => onContinue(job)}>{t.continueJob}</button>
-                  ) : null}
-                  {!["running", "queued"].includes(job.status) ? (
-                    <button className="export-button" type="button" onClick={() => onDelete(job.id)}>{t.deleteHistory}</button>
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function ComparisonPanel({ comparisonEntry, report, t }) {
-  if (!comparisonEntry || !report) return null;
-  const delta = buildIssueDelta(comparisonEntry, report);
-  const categoryDelta = buildCategoryDelta(comparisonEntry, report);
-
-  return (
-    <section className="panel executive-summary">
-      <div className="panel-head">
-        <h2>{t.compareToCurrent}</h2>
-      </div>
-      <div className="executive-body">
-        <p>
-          {t.historyScore}: {comparisonEntry.summary?.healthScore ?? "-"} {"->"} {report.summary?.healthScore ?? "-"};{" "}
-          {t.historyAffected}: {comparisonEntry.summary?.affectedUrlCount ?? 0} {"->"} {report.summary?.affectedUrlCount ?? 0}
-        </p>
-        {delta.improved.length || delta.worsened.length ? (
-          <div className="delta-grid">
-            {delta.improved.length ? (
-              <div className="delta-card delta-good">
-                <strong>{t.improvedIssues}</strong>
-                {delta.improved.map((item) => (
-                  <small key={`improved-${item.severity}`}>{item.severity}: -{item.delta}</small>
-                ))}
-              </div>
-            ) : null}
-            {delta.worsened.length ? (
-              <div className="delta-card delta-bad">
-                <strong>{t.worsenedIssues}</strong>
-                {delta.worsened.map((item) => (
-                  <small key={`worsened-${item.severity}`}>{item.severity}: +{item.delta}</small>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="executive-actions">
-            <small>{t.noDelta}</small>
-          </div>
-        )}
-        {categoryDelta.length ? (
-          <div className="delta-grid">
-            <div className="delta-card">
-              <strong>{t.categoryDelta}</strong>
-              {categoryDelta.map((item) => (
-                <small key={item.key}>
-                  {item.key}: {item.before} {"->"} {item.after}
-                </small>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        {comparisonEntry.issueFingerprints ? (
-          <div className="delta-grid">
-            <div className="delta-card delta-bad">
-              <strong>{t.regressions}: {delta.regressions.length}</strong>
-              {delta.regressions.length
-                ? delta.regressions.slice(0, 20).map((item) => <small key={`regression-${item.key}`}>{item.severity} · {item.type} · {item.url}</small>)
-                : <small>{t.noRegressions}</small>}
-            </div>
-            <div className="delta-card delta-good">
-              <strong>{t.resolvedIssues}: {delta.resolved.length}</strong>
-              {delta.resolved.slice(0, 20).map((item) => <small key={`resolved-${item.key}`}>{item.severity} · {item.type} · {item.url}</small>)}
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-
-
-function detectCsvDelimiter(text) {
-  const firstLine = text.split(/\r?\n/).find((line) => line.trim()) || "";
-  const candidates = [",", "\t", ";"];
-  return candidates
-    .map((delimiter) => ({ delimiter, count: firstLine.split(delimiter).length }))
-    .sort((a, b) => b.count - a.count)[0]?.delimiter || ",";
-}
-
-function parseCsvRows(text) {
-  const delimiter = detectCsvDelimiter(text);
-  const rows = [];
-  let row = [];
-  let cell = "";
-  let inQuotes = false;
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    const next = text[index + 1];
-    if (char === '"' && inQuotes && next === '"') {
-      cell += '"';
-      index += 1;
-    } else if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (delimiter !== "whitespace" && char === delimiter && !inQuotes) {
-      row.push(cell);
-      cell = "";
-    } else if ((char === "\n" || char === "\r") && !inQuotes) {
-      if (char === "\r" && next === "\n") index += 1;
-      row.push(cell);
-      if (row.some((value) => value.trim())) rows.push(row);
-      row = [];
-      cell = "";
-    } else {
-      cell += char;
-    }
-  }
-  row.push(cell);
-  if (row.some((value) => value.trim())) rows.push(row);
-  return rows;
-}
-function parseSearchConsoleCsv(text) {
-  const rows = parseCsvRows(text);
-  if (rows.length < 2) return [];
-  const normalizeHeader = (header) => header.trim().toLowerCase().replace(/^\ufeff/, "");
-  const pageHeaders = [
-    "page",
-    "pages",
-    "url",
-    "landing page",
-    "\u9875\u9762",
-    "\u7f51\u9875",
-    "\u7db2\u5740",
-    "\u7db2\u9801",
-    "\u6392\u540d\u9760\u524d\u7684\u7f51\u9875",
-    "\u6392\u540d\u9760\u524d\u7684\u7db2\u9801",
-  ];
-  const clickHeaders = ["clicks", "\u70b9\u51fb\u6b21\u6570", "\u9ede\u64ca\u6b21\u6578"];
-  const impressionHeaders = ["impressions", "\u5c55\u793a\u6b21\u6570", "\u5c55\u793a", "\u66dd\u5149\u6b21\u6578", "\u66dd\u5149"];
-  const ctrHeaders = ["ctr", "\u70b9\u51fb\u7387", "\u9ede\u95b1\u7387"];
-  const positionHeaders = ["position", "average position", "avg position", "\u6392\u540d", "\u5e73\u5747\u6392\u540d", "\u5e73\u5747\u6392\u540d\u4f4d\u7f6e"];
-
-  const headerCandidates = rows.slice(0, 10).map((row, index) => ({
-    index,
-    headers: row.map(normalizeHeader),
-  }));
-  const findHeaderIn = (headers, candidates) => candidates.map((candidate) => headers.indexOf(candidate)).find((index) => index >= 0);
-  const headerMatch = headerCandidates.find(({ headers }) => {
-    const pageIndex = findHeaderIn(headers, pageHeaders);
-    const clicksIndex = findHeaderIn(headers, clickHeaders);
-    return pageIndex !== undefined && clicksIndex !== undefined;
-  });
-  if (!headerMatch) return [];
-
-  const headers = headerMatch.headers;
-  const findHeader = (candidates) => findHeaderIn(headers, candidates);
-  const pageIndex = findHeader(pageHeaders);
-  const clicksIndex = findHeader(clickHeaders);
-  const impressionsIndex = findHeader(impressionHeaders);
-  const ctrIndex = findHeader(ctrHeaders);
-  const positionIndex = findHeader(positionHeaders);
-  if (pageIndex === undefined) return [];
-  return rows.slice(headerMatch.index + 1).map((row) => {
-    const page = row[pageIndex]?.trim();
-    if (!page || !/^https?:\/\//i.test(page)) return null;
-    const numberValue = (index) => {
-      if (index === undefined) return null;
-      const raw = String(row[index] || "").replace(/[% ,]/g, "");
-      const value = Number(raw);
-      return Number.isFinite(value) ? value : null;
-    };
-    return {
-      page,
-      key: normalizeReportUrl(page),
-      clicks: numberValue(clicksIndex),
-      impressions: numberValue(impressionsIndex),
-      ctr: numberValue(ctrIndex),
-      position: numberValue(positionIndex),
-    };
-  }).filter(Boolean);
-}
 function summarizeGscRows(report, rows) {
   const pageKeys = new Set((report?.pages || []).map((page) => normalizeReportUrl(page.url)));
   const matched = rows.filter((row) => pageKeys.has(row.key));
@@ -1347,478 +919,6 @@ function summarizeGscRows(report, rows) {
 
 
 
-
-function defaultGscDateRange() {
-  const end = new Date();
-  end.setDate(end.getDate() - 2);
-  const start = new Date(end);
-  start.setDate(start.getDate() - 27);
-  return {
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
-  };
-}
-
-
-
-
-
-
-
-
-
-
-
-function buildSearchAnalyticsInsights(rows, dimension, language = "en") {
-  const locale = language === "zh-CN" ? "zh-CN" : language === "zh-TW" ? "zh-TW" : "en";
-  const insightText = {
-    "zh-CN": {
-      low_ctr: ["高展示、低点击率", "重写标题和 meta description，使摘要更符合查询意图并提高点击吸引力。"],
-      snippet_gap: ["排名靠前但几乎没有点击", "检查页面是否匹配查询意图，并改进标题、描述和首屏答案。"],
-      striking_distance: ["接近首页顶部的排名机会", "加强回答该查询的内容段落，增加内部链接并提高摘要相关性。"],
-      page_two: ["第二页排名机会", "扩展内容深度，从更强的相关页面增加内部链接，并对比首页结果的内容差距。"],
-      intent_spread: ["页面覆盖多个查询意图", "围绕最强的搜索意图重新组织页面，并检查是否需要拆分内容。"],
-    },
-    "zh-TW": {
-      low_ctr: ["高曝光、低點閱率", "重寫標題和 meta description，使摘要更符合查詢意圖並提高點擊吸引力。"],
-      snippet_gap: ["排名靠前但幾乎沒有點擊", "檢查頁面是否符合查詢意圖，並改善標題、描述和首屏答案。"],
-      striking_distance: ["接近首頁頂部的排名機會", "加強回答該查詢的內容段落，增加內部連結並提高摘要相關性。"],
-      page_two: ["第二頁排名機會", "擴充內容深度，從更強的相關頁面增加內部連結，並比較首頁結果的內容差距。"],
-      intent_spread: ["頁面涵蓋多個查詢意圖", "圍繞最強的搜尋意圖重新組織頁面，並檢查是否需要拆分內容。"],
-    },
-  };
-  if (dimension !== "page_query") return [];
-  const pageQueryRows = (rows || []).filter((row) => row.page && row.query);
-  const insights = [];
-  const seenInsightDetails = new Set();
-  function addInsight(insight) {
-    const key = insight.detail;
-    if (seenInsightDetails.has(key)) return;
-    seenInsightDetails.add(key);
-    insights.push(insight);
-  }
-  const lowCtr = pageQueryRows
-    .filter((row) => (row.impressions || 0) >= 100 && typeof row.ctr === "number" && row.ctr < 0.01)
-    .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
-    .slice(0, 5);
-  for (const row of lowCtr) {
-    addInsight({
-      type: "low_ctr",
-      severity: "warning",
-      title: "High impressions, low CTR",
-      detail: `${row.query} on ${row.page}`,
-      action: "Rewrite title/meta description to match the query intent and make the result more clickable.",
-      metrics: `${row.impressions} impressions, ${((row.ctr || 0) * 100).toFixed(2)}% CTR, position ${typeof row.position === "number" ? row.position.toFixed(1) : "-"}`,
-    });
-  }
-  const highRankLowClicks = pageQueryRows
-    .filter((row) => typeof row.position === "number" && row.position <= 3 && (row.impressions || 0) >= 100 && (row.clicks || 0) <= 1)
-    .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
-    .slice(0, 5);
-  for (const row of highRankLowClicks) {
-    addInsight({
-      type: "snippet_gap",
-      severity: "warning",
-      title: "Top ranking, almost no clicks",
-      detail: `${row.query} on ${row.page}`,
-      action: "Check whether the query intent matches the page and improve the title, meta description, and visible answer near the top.",
-      metrics: `${row.impressions} impressions, ${row.clicks || 0} clicks, position ${row.position.toFixed(1)}`,
-    });
-  }
-  const strikingDistance = pageQueryRows
-    .filter((row) => typeof row.position === "number" && row.position >= 4 && row.position <= 10 && (row.impressions || 0) >= 50)
-    .sort((a, b) => (a.position || 99) - (b.position || 99))
-    .slice(0, 5);
-  for (const row of strikingDistance) {
-    addInsight({
-      type: "striking_distance",
-      severity: "notice",
-      title: "Ranking within striking distance",
-      detail: `${row.query} on ${row.page}`,
-      action: "Strengthen the section that answers this query, add internal links, and improve snippet relevance.",
-      metrics: `${row.impressions} impressions, position ${row.position.toFixed(1)}`,
-    });
-  }
-  const pageTwo = pageQueryRows
-    .filter((row) => typeof row.position === "number" && row.position > 10 && row.position <= 20 && (row.impressions || 0) >= 100)
-    .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
-    .slice(0, 5);
-  for (const row of pageTwo) {
-    addInsight({
-      type: "page_two",
-      severity: "notice",
-      title: "Page two opportunity",
-      detail: `${row.query} on ${row.page}`,
-      action: "Expand the answer depth, add internal links from stronger related pages, and compare content gaps against page-one results.",
-      metrics: `${row.impressions} impressions, position ${row.position.toFixed(1)}`,
-    });
-  }
-  const byPage = new Map();
-  for (const row of pageQueryRows) {
-    if ((row.impressions || 0) < 30) continue;
-    const list = byPage.get(row.page) || [];
-    list.push(row);
-    byPage.set(row.page, list);
-  }
-  for (const [page, list] of byPage.entries()) {
-    const queryCount = list.length;
-    const impressions = list.reduce((sum, row) => sum + (row.impressions || 0), 0);
-    if (queryCount < 5 || impressions < 300) continue;
-    const topQueries = list
-      .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
-      .slice(0, 3)
-      .map((row) => row.query)
-      .join(", ");
-    addInsight({
-      type: "intent_spread",
-      severity: "notice",
-      title: "Page ranks for many queries",
-      detail: page,
-      action: `Cluster the page around the strongest intent. Top queries: ${topQueries}.`,
-      metrics: `${queryCount} queries, ${impressions} impressions`,
-    });
-  }
-  return insights.slice(0, 12).map((insight) => {
-    const localized = insightText[locale]?.[insight.type];
-    return localized ? { ...insight, title: localized[0], action: localized[1] } : insight;
-  });
-}
-
-function classifySearchQueryOpportunity(row) {
-  if ((row.impressions || 0) >= 100 && typeof row.ctr === "number" && row.ctr < 0.01) return "low_ctr";
-  if (typeof row.position === "number" && row.position >= 4 && row.position <= 10 && (row.impressions || 0) >= 50) return "striking_distance";
-  if (typeof row.position === "number" && row.position > 10 && row.position <= 20 && (row.impressions || 0) >= 100) return "page_two";
-  return "monitor";
-}
-
-function keywordOpportunityAction(type) {
-  if (type === "low_ctr") return "Rewrite title/meta description and align snippet copy with query intent.";
-  if (type === "snippet_gap") return "Improve title/meta description and verify the page answers the query intent clearly.";
-  if (type === "striking_distance") return "Improve the answer section, add internal links, and strengthen topical relevance.";
-  if (type === "page_two") return "Expand content depth and add internal links from stronger related pages.";
-  return "Monitor performance and prioritize if impressions or position improve.";
-}
-
-function downloadKeywordOpportunitiesCsv(rows, insights) {
-  const insightByDetail = new Map((insights || []).map((insight) => [insight.detail, insight]));
-  const csvRows = [
-    ["page", "query", "clicks", "impressions", "ctr", "position", "opportunity_type", "recommended_action"],
-  ];
-  for (const row of (rows || []).filter((item) => item.page && item.query)) {
-    const insight = insightByDetail.get(`${row.query} on ${row.page}`) || insightByDetail.get(row.page);
-    const type = insight?.type || classifySearchQueryOpportunity(row);
-    csvRows.push([
-      row.page,
-      row.query,
-      row.clicks ?? 0,
-      row.impressions ?? 0,
-      typeof row.ctr === "number" ? (row.ctr * 100).toFixed(2) : "",
-      typeof row.position === "number" ? row.position.toFixed(1) : "",
-      type,
-      insight?.action || keywordOpportunityAction(type),
-    ]);
-  }
-  downloadCsvFile(`soos-keyword-opportunities-${new Date().toISOString().slice(0, 19).replaceAll(":", "-")}.csv`, csvRows);
-}
-
-function SearchAnalyticsPanel({ status, siteUrl, onRows, language }) {
-  const copy = gscDataText[language] || gscDataText.en;
-  const defaults = useMemo(() => defaultGscDateRange(), []);
-  const [startDate, setStartDate] = useState(defaults.startDate);
-  const [endDate, setEndDate] = useState(defaults.endDate);
-  const [dimension, setDimension] = useState("page");
-  const [loading, setLoading] = useState(false);
-  const [summary, setSummary] = useState(null);
-  const [rows, setRows] = useState([]);
-  const insights = useMemo(() => buildSearchAnalyticsInsights(rows, summary?.dimension || dimension, language), [dimension, language, rows, summary?.dimension]);
-  const [error, setError] = useState("");
-
-  async function loadAnalytics(event) {
-    event.preventDefault();
-    if (!status?.configured) {
-      setError(copy.connectFirst);
-      return;
-    }
-    if (!siteUrl.trim()) {
-      setError(copy.propertyFirst);
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const body = await loadGscSearchAnalytics({
-        startDate,
-        endDate,
-        siteUrl,
-        dimension,
-      });
-      if (body.dimension === "page") onRows(body.rows || []);
-      setRows(body.rows || []);
-      setSummary({
-        rows: body.rows?.length || 0,
-        clicks: (body.rows || []).reduce((sum, row) => sum + (row.clicks || 0), 0),
-        impressions: (body.rows || []).reduce((sum, row) => sum + (row.impressions || 0), 0),
-        dimension: body.dimension || dimension,
-      });
-    } catch (err) {
-      setError(err.message || String(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <section className="panel search-analytics-panel">
-      <div className="panel-head">
-        <h2>{copy.analyticsTitle}</h2>
-        <span>{status?.configured ? copy.ready : copy.configureFirst}</span>
-      </div>
-      <form className="search-analytics-body" onSubmit={loadAnalytics}>
-        <div className="search-analytics-fields">
-          <label>
-            <strong>{copy.startDate}</strong>
-            <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-          </label>
-          <label>
-            <strong>{copy.endDate}</strong>
-            <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
-          </label>
-          <label>
-            <strong>{copy.dimension}</strong>
-            <select value={dimension} onChange={(event) => setDimension(event.target.value)}>
-              <option value="page">{copy.page}</option>
-              <option value="query">{copy.query}</option>
-              <option value="page_query">{copy.pageQuery}</option>
-              <option value="country">{copy.country}</option>
-              <option value="device">{copy.device}</option>
-            </select>
-          </label>
-        </div>
-        <div className="gsc-api-actions">
-          <button className="export-button" type="submit" disabled={loading}>
-            {loading ? copy.loading : copy.load}
-          </button>
-          {dimension === "page_query" && rows.length ? (
-            <button className="export-button" type="button" onClick={() => downloadKeywordOpportunitiesCsv(rows, insights)}>
-              {copy.export}
-            </button>
-          ) : null}
-        </div>
-        {summary ? (
-          <small>{summary.rows} {copy.rowsLoaded}, {summary.clicks} {copy.clicks}, {summary.impressions} {copy.impressions}</small>
-        ) : (
-          <small>{copy.analyticsHelp}</small>
-        )}
-        {dimension !== "page" ? <small>{copy.pageOnly}</small> : null}
-        {insights.length ? (
-          <div className="search-analytics-insights">
-            {insights.map((insight, index) => (
-              <article className={`search-analytics-insight ${insight.severity}`} key={`${insight.type}-${index}`}>
-                <strong>{insight.title}</strong>
-                <small>{insight.detail}</small>
-                <span>{insight.metrics}</span>
-                <em>{insight.action}</em>
-              </article>
-            ))}
-          </div>
-        ) : dimension === "page_query" && rows.length ? (
-          <small>{copy.noOpportunities}</small>
-        ) : null}
-        {rows.length ? (
-          <div className="search-analytics-results">
-            <div className="search-analytics-result head">
-              <span>{copy.dimension}</span>
-              <span>{copy.clicks}</span>
-              <span>{copy.impressions}</span>
-              <span>CTR</span>
-              <span>{copy.position}</span>
-            </div>
-            {rows.slice(0, 12).map((row, index) => (
-              <div className="search-analytics-result" key={`${row.label || row.page || index}-${index}`}>
-                <strong title={row.label || row.page}>{row.label || row.page || row.query || row.country || row.device}</strong>
-                <span>{row.clicks ?? 0}</span>
-                <span>{row.impressions ?? 0}</span>
-                <span>{typeof row.ctr === "number" ? `${(row.ctr * 100).toFixed(2)}%` : "-"}</span>
-                <span>{typeof row.position === "number" ? row.position.toFixed(1) : "-"}</span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {error ? <small className="gsc-api-error">{error}</small> : null}
-      </form>
-    </section>
-  );
-}
-function SearchConsoleImport({ rows, onImport, onClear, language }) {
-  const copy = gscSupportingText[language] || gscSupportingText.en;
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-
-  async function handleFile(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setError("");
-    setMessage(`${copy.reading} ${file.name}...`);
-    try {
-      const text = await file.text();
-      const parsed = parseSearchConsoleCsv(text);
-      if (!parsed.length) {
-        setError(copy.noRows);
-        setMessage(`${file.name}: 0 ${copy.parsed}`);
-        onImport([]);
-      } else {
-        onImport(parsed);
-        setMessage(`${file.name}: ${parsed.length} ${copy.imported}`);
-      }
-    } catch (err) {
-      setError(err.message || String(err));
-      setMessage(`${file.name}: ${copy.importFailed}`);
-    } finally {
-      event.target.value = "";
-    }
-  }
-
-  function clearImportedRows() {
-    onClear();
-    setMessage(copy.cleared);
-    setError("");
-  }
-
-  return (
-    <section className="panel gsc-import">
-      <div className="panel-head">
-        <h2>{copy.csvTitle}</h2>
-        <span>{rows.length ? `${rows.length} ${copy.rowsLoaded}` : copy.optional}</span>
-      </div>
-      <div className="gsc-import-body">
-        <div>
-          <strong>{copy.importTitle}</strong>
-          <small>{copy.importHelp}</small>
-          {message ? <small className="gsc-import-message">{message}</small> : null}
-          {error ? <small className="gsc-import-error">{error}</small> : null}
-        </div>
-        <div className="gsc-import-actions">
-          <label className="export-button file-button">
-            {copy.importButton}
-            <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values,text/plain" onChange={handleFile} />
-          </label>
-          {rows.length ? (
-            <button className="export-button" type="button" onClick={clearImportedRows}>
-              {copy.clearButton}
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </section>
-  );
-}
-function buildGscRowMap(rows) {
-  return new Map((rows || []).map((row) => [row.key, row]));
-}
-
-function uniqueGscRows(rows) {
-  const byKey = new Map();
-  for (const row of rows || []) {
-    const key = row.key || normalizeReportUrl(row.page || "");
-    if (!key) continue;
-    const current = byKey.get(key);
-    if (!current || (row.impressions || 0) > (current.impressions || 0)) byKey.set(key, row);
-  }
-  return [...byKey.values()];
-}
-
-function isTechnicallyIndexablePage(page) {
-  const blockers = new Set([
-    "fetch_failed",
-    "http_error",
-    "robots_disallow",
-    "noindex",
-    "canonical_blocked",
-    "canonical_cross_host",
-    "canonical_mismatch",
-  ]);
-  return !(page.issues || []).some((issue) => blockers.has(issue.type));
-}
-
-function buildGscOpportunities(report, rows, language = "en") {
-  const copy = gscSupportingText[language] || gscSupportingText.en;
-  const pages = report?.pages || [];
-  const gscRows = uniqueGscRows(rows);
-  if (!gscRows.length || !pages.length) return [];
-
-  const gscByUrl = buildGscRowMap(gscRows);
-  const sitemapKeys = new Set(pages.map((page) => normalizeReportUrl(page.url)));
-  const technicallyIndexableNoImpressions = pages
-    .filter((page) => isTechnicallyIndexablePage(page))
-    .filter((page) => (gscByUrl.get(normalizeReportUrl(page.url))?.impressions || 0) === 0);
-  const lowRanking = pages.filter((page) => {
-    const row = gscByUrl.get(normalizeReportUrl(page.url));
-    return row && isTechnicallyIndexablePage(page) && (row.impressions || 0) > 0 && typeof row.position === "number" && row.position > 20;
-  });
-  const lowCtr = pages.filter((page) => {
-    const row = gscByUrl.get(normalizeReportUrl(page.url));
-    if (!row || !isTechnicallyIndexablePage(page) || (row.impressions || 0) < 100) return false;
-    const ctr = row.clicks != null && row.impressions ? row.clicks / row.impressions : null;
-    return ctr != null && ctr < 0.01;
-  });
-  const blockedWithVisibility = pages.filter((page) => {
-    const row = gscByUrl.get(normalizeReportUrl(page.url));
-    return row && (row.impressions || 0) > 0 && !isTechnicallyIndexablePage(page);
-  });
-  const gscNotInSitemap = gscRows.filter((row) => !sitemapKeys.has(row.key));
-
-  const makeItem = (key, title, severity, urls, detail) => ({
-    key,
-    title,
-    severity,
-    count: urls.length,
-    detail,
-    sampleUrls: urls.slice(0, 5).map((item) => item.url || item.page),
-  });
-
-  return [
-    makeItem(
-      "indexable_no_impressions",
-      copy.indexableNoImpressions[0],
-      "warning",
-      technicallyIndexableNoImpressions,
-      copy.indexableNoImpressions[1],
-    ),
-    makeItem(
-      "low_ranking",
-      copy.lowRanking[0],
-      "notice",
-      lowRanking,
-      copy.lowRanking[1],
-    ),
-    makeItem(
-      "low_ctr",
-      copy.lowCtr[0],
-      "notice",
-      lowCtr,
-      copy.lowCtr[1],
-    ),
-    makeItem(
-      "blocked_with_visibility",
-      copy.blockedVisibility[0],
-      "critical",
-      blockedWithVisibility,
-      copy.blockedVisibility[1],
-    ),
-    makeItem(
-      "gsc_not_in_sitemap",
-      copy.missingSitemap[0],
-      "notice",
-      gscNotInSitemap,
-      copy.missingSitemap[1],
-    ),
-  ]
-    .filter((item) => item.count > 0)
-    .sort((a, b) => {
-      const severityRank = { critical: 3, warning: 2, notice: 1 };
-      return (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0) || b.count - a.count;
-    });
-}
 
 function GscOpportunities({ report, rows, language }) {
   const copy = gscSupportingText[language] || gscSupportingText.en;
@@ -1855,32 +955,6 @@ function GscOpportunities({ report, rows, language }) {
     </section>
   );
 }
-function buildSearchVisibility(report) {
-  const pages = report?.pages || [];
-  const hasIssue = (page, types) => page.issues?.some((issue) => types.includes(issue.type));
-  const hardBlockers = [
-    "fetch_failed",
-    "http_error",
-    "robots_disallow",
-    "noindex",
-    "canonical_blocked",
-    "canonical_cross_host",
-  ];
-  const canonicalNotSelected = ["canonical_mismatch"];
-  const hardBlocked = pages.filter((page) => hasIssue(page, hardBlockers));
-  const canonicalized = pages.filter((page) => hasIssue(page, canonicalNotSelected));
-  const technicallyIndexable = pages.filter((page) => !hasIssue(page, hardBlockers) && !hasIssue(page, canonicalNotSelected));
-  const total = pages.length || 0;
-  const readiness = total ? Math.round((technicallyIndexable.length / total) * 100) : 0;
-  return {
-    total,
-    readiness,
-    technicallyIndexable: technicallyIndexable.length,
-    hardBlocked: hardBlocked.length,
-    canonicalized: canonicalized.length,
-  };
-}
-
 function SearchVisibility({ report, t, gscRows, language }) {
   if (!report?.pages?.length) return null;
   const label = (key, fallback) => t?.[key] || fallback;
@@ -1917,450 +991,6 @@ function SearchVisibility({ report, t, gscRows, language }) {
     </section>
   );
 }
-function buildUrlAlignmentRows(report, inspectionResults, copy) {
-  const pagesByUrl = new Map((report?.pages || []).map((page) => [normalizeReportUrl(page.url), page]));
-  return (inspectionResults || []).map((inspection) => {
-    const page = pagesByUrl.get(normalizeReportUrl(inspection.url)) || {};
-    const submittedUrl = inspection.url || page.url || "";
-    const fetchedUrl = page.finalUrl || submittedUrl;
-    const htmlCanonical = page.canonical || "";
-    const googleCanonical = inspection.googleCanonical || "";
-    const userCanonical = inspection.userCanonical || "";
-    const submittedKey = normalizeReportUrl(submittedUrl);
-    const fetchedKey = normalizeReportUrl(fetchedUrl);
-    const htmlKey = normalizeReportUrl(htmlCanonical);
-    const googleKey = normalizeReportUrl(googleCanonical);
-    const userKey = normalizeReportUrl(userCanonical);
-    const issueTypes = new Set((page.issues || []).map((issue) => issue.type));
-    const blocked = ["robots_disallow", "noindex", "http_error", "fetch_failed", "canonical_blocked"].some((type) => issueTypes.has(type));
-    const verdict = String(inspection.verdict || "").toUpperCase();
-    let state = "unknown";
-    let severity = "notice";
-    let label = copy.unknownAlignment;
-
-    if (!inspection.ok) {
-      state = "inspection_failed";
-      severity = "critical";
-      label = copy.inspectionFailed;
-    } else if (blocked) {
-      state = "blocked";
-      severity = "critical";
-      label = copy.crawlBlocked;
-    } else if (googleKey && googleKey !== submittedKey && googleKey !== fetchedKey && googleKey !== htmlKey) {
-      state = "google_canonical_differs";
-      severity = "warning";
-      label = copy.googleCanonicalDiffers;
-    } else if (submittedKey && fetchedKey && submittedKey !== fetchedKey) {
-      state = "redirect";
-      severity = "warning";
-      label = copy.submittedRedirects;
-    } else if (htmlKey && fetchedKey && htmlKey !== fetchedKey) {
-      state = "html_canonical_differs";
-      severity = "warning";
-      label = copy.htmlCanonicalDiffers;
-    } else if (verdict === "PASS") {
-      state = "aligned_indexed";
-      severity = "good";
-      label = copy.alignedIndexed;
-    } else if (
-      fetchedKey
-      && (!htmlKey || htmlKey === fetchedKey)
-      && (!userKey || userKey === fetchedKey)
-      && (!googleKey || googleKey === fetchedKey)
-    ) {
-      state = "aligned_not_indexed";
-      severity = "critical";
-      label = copy.alignedNotIndexed;
-    }
-
-    return {
-      submittedUrl,
-      fetchedUrl,
-      htmlCanonical,
-      userCanonical,
-      googleCanonical,
-      coverageState: inspection.coverageState || inspection.error || "",
-      state,
-      severity,
-      label,
-    };
-  });
-}
-
-function UrlAlignmentMatrix({ report, inspectionResults, copy }) {
-  const [filter, setFilter] = useState("all");
-  const rows = useMemo(() => buildUrlAlignmentRows(report, inspectionResults, copy), [copy, inspectionResults, report]);
-  const counts = rows.reduce((summary, row) => {
-    summary[row.state] = (summary[row.state] || 0) + 1;
-    return summary;
-  }, {});
-  const visibleRows = filter === "all" ? rows : rows.filter((row) => row.state === filter);
-  const states = [...new Set(rows.map((row) => row.state))];
-  if (!rows.length) return null;
-
-  function exportRows() {
-    downloadCsvFile("soos-google-url-alignment.csv", [
-      ["diagnosis", "state", "submitted_url", "fetched_url", "html_canonical", "gsc_user_canonical", "google_canonical", "coverage_state"],
-      ...rows.map((row) => [
-        row.label,
-        row.state,
-        row.submittedUrl,
-        row.fetchedUrl,
-        row.htmlCanonical,
-        row.userCanonical,
-        row.googleCanonical,
-        row.coverageState,
-      ]),
-    ]);
-  }
-
-  return (
-    <section className="url-alignment">
-      <div className="url-alignment-head">
-        <div>
-          <strong>{copy.alignmentTitle}</strong>
-          <small>{copy.alignmentHelp}</small>
-        </div>
-        <div className="url-alignment-actions">
-          <select value={filter} onChange={(event) => setFilter(event.target.value)}>
-            <option value="all">{copy.alignmentAll} ({rows.length})</option>
-            {states.map((state) => {
-              const row = rows.find((item) => item.state === state);
-              return <option value={state} key={state}>{row.label} ({counts[state]})</option>;
-            })}
-          </select>
-          <button className="export-button" type="button" onClick={exportRows}>{copy.exportAlignment}</button>
-        </div>
-      </div>
-      <div className="url-alignment-table">
-        <div className="url-alignment-row head">
-          <span>{copy.alignmentState}</span>
-          <span>{copy.submittedUrl}</span>
-          <span>{copy.fetchedUrl}</span>
-          <span>{copy.htmlCanonical}</span>
-          <span>{copy.googleCanonical}</span>
-        </div>
-        {visibleRows.map((row) => (
-          <div className="url-alignment-row" key={row.submittedUrl}>
-            <span><Badge severity={row.severity === "good" ? "ok" : row.severity}>{row.label}</Badge></span>
-            <span title={row.submittedUrl}>{row.submittedUrl || "-"}</span>
-            <span title={row.fetchedUrl}>{row.fetchedUrl || "-"}</span>
-            <span title={row.htmlCanonical}>{row.htmlCanonical || "-"}</span>
-            <span title={row.googleCanonical}>{row.googleCanonical || "-"}</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function classifyIndexCoverage(inspection, page, gsc, copy) {
-  const coverage = String(inspection.coverageState || "").toLowerCase();
-  const robots = String(inspection.robotsTxtState || "").toLowerCase();
-  const indexing = String(inspection.indexingState || "").toLowerCase();
-  const fetchState = String(inspection.pageFetchState || "").toLowerCase();
-  const verdict = String(inspection.verdict || "").toUpperCase();
-  const issueTypes = new Set((page?.issues || []).map((issue) => issue.type));
-  const submittedKey = normalizeReportUrl(inspection.url);
-  const localCanonicalKey = normalizeReportUrl(page?.canonical || inspection.userCanonical || "");
-  const googleCanonicalKey = normalizeReportUrl(inspection.googleCanonical || "");
-  const canonicalAgreement = Boolean(
-    googleCanonicalKey
-    && localCanonicalKey
-    && googleCanonicalKey === localCanonicalKey
-    && googleCanonicalKey !== submittedKey
-  );
-  let reason = "other";
-  let reasonLabel = copy.reasonOther;
-  let disposition = "needs_fix";
-  let dispositionLabel = copy.needsFix;
-
-  if (!inspection.ok) {
-    reason = "inspection_error";
-    reasonLabel = copy.inspectionFailed;
-  } else if (verdict === "PASS") {
-    reason = "indexed";
-    reasonLabel = copy.indexedState;
-    disposition = "indexed";
-    dispositionLabel = copy.indexedState;
-  } else if (
-    robots.includes("blocked")
-    || robots.includes("disallow")
-    || indexing.includes("blocked")
-    || indexing.includes("noindex")
-    || ["robots_disallow", "noindex", "canonical_blocked"].some((type) => issueTypes.has(type))
-  ) {
-    reason = "blocked";
-    reasonLabel = copy.reasonBlocked;
-  } else if (coverage.includes("soft 404")) {
-    reason = "soft_404";
-    reasonLabel = copy.reasonSoft404;
-  } else if (
-    coverage.includes("server error")
-    || coverage.includes("redirect error")
-    || (
-      fetchState
-      && !fetchState.includes("unspecified")
-      && !["successful", "page_fetch_state_successful"].includes(fetchState)
-    )
-    || ["fetch_failed", "http_error"].some((type) => issueTypes.has(type))
-  ) {
-    reason = "fetch_problem";
-    reasonLabel = copy.reasonFetch;
-  } else if (coverage.includes("discovered") && coverage.includes("not indexed")) {
-    reason = "discovered_not_crawled";
-    reasonLabel = copy.reasonDiscovered;
-  } else if (coverage.includes("crawled") && coverage.includes("not indexed")) {
-    reason = "crawled_not_indexed";
-    reasonLabel = copy.reasonCrawled;
-  } else if (coverage.includes("duplicate") || coverage.includes("alternate page")) {
-    reason = "duplicate";
-    reasonLabel = copy.reasonDuplicate;
-    if (canonicalAgreement) {
-      disposition = "expected_exclusion";
-      dispositionLabel = copy.expectedExclusion;
-    }
-  } else if (googleCanonicalKey && googleCanonicalKey !== submittedKey) {
-    reason = "canonical_conflict";
-    reasonLabel = copy.reasonCanonical;
-    if (canonicalAgreement) {
-      disposition = "expected_exclusion";
-      dispositionLabel = copy.expectedExclusion;
-    }
-  }
-
-  const impressions = gsc?.impressions || 0;
-  const clicks = gsc?.clicks || 0;
-  const lastCrawlMs = inspection.lastCrawlTime ? new Date(inspection.lastCrawlTime).getTime() : NaN;
-  const crawlAgeDays = Number.isFinite(lastCrawlMs) ? Math.floor((Date.now() - lastCrawlMs) / 86400000) : null;
-  const stale = crawlAgeDays != null && crawlAgeDays > 90;
-  let priority = "low";
-  if (disposition === "needs_fix" && (clicks > 0 || impressions >= 100 || reason === "blocked" || reason === "fetch_problem")) {
-    priority = "high";
-  } else if (disposition === "needs_fix" || impressions > 0 || stale) {
-    priority = "medium";
-  }
-
-  return {
-    url: inspection.url,
-    reason,
-    reasonLabel,
-    disposition,
-    dispositionLabel,
-    priority,
-    impressions,
-    clicks,
-    position: gsc?.position ?? null,
-    lastCrawlTime: inspection.lastCrawlTime || "",
-    crawlAgeDays,
-    stale,
-    coverageState: inspection.coverageState || inspection.error || "",
-    googleCanonical: inspection.googleCanonical || "",
-  };
-}
-
-function IndexCoveragePriorities({ report, inspectionResults, gscRows, copy }) {
-  const pagesByUrl = new Map((report?.pages || []).map((page) => [normalizeReportUrl(page.url), page]));
-  const gscByUrl = buildGscRowMap(uniqueGscRows(gscRows || []));
-  const rows = (inspectionResults || []).map((inspection) => {
-    const page = pagesByUrl.get(normalizeReportUrl(inspection.url));
-    const gsc = gscByUrl.get(normalizeReportUrl(inspection.url))
-      || gscByUrl.get(normalizeReportUrl(inspection.googleCanonical || ""));
-    return classifyIndexCoverage(inspection, page, gsc, copy);
-  });
-  const priorityRank = { high: 3, medium: 2, low: 1 };
-  const actionableRows = rows
-    .filter((row) => row.disposition !== "indexed")
-    .sort((a, b) => priorityRank[b.priority] - priorityRank[a.priority] || b.impressions - a.impressions);
-  const groups = [...new Map(actionableRows.map((row) => [row.reason, {
-    reason: row.reason,
-    label: row.reasonLabel,
-    rows: actionableRows.filter((item) => item.reason === row.reason),
-  }])).values()];
-  if (!rows.length) return null;
-
-  function priorityLabel(priority) {
-    if (priority === "high") return copy.priorityHigh;
-    if (priority === "medium") return copy.priorityMedium;
-    return copy.priorityLow;
-  }
-
-  function exportCoverage() {
-    downloadCsvFile("soos-google-index-coverage.csv", [
-      ["url", "reason", "disposition", "priority", "coverage_state", "clicks", "impressions", "position", "last_crawl", "crawl_age_days", "google_canonical"],
-      ...rows.map((row) => [
-        row.url,
-        row.reason,
-        row.disposition,
-        row.priority,
-        row.coverageState,
-        row.clicks,
-        row.impressions,
-        row.position ?? "",
-        row.lastCrawlTime,
-        row.crawlAgeDays ?? "",
-        row.googleCanonical,
-      ]),
-    ]);
-  }
-
-  return (
-    <section className="index-coverage-priorities">
-      <div className="url-alignment-head">
-        <div>
-          <strong>{copy.coverageTitle}</strong>
-          <small>{copy.coverageHelp}</small>
-        </div>
-        <button className="export-button" type="button" onClick={exportCoverage}>{copy.coverageExport}</button>
-      </div>
-      <div className="coverage-disposition-summary">
-        <span>{copy.needsFix}: {rows.filter((row) => row.disposition === "needs_fix").length}</span>
-        <span>{copy.expectedExclusion}: {rows.filter((row) => row.disposition === "expected_exclusion").length}</span>
-        <span>{copy.indexedState}: {rows.filter((row) => row.disposition === "indexed").length}</span>
-      </div>
-      {groups.length ? (
-        <div className="coverage-groups">
-          {groups.map((group) => (
-            <article className="coverage-group" key={group.reason}>
-              <div className="impact-top">
-                <Badge severity={group.rows.some((row) => row.priority === "high") ? "critical" : "warning"}>{group.label}</Badge>
-                <strong>{group.rows.length} {copy.affectedUrls}</strong>
-                <span>{group.rows.reduce((sum, row) => sum + row.impressions, 0)} {copy.impressions}</span>
-              </div>
-              <div className="coverage-priority-rows">
-                {group.rows.slice(0, 8).map((row) => (
-                  <div className="coverage-priority-row" key={row.url}>
-                    <Badge severity={row.priority === "high" ? "critical" : row.priority === "medium" ? "warning" : "notice"}>{priorityLabel(row.priority)}</Badge>
-                    <strong title={row.url}>{row.url}</strong>
-                    <span>{row.dispositionLabel}</span>
-                    <small>
-                      {row.impressions || row.clicks
-                        ? `${row.clicks} ${copy.clicks} / ${row.impressions} ${copy.impressions}`
-                        : copy.noPerformanceData}
-                      {row.stale ? ` | ${copy.staleCrawl}: ${row.crawlAgeDays}d` : ""}
-                    </small>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function ImportantPageFreshness({ inspectionResults, gscRows, copy }) {
-  const [sortBy, setSortBy] = useState("risk");
-  const gscByUrl = buildGscRowMap(uniqueGscRows(gscRows || []));
-  const riskRank = { critical: 4, stale: 3, unknown: 2, watch: 1, fresh: 0 };
-  const rows = (inspectionResults || [])
-    .filter((item) => item.ok && String(item.verdict || "").toUpperCase() === "PASS")
-    .map((inspection) => {
-      const gsc = gscByUrl.get(normalizeReportUrl(inspection.url))
-        || gscByUrl.get(normalizeReportUrl(inspection.googleCanonical || ""));
-      const impressions = gsc?.impressions || 0;
-      const clicks = gsc?.clicks || 0;
-      if (!impressions && !clicks) return null;
-      const lastCrawlMs = inspection.lastCrawlTime ? new Date(inspection.lastCrawlTime).getTime() : NaN;
-      const crawlAgeDays = Number.isFinite(lastCrawlMs) ? Math.max(0, Math.floor((Date.now() - lastCrawlMs) / 86400000)) : null;
-      const demand = clicks > 0 || impressions >= 1000 ? "high" : impressions >= 100 ? "medium" : "low";
-      const demandScore = clicks * 1000 + impressions;
-      let freshness = "fresh";
-      if (crawlAgeDays == null) freshness = "unknown";
-      else if (crawlAgeDays > 180) freshness = "critical";
-      else if (crawlAgeDays > 90) freshness = "stale";
-      else if (crawlAgeDays > 30) freshness = "watch";
-      return {
-        url: inspection.url,
-        googleCanonical: inspection.googleCanonical || "",
-        lastCrawlTime: inspection.lastCrawlTime || "",
-        crawlAgeDays,
-        freshness,
-        demand,
-        demandScore,
-        impressions,
-        clicks,
-        position: gsc?.position ?? null,
-      };
-    })
-    .filter(Boolean);
-  const sortedRows = [...rows].sort((a, b) => {
-    if (sortBy === "demand") return b.demandScore - a.demandScore || (b.crawlAgeDays || 0) - (a.crawlAgeDays || 0);
-    if (sortBy === "age") return (b.crawlAgeDays ?? -1) - (a.crawlAgeDays ?? -1) || b.demandScore - a.demandScore;
-    return riskRank[b.freshness] - riskRank[a.freshness] || b.demandScore - a.demandScore;
-  });
-  if (!rows.length) return null;
-
-  function freshnessLabel(value) {
-    if (value === "critical") return copy.freshnessCritical;
-    if (value === "stale") return copy.freshnessStale;
-    if (value === "watch") return copy.freshnessWatch;
-    if (value === "unknown") return copy.freshnessUnknown;
-    return copy.freshnessFresh;
-  }
-
-  function demandLabel(value) {
-    if (value === "high") return copy.demandHigh;
-    if (value === "medium") return copy.demandMedium;
-    return copy.demandLow;
-  }
-
-  function exportFreshness() {
-    downloadCsvFile("soos-google-crawl-freshness.csv", [
-      ["url", "freshness", "demand", "last_crawl", "crawl_age_days", "clicks", "impressions", "position", "google_canonical"],
-      ...sortedRows.map((row) => [
-        row.url,
-        row.freshness,
-        row.demand,
-        row.lastCrawlTime,
-        row.crawlAgeDays ?? "",
-        row.clicks,
-        row.impressions,
-        row.position ?? "",
-        row.googleCanonical,
-      ]),
-    ]);
-  }
-
-  return (
-    <section className="crawl-freshness">
-      <div className="url-alignment-head">
-        <div>
-          <strong>{copy.freshnessTitle}</strong>
-          <small>{copy.freshnessHelp}</small>
-        </div>
-        <div className="url-alignment-actions">
-          <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
-            <option value="risk">{copy.freshnessSortRisk}</option>
-            <option value="demand">{copy.freshnessSortDemand}</option>
-            <option value="age">{copy.freshnessSortAge}</option>
-          </select>
-          <button className="export-button" type="button" onClick={exportFreshness}>{copy.freshnessExport}</button>
-        </div>
-      </div>
-      <div className="coverage-disposition-summary">
-        <span>{copy.indexedWithDemand}: {rows.length}</span>
-        <span>{copy.freshnessCritical}: {rows.filter((row) => row.freshness === "critical").length}</span>
-        <span>{copy.freshnessStale}: {rows.filter((row) => row.freshness === "stale").length}</span>
-      </div>
-      <div className="crawl-freshness-list">
-        {sortedRows.map((row) => (
-          <div className="crawl-freshness-row" key={row.url}>
-            <Badge severity={row.freshness === "critical" ? "critical" : row.freshness === "stale" ? "warning" : row.freshness === "watch" || row.freshness === "unknown" ? "notice" : "ok"}>
-              {freshnessLabel(row.freshness)}
-            </Badge>
-            <strong title={row.url}>{row.url}</strong>
-            <span>{demandLabel(row.demand)}</span>
-            <small>{row.crawlAgeDays == null ? copy.freshnessUnknown : `${copy.crawlAge}: ${row.crawlAgeDays} ${copy.days}`}</small>
-            <small>{row.clicks} {copy.clicks} / {row.impressions} {copy.impressions}</small>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function normalizeSetUrl(value, policy) {
   return comparisonUrl(value, policy);
 }
@@ -2731,7 +1361,7 @@ function StructuredDataDiagnostics({ report, inspectionResults, copy, language }
 
 
 
-function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
+function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows, onResultsChange }) {
   const copy = gscDataText[language] || gscDataText.en;
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -2744,6 +1374,9 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
     setResult(null);
     setError("");
   }, [report?.scannedAt]);
+  useEffect(() => {
+    onResultsChange?.(result?.results || []);
+  }, [onResultsChange, result]);
   if (!report?.pages?.length) return null;
 
   const inspectedUrlKeys = new Set((result?.results || []).map((item) => inspectionCandidateKey(item.url)));
@@ -2811,7 +1444,7 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
         ],
       }));
     } catch (err) {
-      setError(err.message || String(err));
+      setError(formatApiError(err));
     } finally {
       setLoading(false);
     }
@@ -2854,7 +1487,7 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
         ) : null}
       </div>
       {result && pendingCandidates.length ? <small className="inspection-remaining">{pendingCandidates.length} {copy.remaining}</small> : null}
-      {error ? <div className="url-inspection-error">{error}</div> : null}
+      {error ? <div className="url-inspection-error" role="alert">{error}</div> : null}
       <StructuredDataDiagnostics report={report} inspectionResults={result?.results || []} copy={copy} language={language} />
       <UrlSetComparison report={report} gscRows={gscRows} inspectionResults={result?.results || []} copy={copy} />
       {result ? (
@@ -2869,9 +1502,9 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
             <span>{diagnosisSummary.warning} {copy.warnings}</span>
             <span>{diagnosisSummary.notice} {copy.notices}</span>
           </div>
-          <IndexCoveragePriorities report={report} inspectionResults={result.results} gscRows={gscRows} copy={copy} />
-          <ImportantPageFreshness inspectionResults={result.results} gscRows={gscRows} copy={copy} />
-          <UrlAlignmentMatrix report={report} inspectionResults={result.results} copy={copy} />
+          <IndexCoveragePriorities report={report} inspectionResults={result.results} gscRows={gscRows} copy={copy} Badge={Badge} />
+          <ImportantPageFreshness inspectionResults={result.results} gscRows={gscRows} copy={copy} Badge={Badge} />
+          <UrlAlignmentMatrix report={report} inspectionResults={result.results} copy={copy} Badge={Badge} />
           <div className="inspection-list">
             {diagnosedResults.map((item) => (
               <article className="inspection-card" key={item.url}>
@@ -2923,136 +1556,6 @@ function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRows }) {
   );
 }
 
-function diagnoseInspectionResult(item) {
-  const diagnoses = [];
-  const coverage = String(item.coverageState || "").toLowerCase();
-  const indexing = String(item.indexingState || "").toLowerCase();
-  const robots = String(item.robotsTxtState || "").toLowerCase();
-  const fetchState = String(item.pageFetchState || "").toLowerCase();
-  const verdict = String(item.verdict || "").toUpperCase();
-  const mobileVerdict = String(item.mobileVerdict || "").toUpperCase();
-  const richVerdict = String(item.richResultsVerdict || "").toUpperCase();
-  if (!item.ok) {
-    diagnoses.push({
-      type: "inspection_error",
-      severity: "critical",
-      title: "Inspection request failed",
-      detail: item.error || "Google did not return URL Inspection data for this URL.",
-      action: "Check the API connection, property access, and whether this URL belongs to the configured property.",
-    });
-    return diagnoses;
-  }
-  if (verdict === "FAIL" || coverage.includes("not indexed") || coverage.includes("excluded") || coverage.includes("crawled - currently not indexed")) {
-    diagnoses.push({
-      type: "not_indexed",
-      severity: "critical",
-      title: "Not indexed by Google",
-      detail: item.coverageState || "Google did not report this URL as indexed.",
-      action: "Review crawlability, canonical tags, content quality, internal links, and sitemap inclusion.",
-    });
-  }
-  if (coverage.includes("discovered") && coverage.includes("not indexed")) {
-    diagnoses.push({
-      type: "discovered_not_crawled",
-      severity: "warning",
-      title: "Discovered, not crawled yet",
-      detail: item.coverageState,
-      action: "Strengthen internal links, verify crawl budget signals, keep the URL in sitemap, and make sure the server responds quickly.",
-    });
-  }
-  if (coverage.includes("duplicate") || coverage.includes("alternate page")) {
-    diagnoses.push({
-      type: "duplicate_or_alternate",
-      severity: "warning",
-      title: "Google treats this as duplicate or alternate",
-      detail: item.coverageState,
-      action: "Confirm the canonical target is intentional. If this URL should rank, make canonical, sitemap, internal links, and content unique.",
-    });
-  }
-  if (coverage.includes("soft 404")) {
-    diagnoses.push({
-      type: "soft_404",
-      severity: "critical",
-      title: "Soft 404 detected",
-      detail: item.coverageState,
-      action: "Add substantial useful content or return a real 404/410 if the page should not exist.",
-    });
-  }
-  if (robots.includes("disallow") || robots.includes("blocked")) {
-    diagnoses.push({
-      type: "robots_blocked",
-      severity: "critical",
-      title: "Blocked by robots.txt",
-      detail: item.robotsTxtState || "Google reports a robots.txt blocker.",
-      action: "Remove the blocking robots.txt rule if this page should be indexed.",
-    });
-  }
-  if (fetchState && !["successful", "page_fetch_state_successful"].includes(fetchState)) {
-    diagnoses.push({
-      type: "fetch_problem",
-      severity: "warning",
-      title: "Google fetch has problems",
-      detail: item.pageFetchState || "Google reported a non-successful fetch state.",
-      action: "Check server availability, redirects, status codes, firewall rules, and rendering stability.",
-    });
-  }
-  if (item.googleCanonical && item.userCanonical && normalizeReportUrl(item.googleCanonical) !== normalizeReportUrl(item.userCanonical)) {
-    diagnoses.push({
-      type: "canonical_mismatch",
-      severity: "warning",
-      title: "Google selected a different canonical",
-      detail: `Google: ${item.googleCanonical}`,
-      action: "Align canonical tags, internal links, redirects, and sitemap URLs around the preferred canonical.",
-    });
-  }
-  if (!item.sitemap?.length && verdict !== "PASS") {
-    diagnoses.push({
-      type: "not_seen_in_sitemap",
-      severity: "notice",
-      title: "Google did not report sitemap discovery",
-      detail: "URL Inspection did not include a sitemap source for this URL.",
-      action: "Keep the canonical URL in the submitted sitemap and ensure the sitemap is discoverable from robots.txt.",
-    });
-  }
-  if (!item.referringUrls?.length && verdict !== "PASS") {
-    diagnoses.push({
-      type: "no_referrers",
-      severity: "notice",
-      title: "No referring URLs reported",
-      detail: "Google did not report internal or external referrers for this URL.",
-      action: "Add internal links from relevant indexed pages so Google can discover and prioritize the URL.",
-    });
-  }
-  if (mobileVerdict && mobileVerdict !== "PASS") {
-    diagnoses.push({
-      type: "mobile_usability",
-      severity: "warning",
-      title: "Mobile usability issue",
-      detail: item.mobileVerdict,
-      action: "Review mobile usability issues in Search Console and fix layout, tap target, and viewport problems.",
-    });
-  }
-  if (richVerdict && richVerdict !== "PASS" && richVerdict !== "VERDICT_UNSPECIFIED") {
-    diagnoses.push({
-      type: "rich_results",
-      severity: "notice",
-      title: "Rich results need review",
-      detail: item.richResultsVerdict,
-      action: "Validate structured data with Google's rich results tooling and fix invalid detected items.",
-    });
-  }
-  if (indexing && indexing !== "indexing_allowed" && indexing !== "allowed") {
-    diagnoses.push({
-      type: "indexing_state",
-      severity: "notice",
-      title: "Indexing state needs review",
-      detail: item.indexingState || "Google returned a non-standard indexing state.",
-      action: "Compare this state with meta robots, canonical signals, and crawl diagnostics.",
-    });
-  }
-  return diagnoses;
-}
-
 function GooglebotLogAnalysis({ report, language, gscRows }) {
   const copy = googlebotLogText[language] || googlebotLogText.en;
   const [analysis, setAnalysis] = useState(null);
@@ -3080,7 +1583,7 @@ function GooglebotLogAnalysis({ report, language, gscRows }) {
       setAnalysis({ fileName: file.name, ...parsed, verifications: body.results || [], verifiedAt: body.verifiedAt });
       setMessage("");
     } catch (err) {
-      setError(err.message || String(err));
+      setError(formatApiError(err));
       setMessage("");
     } finally {
       event.target.value = "";
@@ -3175,8 +1678,8 @@ function GooglebotLogAnalysis({ report, language, gscRows }) {
         <div>
           <strong>{copy.help}</strong>
           <small>{copy.privacy}</small>
-          {message ? <small>{message}</small> : null}
-          {error ? <small className="gsc-import-error">{copy.failed}: {error}</small> : null}
+          {message ? <small role="status">{message}</small> : null}
+          {error ? <small className="gsc-import-error" role="alert">{copy.failed}: {error}</small> : null}
         </div>
         <div className="gsc-import-actions">
           <label className="export-button file-button">
@@ -3342,66 +1845,70 @@ function InternalLinkGraph({ report, t }) {
   );
 }
 
-function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
+const URL_PAGE_SIZE = 50;
+
+function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language, activeView, onViewChange, comparisonEntry }) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [issueFilter, setIssueFilter] = useState(null);
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [changeFilter, setChangeFilter] = useState("all");
+  const [inspectionResults, setInspectionResults] = useState([]);
+  const [pageNumber, setPageNumber] = useState(1);
+  const sourceSets = useMemo(
+    () => buildUrlSourceSets(report, gscRows, inspectionResults),
+    [gscRows, inspectionResults, report],
+  );
+  const filterCounts = useMemo(
+    () => urlFilterCounts(report?.pages || [], sourceSets, comparisonEntry),
+    [comparisonEntry, report, sourceSets],
+  );
   const pages = useMemo(() => {
     if (!report?.pages) return [];
-    let filtered;
-    if (filter === "all") filtered = report.pages;
-    else if (filter === "ok") filtered = report.pages.filter((page) => !page.issues.length);
-    else filtered = report.pages.filter((page) => page.issues.some((issue) => issue.severity === filter));
+    return report.pages.filter((page) => pageMatchesUrlFilters(page, {
+      severity: filter,
+      issueType: issueFilter?.type || "",
+      query,
+      source: sourceFilter,
+      change: changeFilter,
+      sourceSets,
+      comparisonEntry,
+    }));
+  }, [changeFilter, comparisonEntry, filter, issueFilter, query, report, sourceFilter, sourceSets]);
+  const pageCount = Math.max(1, Math.ceil(pages.length / URL_PAGE_SIZE));
+  const visiblePages = pages.slice((pageNumber - 1) * URL_PAGE_SIZE, pageNumber * URL_PAGE_SIZE);
+  const workspaceCopy = workspaceText[language] || workspaceText.en;
 
-    if (issueFilter?.type) {
-      filtered = filtered.filter((page) => page.issues.some((issue) => issue.type === issueFilter.type));
-    }
+  useEffect(() => {
+    setPageNumber(1);
+  }, [changeFilter, filter, issueFilter, query, report, sourceFilter]);
 
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return filtered;
+  useEffect(() => {
+    if (pageNumber > pageCount) setPageNumber(pageCount);
+  }, [pageCount, pageNumber]);
 
-    return filtered.filter((page) => {
-      const issueText = page.issues.map((issue) => `${issue.type} ${issue.message} ${issue.detail || ""}`).join(" ");
-      const reasonText = (page.googleReasons || []).map((reason) => `${reason.label} ${reason.detail}`).join(" ");
-      const haystack = [
-        page.url,
-        page.finalUrl,
-        page.canonical,
-        page.title,
-        page.description,
-        issueText,
-        reasonText,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(normalizedQuery);
-    });
-  }, [filter, issueFilter, query, report]);
+  function selectIssue(issue) {
+    setIssueFilter(issue);
+    onViewChange?.("urls");
+  }
 
-  if (!report) return <EmptyState t={t} />;
+  if (!report) return ["scan", "issues", "urls"].includes(activeView) ? <EmptyState t={t} /> : null;
 
   return (
     <>
-      <StatusFlags flags={report.statusFlags} t={t} />
-      <ExecutiveSummary summary={report.executiveSummary} t={t} />
-      <ScoreCard score={report.summary.healthScore} t={t} />
-      <SearchVisibility report={report} t={t} gscRows={gscRows} language={language} />
-      <GscOpportunities report={report} rows={gscRows} language={language} />
-      <GooglebotLogAnalysis report={report} language={language} gscRows={gscRows} />
-      <UrlInspectionPanel report={report} gscStatus={gscStatus} siteUrl={gscSiteUrl} language={language} gscRows={gscRows} />
-      <InternalDiscovery report={report} t={t} />
-      <InternalLinkGraph report={report} t={t} />
-      <section className="summary">
-        <Stat label={t.urls} value={report.summary.urlCount} />
-        {report.options?.internalCrawl ? <Stat label={t.discoveredUrls} value={report.summary.discoveredUrlCount || 0} /> : null}
-        <Stat label={t.affected} value={report.summary.affectedUrlCount} tone="warn" />
-        <Stat label={t.googleRisk} value={report.summary.googleBlockedCount} tone="bad" />
-        <Stat label={t.critical} value={report.summary.issueCounts.critical} tone="bad" />
-        <Stat label={t.warnings} value={report.summary.issueCounts.warning} tone="warn" />
-      </section>
-
-      <section className="panel detected">
+      <div className="workspace-view" hidden={activeView !== "scan"}>
+        <StatusFlags flags={report.statusFlags} t={t} />
+        <ExecutiveSummary summary={report.executiveSummary} t={t} />
+        <ScoreCard score={report.summary.healthScore} t={t} />
+        <section className="summary">
+          <Stat label={t.urls} value={report.summary.urlCount} />
+          {report.options?.internalCrawl ? <Stat label={t.discoveredUrls} value={report.summary.discoveredUrlCount || 0} /> : null}
+          <Stat label={t.affected} value={report.summary.affectedUrlCount} tone="warn" />
+          <Stat label={t.googleRisk} value={report.summary.googleBlockedCount} tone="bad" />
+          <Stat label={t.critical} value={report.summary.issueCounts.critical} tone="bad" />
+          <Stat label={t.warnings} value={report.summary.issueCounts.warning} tone="warn" />
+        </section>
+        <section className="panel detected">
         <div className="panel-head">
           <h2>{t.detectedInputs}</h2>
           <span>{report.input.inputType}</span>
@@ -3412,9 +1919,8 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
           <p><strong>Sitemap</strong><span>{report.input.sitemapUrl}</span></p>
           <p><strong>Robots</strong><span>{report.input.robotsUrl}</span></p>
         </div>
-      </section>
-
-      {report.truncation?.truncated ? (
+        </section>
+        {report.truncation?.truncated ? (
         <section className="limit-warning">
           <AlertTriangle size={20} />
           <div>
@@ -3429,11 +1935,26 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
             {formatText(t.limitOk, { urls: report.limits.maxUrls, sitemaps: report.limits.maxSitemaps })}
           </span>
         </section>
-      )}
+        )}
+      </div>
 
-      <Backlog backlog={report.backlog} t={t} />
+      <div className="workspace-view" hidden={activeView !== "google"}>
+        <SearchVisibility report={report} t={t} gscRows={gscRows} language={language} />
+        <GscOpportunities report={report} rows={gscRows} language={language} />
+        <GooglebotLogAnalysis report={report} language={language} gscRows={gscRows} />
+        <UrlInspectionPanel
+          report={report}
+          gscStatus={gscStatus}
+          siteUrl={gscSiteUrl}
+          language={language}
+          gscRows={gscRows}
+          onResultsChange={setInspectionResults}
+        />
+      </div>
 
-      <section className="panel robots">
+      <div className="workspace-view" hidden={activeView !== "issues"}>
+        <Backlog backlog={report.backlog} t={t} />
+        <section className="panel robots">
         <div>
           <Bot size={20} />
           <div>
@@ -3446,17 +1967,17 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
         ) : (
           <Badge severity="warning">{report.robots?.error || "Not found"}</Badge>
         )}
-      </section>
+        </section>
+        <RobotsDetails robots={report.robots} t={t} onSelectIssue={selectIssue} />
+        <SitemapSignals signals={report.sitemapSignals} t={t} onSelectIssue={selectIssue} />
+        <InternationalSignals signals={report.internationalSignals} t={t} onSelectIssue={selectIssue} />
+      </div>
 
-      <RobotsDetails robots={report.robots} t={t} onSelectIssue={setIssueFilter} />
-
-      <SitemapSignals signals={report.sitemapSignals} t={t} onSelectIssue={setIssueFilter} />
-
-      <InternationalSignals signals={report.internationalSignals} t={t} onSelectIssue={setIssueFilter} />
-
-      <Sitemaps sitemaps={report.sitemaps} t={t} />
-
-      <section className="panel">
+      <div className="workspace-view" hidden={activeView !== "urls"}>
+        <InternalDiscovery report={report} t={t} />
+        <InternalLinkGraph report={report} t={t} />
+        <Sitemaps sitemaps={report.sitemaps} t={t} />
+        <section className="panel">
         <div className="panel-head">
           <h2>{t.urlFindings}</h2>
           <div className="findings-toolbar">
@@ -3466,6 +1987,7 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
                   className={filter === item ? "active" : ""}
                   key={item}
                   type="button"
+                  aria-pressed={filter === item}
                   onClick={() => {
                     setFilter(item);
                     if (item === "ok") setIssueFilter(null);
@@ -3481,9 +2003,31 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
                   {issueFilter.type}
                 </button>
               ) : null}
+              <label className="findings-select">
+                <span>{workspaceCopy.sourceFilter}</span>
+                <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
+                  <option value="all">{workspaceCopy.sourceAll} ({filterCounts.sources.all})</option>
+                  <option value="sitemap">{workspaceCopy.sourceSitemap} ({filterCounts.sources.sitemap})</option>
+                  <option value="internal">{workspaceCopy.sourceInternal} ({filterCounts.sources.internal})</option>
+                  <option value="gsc">{workspaceCopy.sourceGsc} ({filterCounts.sources.gsc})</option>
+                  <option value="google">{workspaceCopy.sourceGoogle} ({filterCounts.sources.google})</option>
+                </select>
+              </label>
+              <label className="findings-select">
+                <span>{workspaceCopy.changeFilter}</span>
+                <select value={changeFilter} onChange={(event) => setChangeFilter(event.target.value)}>
+                  <option value="all">{workspaceCopy.changeAll} ({filterCounts.changes.all})</option>
+                  <option value="regressed">{workspaceCopy.changeRegressed} ({filterCounts.changes.regressed})</option>
+                  <option value="persistent">{workspaceCopy.changePersistent} ({filterCounts.changes.persistent})</option>
+                  <option value="improved">{workspaceCopy.changeImproved} ({filterCounts.changes.improved})</option>
+                  <option value="unchanged">{workspaceCopy.changeUnchanged} ({filterCounts.changes.unchanged})</option>
+                  <option value="unavailable">{workspaceCopy.changeUnavailable} ({filterCounts.changes.unavailable})</option>
+                </select>
+              </label>
               <input
                 className="findings-search"
                 type="search"
+                aria-label={t.searchUrls}
                 placeholder={t.searchUrls}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -3491,16 +2035,47 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
               <button className="export-button" type="button" onClick={() => downloadSummary(report)}>
                 {t.exportSummary}
               </button>
-              <button className="export-button" type="button" onClick={() => downloadCsv(report, gscRows)}>
+              <button className="export-button" type="button" onClick={() => downloadHtmlReport(report, gscRows, language)}>
+                {workspaceCopy.exportHtml}
+              </button>
+              <button className="export-button" type="button" onClick={() => downloadCsv(report, gscRows, pages)}>
                 {t.exportCsv}
               </button>
+              {(filter !== "all" || issueFilter || sourceFilter !== "all" || changeFilter !== "all" || query) ? (
+                <button
+                  className="export-button"
+                  type="button"
+                  onClick={() => {
+                    setFilter("all");
+                    setIssueFilter(null);
+                    setSourceFilter("all");
+                    setChangeFilter("all");
+                    setQuery("");
+                  }}
+                >
+                  {workspaceCopy.clearFilters}
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
-        <div className="rows">
-          {pages.length ? pages.map((page) => <PageRow page={page} key={page.url} t={t} />) : <p className="none">{t.noFilter}</p>}
-        </div>
-      </section>
+          <small className="findings-match-count">{pages.length} {workspaceCopy.matchingUrls}</small>
+          <div className="rows">
+            {visiblePages.length ? visiblePages.map((page) => <PageRow page={page} key={page.url} t={t} />) : <p className="none">{t.noFilter}</p>}
+          </div>
+          {pageCount > 1 ? (
+            <nav className="result-pagination" aria-label={t.urlFindings}>
+              <button type="button" onClick={() => setPageNumber((value) => Math.max(1, value - 1))} disabled={pageNumber === 1}>
+                {workspaceCopy.previousPage}
+              </button>
+              <span>{workspaceCopy.page} {pageNumber} {workspaceCopy.of} {pageCount}</span>
+              <button type="button" onClick={() => setPageNumber((value) => Math.min(pageCount, value + 1))} disabled={pageNumber === pageCount}>
+                {workspaceCopy.nextPage}
+              </button>
+            </nav>
+          ) : null}
+        </section>
+      </div>
     </>
   );
 }
@@ -3508,6 +2083,7 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language }) {
 function App() {
   const [sitemapUrl, setSitemapUrl] = useState("");
   const [language, setLanguage] = useState(() => detectLanguage());
+  const [activeView, setActiveView] = useState(() => loadWorkspaceView());
   const [contentChecks, setContentChecks] = useState(false);
   const [directoryRobots, setDirectoryRobots] = useState(false);
   const [performanceChecks, setPerformanceChecks] = useState(false);
@@ -3518,10 +2094,21 @@ function App() {
   const [gscRows, setGscRows] = useState([]);
   const [gscStatus, setGscStatus] = useState(null);
   const [gscSiteUrl, setGscSiteUrl] = useState("");
+  const [dataResetKey, setDataResetKey] = useState(0);
   const [report, setReport] = useState(null);
   const [history, setHistory] = useState(() => loadHistory());
   const [historyLimit, setHistoryLimit] = useState(() => loadHistoryLimit());
   const [retainedJobs, setRetainedJobs] = useState([]);
+  const [retainedJobsMeta, setRetainedJobsMeta] = useState({
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    pageCount: 1,
+    retentionSeconds: 0,
+    storage: "memory",
+  });
+  const [retainedJobsQuery, setRetainedJobsQuery] = useState("");
+  const [retainedJobsStatus, setRetainedJobsStatus] = useState("");
   const [retainedJobsLoading, setRetainedJobsLoading] = useState(false);
   const [comparisonEntry, setComparisonEntry] = useState(null);
   const [error, setError] = useState("");
@@ -3532,7 +2119,24 @@ function App() {
   const [currentJobStartedAt, setCurrentJobStartedAt] = useState(null);
   const [pauseCount, setPauseCount] = useState(0);
   const [elapsedNow, setElapsedNow] = useState(0);
+  const mainContentRef = useRef(null);
   const t = dictionaries[language];
+  const workspaceCopy = workspaceText[language] || workspaceText.en;
+  const workspaceViews = [
+    ["scan", ScanSearch],
+    ["google", ChartNoAxesCombined],
+    ["issues", ListChecks],
+    ["urls", Link],
+    ["history", History],
+    ["settings", Settings],
+  ];
+
+  function changeView(view, options = {}) {
+    setActiveView(saveWorkspaceView(view));
+    if (options.focus !== false) {
+      window.requestAnimationFrame(() => mainContentRef.current?.focus({ preventScroll: true }));
+    }
+  }
 
     useEffect(() => {
     getGscStatus()
@@ -3558,7 +2162,7 @@ useEffect(() => {
     setElapsedNow(Date.now() - saved.startedAt);
     setProgress({ label: t.progressPreparing, value: 5, meta: "" });
     pollAuditJob(saved.id)
-      .catch((err) => setError(err.message || String(err)))
+      .catch((err) => setError(formatApiError(err)))
       .finally(resetJobUi);
   }, []);
   useEffect(() => {
@@ -3590,11 +2194,24 @@ useEffect(() => {
     loadRetainedJobs().catch(() => {});
   }
 
-  async function loadRetainedJobs() {
+  async function loadRetainedJobs(overrides = {}) {
     setRetainedJobsLoading(true);
     try {
-      const body = await listAuditJobs(20);
+      const body = await listAuditJobs({
+        page: overrides.page || retainedJobsMeta.page || 1,
+        pageSize: retainedJobsMeta.pageSize || 10,
+        query: overrides.query ?? retainedJobsQuery,
+        status: overrides.status ?? retainedJobsStatus,
+      });
       setRetainedJobs(body.items || []);
+      setRetainedJobsMeta({
+        total: body.total || 0,
+        page: body.page || 1,
+        pageSize: body.pageSize || 10,
+        pageCount: body.pageCount || 1,
+        retentionSeconds: body.retentionSeconds || 0,
+        storage: body.storage || "memory",
+      });
     } finally {
       setRetainedJobsLoading(false);
     }
@@ -3634,8 +2251,8 @@ useEffect(() => {
 
   async function deleteRetainedJob(jobId) {
     await removeAuditJob(jobId);
-    setRetainedJobs((items) => items.filter((item) => item.id !== jobId));
     if (currentJobId === jobId) clearActiveAuditJob();
+    await loadRetainedJobs();
   }
 
   async function controlJob(action) {
@@ -3708,14 +2325,16 @@ useEffect(() => {
       saveActiveAuditJob({ id: startBody.id, startedAt });
       await pollAuditJob(startBody.id);
     } catch (err) {
-      setError(err.message || String(err));
+      setError(formatApiError(err));
     } finally {
       resetJobUi();
     }
   }
 
   return (
-    <main>
+    <>
+      <a className="skip-link" href="#workspace-content">{t.skipToContent}</a>
+      <main id="workspace-content" tabIndex="-1" ref={mainContentRef}>
       <header className="top">
         <div>
           <span className="mark">soos</span>
@@ -3723,7 +2342,8 @@ useEffect(() => {
         </div>
         <div className="top-actions">
           <p>{t.subheading}</p>
-          <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+          <label className="visually-hidden" htmlFor="language-select">{t.languageLabel}</label>
+          <select id="language-select" value={language} onChange={(event) => setLanguage(event.target.value)}>
             <option value="en">English</option>
             <option value="zh-CN">{"\u7b80\u4f53\u4e2d\u6587"}</option>
             <option value="zh-TW">{"\u7e41\u9ad4\u4e2d\u6587"}</option>
@@ -3731,9 +2351,27 @@ useEffect(() => {
         </div>
       </header>
 
-      <form className="searchbar" onSubmit={runAudit}>
-        <Search size={20} />
+      <nav className="workspace-nav" aria-label={workspaceCopy.navigation}>
+        {workspaceViews.map(([view, Icon]) => (
+          <button
+            className={activeView === view ? "active" : ""}
+            type="button"
+            key={view}
+            aria-current={activeView === view ? "page" : undefined}
+            onClick={() => changeView(view, { focus: false })}
+          >
+            <Icon size={17} aria-hidden="true" />
+            <span>{workspaceCopy[view]}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="workspace-view" hidden={activeView !== "scan"}>
+        <form className="searchbar" onSubmit={runAudit}>
+        <Search size={20} aria-hidden="true" />
+        <label className="visually-hidden" htmlFor="audit-url">{t.auditUrlLabel}</label>
         <input
+          id="audit-url"
           type="url"
           required
           placeholder={t.placeholder}
@@ -3741,61 +2379,63 @@ useEffect(() => {
           onChange={(event) => setSitemapUrl(event.target.value)}
         />
         <button type="submit" disabled={loading}>
-          {loading ? <Loader2 className="spin" size={18} /> : <FileSearch size={18} />}
+          {loading ? <Loader2 className="spin" size={18} aria-hidden="true" /> : <FileSearch size={18} aria-hidden="true" />}
           {t.audit}
         </button>
-      </form>
+        </form>
 
-      <ProgressBar progress={progress} />
-      <RuntimePanel
+        <ProgressBar progress={progress} />
+        <RuntimePanel
         loading={loading}
         jobStatus={jobStatus}
         progress={progress}
         runtimeMeta={{ startedAt: currentJobStartedAt, elapsedMs: elapsedNow, stageElapsedMs: progress?.stageStartedAt ? Date.now() - progress.stageStartedAt : elapsedNow, pauseCount }}
         t={t}
-      />
-      <ProgressControls
+        />
+        <ProgressControls
         loading={loading}
         jobStatus={jobStatus}
-        onPause={() => controlJob("pause").catch((err) => setError(err.message || String(err)))}
-        onResume={() => controlJob("resume").catch((err) => setError(err.message || String(err)))}
-        onStop={() => controlJob("stop").catch((err) => setError(err.message || String(err)))}
+        onPause={() => controlJob("pause").catch((err) => setError(formatApiError(err)))}
+        onResume={() => controlJob("resume").catch((err) => setError(formatApiError(err)))}
+        onStop={() => controlJob("stop").catch((err) => setError(formatApiError(err)))}
         t={t}
-      />
+        />
+      </div>
 
-      <label className="option-toggle">
+      <div className="workspace-view" hidden={activeView !== "settings"}>
+        <label className="option-toggle">
         <input type="checkbox" checked={contentChecks} onChange={(event) => setContentChecks(event.target.checked)} />
         <span>
           <strong>{t.pageChecksTitle}</strong>
           <small>{t.pageChecksHelp}</small>
         </span>
-      </label>
+        </label>
 
-      <label className="option-toggle">
+        <label className="option-toggle">
         <input type="checkbox" checked={performanceChecks} onChange={(event) => setPerformanceChecks(event.target.checked)} />
         <span>
           <strong>{t.performanceChecksTitle || "Performance checks"}</strong>
           <small>{t.performanceChecksHelp || "TTFB, HTML size, scripts, stylesheets, images, and lightweight CWV readiness signals"}</small>
         </span>
-      </label>
+        </label>
 
-      <label className="option-toggle">
+        <label className="option-toggle">
         <input type="checkbox" checked={backgroundMode} onChange={(event) => setBackgroundMode(event.target.checked)} />
         <span>
           <strong>{t.backgroundModeTitle || "Background worker mode"}</strong>
           <small>{t.backgroundModeHelp || "Raise the scan limit to 2000 URLs and keep the job available longer"}</small>
         </span>
-      </label>
+        </label>
 
-      <label className="option-toggle">
+        <label className="option-toggle">
         <input type="checkbox" checked={internalCrawl} onChange={(event) => setInternalCrawl(event.target.checked)} />
         <span>
           <strong>{t.internalCrawlTitle}</strong>
           <small>{t.internalCrawlHelp}</small>
         </span>
-      </label>
+        </label>
 
-      <section className="url-policy-settings">
+        <section className="url-policy-settings">
         <div className="url-policy-copy">
           <strong>{t.urlPolicyTitle}</strong>
           <small>{t.urlPolicyHelp}</small>
@@ -3816,30 +2456,83 @@ useEffect(() => {
             <option value="add">{t.slashAdd}</option>
           </select>
         </label>
-      </section>
+        </section>
 
-      <label className="option-toggle">
+        <label className="option-toggle">
         <input type="checkbox" checked={directoryRobots} onChange={(event) => setDirectoryRobots(event.target.checked)} />
         <span>
           <strong>{t.directoryRobotsTitle}</strong>
           <small>{t.directoryRobotsHelp}</small>
         </span>
-      </label>
-      <SearchConsoleApiConfig status={gscStatus} onStatus={setGscStatus} siteUrl={gscSiteUrl} onSiteUrlChange={setGscSiteUrl} language={language} />
-      <SearchAnalyticsPanel status={gscStatus} siteUrl={gscSiteUrl} onRows={setGscRows} language={language} />
-      <GscSitemapsPanel status={gscStatus} siteUrl={gscSiteUrl} currentSitemapUrl={report?.input?.sitemapUrl} language={language} />
-      <SearchConsoleImport rows={gscRows} onImport={setGscRows} onClear={() => setGscRows([])} language={language} />
+        </label>
 
-      <RetainedJobsPanel
+        <PrivacyDataPanel
+          language={language}
+          onDeleted={() => {
+            setSitemapUrl("");
+            setReport(null);
+            setHistory([]);
+            setHistoryLimit(12);
+            setComparisonEntry(null);
+            setGscRows([]);
+            setGscStatus({ configured: false });
+            setGscSiteUrl("");
+            setRetainedJobs([]);
+            setRetainedJobsMeta({
+              total: 0,
+              page: 1,
+              pageSize: 10,
+              pageCount: 1,
+              retentionSeconds: 0,
+              storage: "memory",
+            });
+            setRetainedJobsQuery("");
+            setRetainedJobsStatus("");
+            setRetainedJobsLoading(false);
+            setError("");
+            setLoading(false);
+            setProgress(null);
+            setCurrentJobId(null);
+            setJobStatus(null);
+            setCurrentJobStartedAt(null);
+            setElapsedNow(0);
+            setPauseCount(0);
+            setDataResetKey((value) => value + 1);
+          }}
+        />
+      </div>
+
+      <div className="workspace-view" hidden={activeView !== "google"}>
+        <SearchConsoleApiConfig key={`gsc-config-${dataResetKey}`} status={gscStatus} onStatus={setGscStatus} siteUrl={gscSiteUrl} onSiteUrlChange={setGscSiteUrl} language={language} />
+        <SearchAnalyticsPanel key={`gsc-analytics-${dataResetKey}`} status={gscStatus} siteUrl={gscSiteUrl} onRows={setGscRows} language={language} />
+        <GscSitemapsPanel key={`gsc-sitemaps-${dataResetKey}`} status={gscStatus} siteUrl={gscSiteUrl} currentSitemapUrl={report?.input?.sitemapUrl} language={language} />
+        <SearchConsoleImport key={`gsc-import-${dataResetKey}`} rows={gscRows} onImport={setGscRows} onClear={() => setGscRows([])} language={language} />
+      </div>
+
+      <div className="workspace-view" hidden={activeView !== "history"}>
+        <RetainedJobsPanel
         jobs={retainedJobs}
         loading={retainedJobsLoading}
+        meta={retainedJobsMeta}
+        query={retainedJobsQuery}
+        status={retainedJobsStatus}
         t={t}
-        onRefresh={() => loadRetainedJobs().catch((err) => setError(err.message || String(err)))}
-        onOpen={(id) => openRetainedReport(id).catch((err) => setError(err.message || String(err)))}
-        onContinue={(job) => continueRetainedJob(job).catch((err) => setError(err.message || String(err)))}
-        onDelete={(id) => deleteRetainedJob(id).catch((err) => setError(err.message || String(err)))}
-      />
-      <HistoryPanel
+        onQueryChange={setRetainedJobsQuery}
+        onStatusChange={(value) => {
+          setRetainedJobsStatus(value);
+          loadRetainedJobs({ page: 1, status: value }).catch((err) => setError(formatApiError(err)));
+        }}
+        onSearch={(event) => {
+          event.preventDefault();
+          loadRetainedJobs({ page: 1 }).catch((err) => setError(formatApiError(err)));
+        }}
+        onPageChange={(page) => loadRetainedJobs({ page }).catch((err) => setError(formatApiError(err)))}
+        onRefresh={() => loadRetainedJobs().catch((err) => setError(formatApiError(err)))}
+        onOpen={(id) => openRetainedReport(id).catch((err) => setError(formatApiError(err)))}
+        onContinue={(job) => continueRetainedJob(job).catch((err) => setError(formatApiError(err)))}
+        onDelete={(id) => deleteRetainedJob(id).catch((err) => setError(formatApiError(err)))}
+        />
+        <HistoryPanel
         history={history}
         currentReport={report}
         historyLimit={historyLimit}
@@ -3872,17 +2565,33 @@ useEffect(() => {
             setComparisonEntry(null);
           }
         }}
+        />
+        <ComparisonPanel comparisonEntry={comparisonEntry} report={report} t={t} />
+      </div>
+
+      {error ? <div className="error" role="alert">{error}</div> : null}
+      <Report
+        report={report}
+        t={t}
+        gscRows={gscRows}
+        gscStatus={gscStatus}
+        gscSiteUrl={gscSiteUrl}
+        language={language}
+        activeView={activeView}
+        onViewChange={changeView}
+        comparisonEntry={comparisonEntry}
       />
-
-      <ComparisonPanel comparisonEntry={comparisonEntry} report={report} t={t} />
-
-      {error ? <div className="error">{error}</div> : null}
-      <Report report={report} t={t} gscRows={gscRows} gscStatus={gscStatus} gscSiteUrl={gscSiteUrl} language={language} />
-    </main>
+      </main>
+    </>
   );
 }
 
-createRoot(document.getElementById("root")).render(
+const reactRootKey = Symbol.for("soos.reactRoot");
+const reactRootElement = document.getElementById("root");
+const reactRoot = reactRootElement[reactRootKey] || createRoot(reactRootElement);
+reactRootElement[reactRootKey] = reactRoot;
+
+reactRoot.render(
   <ErrorBoundary>
     <App />
   </ErrorBoundary>,

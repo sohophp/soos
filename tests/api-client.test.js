@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
-import { ApiError, apiGet, apiPost } from "../src/api-client.js";
+import { ApiError, apiGet, apiPost, formatApiError } from "../src/api-client.js";
 
 const originalFetch = globalThis.fetch;
+
+assert.equal(
+  formatApiError(new ApiError("Try later", { code: "RATE_LIMITED", requestId: "req-123" })),
+  "Try later (RATE_LIMITED · request req-123)",
+);
+assert.equal(formatApiError(new Error("Local failure")), "Local failure");
 
 globalThis.fetch = async (url, options) => new Response(JSON.stringify({
   url,

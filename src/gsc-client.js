@@ -18,6 +18,18 @@ export function testGscConnection(siteUrl) {
   });
 }
 
+export function loadGscSites() {
+  return apiGet("/api/gsc/sites", {
+    fallbackMessage: "Could not load Search Console properties",
+  });
+}
+
+export function saveGscProperty(siteUrl) {
+  return apiPost("/api/gsc/config", { siteUrl }, {
+    fallbackMessage: "Could not save Search Console property",
+  });
+}
+
 export function startGscOAuth(siteUrl) {
   return apiPost("/api/gsc/oauth/start", { siteUrl }, {
     fallbackMessage: "Could not start OAuth",

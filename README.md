@@ -14,6 +14,9 @@ The roadmap is organized by release:
 
 Paid scheduled scans such as Vercel Cron are intentionally excluded.
 
+Production release, migration, recovery, rollback, and key-rotation procedures are maintained in [OPERATIONS.md](OPERATIONS.md).
+Stored data, retention periods, Google disconnection, and complete current-session deletion are documented in [PRIVACY.md](PRIVACY.md).
+
 ## Features
 
 - Accepts a website URL, sitemap URL, or robots.txt URL and detects the best audit target.
@@ -39,6 +42,22 @@ Paid scheduled scans such as Vercel Cron are intentionally excluded.
 - Neon retained-task management and URL-level regression comparisons across repeated scans.
 - OAuth refresh token support so access tokens can refresh automatically.
 - Shared frontend API client with structured request errors and a three-language React render fallback.
+- Dedicated `server/gsc-search-analytics.js` service for Search Analytics validation, Google requests, row normalization, and previous-period orchestration.
+- Dedicated GSC configuration storage and Google service modules for encrypted local/Neon persistence, OAuth refresh, account identity, Sites, Sitemaps, Search Analytics, and URL Inspection.
+- Dedicated server route modules for health/metrics, current-session data lifecycle, GSC/OAuth, and audit-job list/create/run/control/delete endpoints.
+- A dedicated audit-job store owns memory jobs, Neon persistence, page checkpoints, leases, stale-worker recovery, session retirement, and deletion tombstones.
+- Pure scan parsers isolate input detection, sitemap XML, robots rules, canonical/meta/hreflang, noindex, and internal-link extraction from network orchestration.
+- A scan fetcher owns timeout, public-DNS verification, pinned dispatchers, and controlled redirect tracing.
+- A scan runner owns sitemap recursion, page inspection, recursive internal discovery, checkpoints, report assembly, and scan limits.
+- Structured data validation and scan-level diagnosis/report scoring live in dedicated domain modules.
+- Persistent Scan, Google, Issues, URLs, History, and Settings views, with paginated URL findings and state-preserving Google diagnostics.
+- URL findings can be filtered by severity, issue type, text, Sitemap/internal/GSC/Inspection source, and historical change state; CSV export follows the active filters.
+- History comparison separates introduced, resolved, worsened, improved, and persistent issues and warns when scan configuration changes may affect the result.
+- Browser history persistence, retention limits, snapshot creation, and comparison deltas live in `src/history.js`; history, retained-job, and comparison views live in `src/components/HistoryPanels.jsx`.
+- Standalone responsive HTML reports include scan scope, limits, configuration, summary, URL evidence, and available page-level Search Analytics metrics.
+- Retained server reports support task ID/URL search, status filtering, true Neon pagination, expiry visibility, and confirmed deletion.
+- Production responses include CSP, HSTS (Vercel), frame, referrer, permissions, and content-type protections. Browser write requests are origin-checked, and high-cost API routes are rate-limited per session and client IP.
+- The Settings view reports server/browser data for the current session and can delete its Google connection, retained jobs, reports, checkpoints, leases, and soos-prefixed browser storage in one confirmed action.
 
 ## Requirements
 
@@ -64,6 +83,7 @@ Default local URLs:
 
 - Frontend: `http://127.0.0.1:5173/`
 - API: `http://127.0.0.1:4177`
+- API health: `http://127.0.0.1:4177/api/health`
 
 If port `4177` is busy:
 
@@ -84,6 +104,14 @@ Check API syntax:
 node --check server/api.js
 ```
 
+Health responses include a request ID, service version, timestamp, and process uptime. API errors also return a stable error code and request ID; include that request ID when investigating a production failure.
+
+HTTP routing is split under `server/routes/`. `server/api.js` is a compact composition root for request security, session ownership, rate limiting, database initialization, and domain-service injection. Encrypted Search Console storage lives in `server/gsc-config-store.js`; OAuth and Google API calls live in `server/gsc-service.js`.
+
+`GET /api/metrics` returns aggregate HTTP error rates, Google API failure rates, scan outcomes, and duration summaries. It does not include scanned URLs, Search Console properties, Google accounts, tokens, or error text. On Vercel these metrics cover only the current Serverless instance since its cold start; use an external log or metrics backend for cross-instance history and alerting.
+
+The main workspace supports keyboard-visible focus, skip navigation, screen-reader status/error announcements, reduced-motion preferences, and responsive layouts down to 320px. `npm run check` includes accessibility contract checks alongside the API, unit, and production-build gates.
+
 ## Configuration
 
 Runtime Google Search Console config is stored locally in `.soos-gsc.json` when no database is configured. This file may contain OAuth tokens and is intentionally ignored by Git.
@@ -98,13 +126,23 @@ DATABASE_URL=postgresql://...
 GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
 SOOS_TOKEN_ENCRYPTION_KEY=generate-a-long-random-value
+SOOS_TOKEN_ENCRYPTION_KEY_PREVIOUS=
 ```
 
 Visitors do not enter OAuth Client ID or Client Secret. The deployment owner configures one Google OAuth app on the server, and each visitor connects their own Google account from the UI.
 
 Older installations may still use a server-side `SOOS_GSC_ACCESS_TOKEN`, but the public multi-user flow should use OAuth refresh tokens instead. Manual access tokens expire quickly and do not identify or isolate visitors.
 
-`SOOS_TOKEN_ENCRYPTION_KEY` is recommended for production. soos encrypts stored access and refresh tokens with AES-256-GCM. If the variable is omitted, the Google OAuth Client Secret is used to derive the encryption key. Keep the selected key stable; changing it makes existing encrypted connections unreadable.
+`SOOS_TOKEN_ENCRYPTION_KEY` is recommended for production. soos encrypts stored access and refresh tokens with AES-256-GCM and records a non-secret key ID with each ciphertext. If the variable is omitted, the Google OAuth Client Secret is used as a legacy fallback.
+
+Token encryption key rotation:
+
+1. Generate a new random value and set it as `SOOS_TOKEN_ENCRYPTION_KEY`.
+2. Move the previous value to `SOOS_TOKEN_ENCRYPTION_KEY_PREVIOUS`. Multiple historical keys may be comma-separated.
+3. Redeploy. Connections are decrypted with the matching historical key and rewritten with the new primary key when they are next used.
+4. Keep previous keys for at least the 90-day inactive-connection retention window, then remove them after confirming old connections have expired or been used.
+
+OAuth authorization state expires after 10 minutes and is consumed before exchanging the authorization code. A successful OAuth callback rotates the browser session and moves the Neon connection to the new session. Disconnect always removes the stored connection and rotates the session even when Google token revocation cannot be confirmed.
 
 ## Google Search Console OAuth
 
@@ -126,6 +164,8 @@ Visitor flow:
 5. Continue through the soos sign-in screen.
 6. Select the permission to view Search Console data for verified sites, then continue.
 7. Return to soos and click `Test API connection`.
+
+After OAuth connects, soos loads the Search Console properties available to that Google account. Select a property from the list to switch between URL-prefix and Domain properties without retyping the exact property identifier.
 
 soos requests Search Console read-only access plus basic Google account identity (`openid email profile`) so the UI can show which Google account is connected. Existing connections created before this scope was added may need to reconnect once before the email appears.
 
@@ -167,7 +207,10 @@ DATABASE_URL=postgresql://...
 GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
 SOOS_TOKEN_ENCRYPTION_KEY=generate-a-long-random-value
+SOOS_TOKEN_ENCRYPTION_KEY_PREVIOUS=
 ```
+
+Run `npm run db:status` to inspect the current Neon schema without changing it. After creating a Neon restore branch or point-in-time recovery reference, run `npm run db:migrate`, then require `db:status` to report `ready: true`. The API also applies pending idempotent migrations automatically on its first database-backed request.
 
 Notes:
 
@@ -176,6 +219,9 @@ Notes:
 - OAuth Client ID and Client Secret are deployment secrets. Visitors never enter them in the UI.
 - Each visitor's encrypted refresh token is scoped to the browser session cookie and saved separately in Neon.
 - Browser sessions and inactive Neon GSC records expire after 90 days. Disconnect rotates the session cookie, removes the saved connection, and attempts to revoke Google access.
+- Session cookies are `HttpOnly` and `SameSite=Lax`, and become `Secure` on Vercel or an HTTPS public base URL. Configure `SOOS_PUBLIC_BASE_URL` to the exact deployed origin for strict browser write-origin checks.
+- Scan targets and every redirect destination must resolve only to public IP addresses. Direct requests pin the verified DNS result to reduce SSRF and DNS rebinding risk.
+- Scan proxies are disabled by default. `SOOS_ALLOW_PROXY=1` is intended only for a trusted local deployment where the configured proxy is responsible for enforcing its own DNS and network boundary; do not enable it on the public Vercel deployment.
 - Without `DATABASE_URL`, background audit jobs use in-memory state and are best-effort on serverless platforms.
 - With `DATABASE_URL`, background job ownership, progress, request settings, and completed reports are retained in Neon for 7 days. Refreshing the page restores the active task.
 - Page inspection results are checkpointed to Neon every 10 URLs. If a serverless worker stops mid-scan, soos marks the task as interrupted and automatically resumes from the last completed batch. At most the unfinished batch is repeated.
@@ -191,7 +237,10 @@ Search Analytics notes:
 - Page dimension rows feed GSC opportunities, Search Visibility, and CSV export.
 - Query, Page + Query, Country, and Device dimensions are displayed in the Search Analytics panel for exploration.
 - Page + Query rows also generate lightweight opportunities for high impressions with low CTR, top rankings with almost no clicks, rankings in positions 4-10, page-two rankings, and pages spread across many queries.
+- Page + Query analysis flags likely keyword cannibalization when multiple pages receive a meaningful share of visibility for the same query.
 - Page + Query rows can be exported as a keyword opportunities CSV.
+- Previous-period comparison loads the immediately preceding date range with the same number of days and explains click, impression, CTR, and average-position changes.
+- Comparison results identify newly visible and lost dimension rows and can be exported with both date ranges, current values, previous values, and deltas.
 
 URL Inspection notes:
 

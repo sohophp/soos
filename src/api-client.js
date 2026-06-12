@@ -10,6 +10,15 @@ export class ApiError extends Error {
   }
 }
 
+export function formatApiError(error) {
+  const message = error?.message || String(error || "Request failed");
+  const metadata = [
+    error?.code && error.code !== "NETWORK_ERROR" ? error.code : "",
+    error?.requestId ? `request ${error.requestId}` : "",
+  ].filter(Boolean);
+  return metadata.length ? `${message} (${metadata.join(" · ")})` : message;
+}
+
 function responseRequestId(response, body) {
   return body?.requestId
     || response.headers?.get?.("x-request-id")

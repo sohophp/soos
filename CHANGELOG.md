@@ -17,6 +17,54 @@ All notable changes to soos will be documented in this file.
 - HTTP-level API route tests for CORS preflight, unknown routes, malformed JSON, audit task lifecycle, and browser-session isolation.
 - A dedicated audit-task client for route calls, active-job storage, and localized progress snapshot conversion.
 - A dedicated Search Console client plus extracted OAuth configuration and submitted-sitemap panels.
+- A shared CSV download utility for report exports and standalone regression coverage for CSV serialization edge cases.
+- An extracted Search Analytics panel plus pure date-range and opportunity-insight helpers that can be tested outside React.
+- Dedicated GSC CSV parsing and summary helper modules with regression tests for imported exports, opportunity grouping, and search-visibility readiness.
+- An extracted Search Console CSV import panel that no longer keeps file-import state inside `main.jsx`.
+- A dedicated URL Inspection diagnostics module covering URL alignment, index coverage classification, crawl freshness, and per-URL Google findings.
+- Extracted URL alignment, index coverage priority, and important-page freshness views with deterministic diagnostic regression tests.
+- A shared server HTTP module for request IDs, JSON body limits, structured errors, no-store responses, and JSON request logs.
+- Stable `/api/health` and `/api/healthz` liveness endpoints that do not create browser sessions.
+- A dedicated Googlebot DNS verifier module with injectable DNS adapters and cache-aware regression tests.
+- A dedicated server-side Search Analytics service with injected OAuth/config, fetch, URL normalization, and Google error adapters.
+- A dedicated GSC configuration store for environment loading, encrypted local/Neon persistence, lazy token-key rotation, and session-scoped configuration.
+- A dedicated OAuth/GSC service for token exchange and refresh, account identity, revoke, Sites, Sitemaps, Search Analytics, URL Inspection, status sanitization, and Google error translation.
+- A dedicated frontend history module plus extracted history, retained-job, and version-comparison panels.
+- Search Console Sites API support with normalized permission levels, property deduplication, and verified-property counts.
+- A three-language connected-property selector that automatically loads and persists the user's accessible Search Console properties.
+- Search Analytics previous-period comparison with equal-length date ranges, click/impression/CTR/position deltas, gained/lost visibility diagnosis, and evidence-rich CSV export.
+- Page + Query cannibalization diagnosis for queries where multiple pages receive meaningful competing visibility.
+- Persistent three-language workspace navigation for Scan, Google, Issues, URLs, History, and Settings.
+- URL findings pagination with 50 rows per page and automatic reset when filters or search terms change.
+- Unified URL source filters for Sitemap, internal links, Search Analytics, and URL Inspection, with per-source counts.
+- URL-level change filters for new, persistent, improved, unchanged, and unavailable comparison states.
+- Detailed history comparison for introduced, resolved, severity-worsened, severity-improved, and persistent URL issues.
+- Scan configuration snapshots and comparison warnings when audit scope or checks differ between versions.
+- Standalone, responsive HTML report export with scan scope, limits, configuration, summary, URL evidence, and optional page-level GSC metrics.
+- Server-side retained-task search, status filters, database pagination, total counts, storage mode, retention metadata, and per-task expiry times.
+- Three-language retained-task controls and destructive deletion confirmation.
+- API CSP, frame, referrer, permissions, content-type and same-origin CORS response headers.
+- Same-origin enforcement for browser write requests using the existing HttpOnly SameSite session cookie.
+- Session-and-IP fixed-window limits for audit creation/runs, URL Inspection, Search Analytics, and Googlebot DNS verification.
+- Vercel static HSTS and security headers plus a strict CSP for the React entry page and built assets.
+- SSRF and DNS rebinding protection that rejects local, private, link-local, reserved, and mixed public/private DNS targets before every redirect hop.
+- DNS-pinned Undici dispatchers for direct scan requests, including IPv4, IPv6, and IPv4-mapped IPv6 regression coverage.
+- Versioned Neon schema migrations with an applied-version ledger, transactional config/lease table setup, and query indexes.
+- A deployment-friendly `npm run db:migrate` command plus migration regression tests for fresh, partial, and current schemas.
+- Versioned AES-256-GCM token ciphertext with non-secret key IDs, historical-key fallback, legacy `enc:v1` compatibility, and lazy re-encryption.
+- Ten-minute, single-use OAuth state validation with constant-time comparison.
+- Browser-session rotation after successful OAuth and disconnect, including Neon connection migration to the new session.
+- API lifecycle coverage proving disconnect removes stored credentials and replaces the session cookie.
+- A privacy-minimized `/api/metrics` snapshot for HTTP error rates, Google API failure rates, audit outcomes, and duration summaries.
+- Per-service Google fetch instrumentation and deduplicated background/synchronous audit lifecycle metrics.
+- Three-language skip navigation, explicit form control names, visible keyboard focus rings, reduced-motion support, and semantic progress/status/error announcements.
+- Accessible expanded/pressed states for URL rows and severity filters.
+- Mobile empty-state alignment and verified 320px, 390px, and desktop layouts for the primary, Settings, and Google views.
+- Accessibility regression checks included in `npm run check`.
+- A production operations runbook covering release gates, Neon backup/restore, forward-only migrations, Vercel rollback, key incidents, and operational signals.
+- A read-only `npm run db:status` command for migration versions, pending migrations, and required-table readiness.
+- GitHub Actions CI running clean install, high-severity dependency audit, the complete test suite, and production build on Node 22.
+- Operations-contract regression tests for required release, migration, recovery, and CI commands.
 - Controlled redirect tracing with per-hop status and destination, loop/invalid/overlong/cross-host/HTTPS-downgrade diagnostics, CSV output, and URL Inspection prioritization.
 - A shared HTTP(S) URL policy used by crawling, link graphs, redirect analysis, and Inspection candidate deduplication.
 - Three-language URL comparison settings for query parameters and trailing slashes, persisted with each audit and shown in URL set diagnosis.
@@ -64,9 +112,31 @@ All notable changes to soos will be documented in this file.
 - Interrupted worker detection and recoverable audit restart after a server cold start.
 - Sitemap discovery and page-result checkpoints for true URL-batch continuation.
 - Atomic Neon worker leases and request-driven batch execution for serverless deployments.
+- Current-session data inventory and confirmed deletion for encrypted GSC configuration, retained audits, reports, checkpoints, worker leases, and soos-prefixed browser storage.
+- Session retirement, cookie rotation, Google token revocation attempt, and worker tombstones to prevent deleted tasks from being restored by in-flight persistence.
+- A three-language Privacy and data Settings panel plus a dedicated data lifecycle document.
+- Server route modules for health/metrics, session-data lifecycle, and audit-job management, with dependency-injected route tests.
+- A GSC/OAuth route module covering status, configuration, disconnect, OAuth start/callback, Sites, Search Analytics, Sitemaps, URL Inspection, and connection testing.
+- An audit-job store module encapsulating in-memory state, Neon reports, URL batches, worker leases, stale-run recovery, and deletion protection.
+- A scan parser module for audit input classification, sitemap XML, robots.txt decisions, and raw-HTML SEO signal extraction.
+- Dedicated modules for structured-data validation, scan network requests, scan-level diagnostics, and the full resumable scan runner.
+- Scan runner regression coverage for sitemap collection, page inspection, structured data, robots blocking, checkpoints, progress, report flags, and proxy policy.
 
 ### Changed
 
+- React root mounting is reused across Vite hot updates, avoiding duplicate `createRoot()` warnings during local development.
+- `server/api.js` now composes system, session-data, and audit-job route modules instead of carrying those endpoint branches inline.
+- GSC and OAuth endpoint orchestration now lives in `server/routes/gsc-routes.js`; token, state, encryption, storage, and Google-client services remain injected domain dependencies.
+- `server/api.js` delegates task state/persistence to `server/audit-job-store.js` and pure document parsing to `server/scan-parsers.js`.
+- Terminal audit states now replace any pending delayed write with an immediate persistence task.
+- Robots decisions now expose the requested path and ordered matching-rule evidence used by blocked-URL diagnostics.
+- `server/api.js` is now a roughly 440-line composition entry instead of containing the crawler, parser, structured-data rules, report diagnosis, task store, GSC persistence, OAuth refresh, or Google API client.
+- GSC configuration and service tests verify encrypted secret storage, environment fallback, OAuth URL parameters, refresh-token persistence, status redaction, property access, and friendly Google errors.
+- `main.jsx` no longer owns browser history persistence, snapshot/delta calculation, or history/report-retention panel markup; focused tests cover malformed storage, retention settings, deterministic snapshots, severity changes, and category changes.
+- Upgraded `concurrently` from 9.2.1 to 10.0.3 to remove the critical transitive `shell-quote` advisory; a fresh audit reports zero vulnerabilities.
+- Moved Vite, the React plugin, TypeScript, and concurrently to `devDependencies`, reducing the production dependency set.
+- Updated Undici within major version 7 to 7.27.2 and declared the required Node.js baseline.
+- Scan proxy usage is disabled by default and now requires the trusted local deployment flag `SOOS_ALLOW_PROXY=1`.
 - Completed background reports remain available in Neon for 7 days.
 - Background job endpoints now enforce browser-session ownership.
 - Page inspection persists every 10 URLs and resumes from the last completed batch.
@@ -74,6 +144,22 @@ All notable changes to soos will be documented in this file.
 - Removed reliance on post-response background promises for Vercel audit jobs.
 - Updated the crawler user agent to `soos/0.2 SEO audit`.
 - Historical reports without internal-link data no longer produce false orphan-page findings.
+- Search Analytics opportunity logic now lives outside `main.jsx`, reducing frontend entry-point coupling.
+- Search Analytics requests can optionally load the immediately preceding period while keeping current Page rows as the source for existing URL diagnostics.
+- Search Analytics validation, Google requests, row normalization, and previous-period orchestration no longer live in `server/api.js`.
+- The former long single-page flow is grouped into stable workspace views without unmounting stateful Google diagnostics when users switch views.
+- URL CSV export now follows the active URL filters while exporting all matching rows rather than only the current page.
+- Older history entries remain comparable and explicitly report when no configuration snapshot is available.
+- Text, CSV, and HTML downloads now share one browser download helper.
+- Neon task listing now uses database `COUNT`, filtering, `LIMIT`, and `OFFSET` rather than loading an arbitrary task subset into the function.
+- Cross-origin write attempts return structured `ORIGIN_REJECTED` errors; high-cost request limits return `RATE_LIMITED`, rate headers, and `Retry-After`.
+- Search Console CSV parsing, imported-row deduplication, and visibility summary rules now live outside `main.jsx`.
+- URL Inspection diagnostic rules and supporting views now live outside `main.jsx`; unspecified Google fetch states no longer create false fetch warnings.
+- Restored explicit imports for shared GSC row helpers used by report and Googlebot views, preventing runtime-only undefined references.
+- API errors retain the compatible `error` message while adding `code`, `requestId`, and `retryable`; frontend panels now show diagnostic IDs when available.
+- Oversized API request bodies now return HTTP 413 with `REQUEST_TOO_LARGE`, while malformed JSON returns `INVALID_JSON`.
+- Googlebot reverse/forward DNS verification, public-IP filtering, batching, and caching no longer live in the main API file.
+- Connected users can switch Search Console properties from a Google-provided list while manual property entry remains available before OAuth.
 
 ### Removed
 

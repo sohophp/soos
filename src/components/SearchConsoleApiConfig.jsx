@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
+import { formatApiError } from "../api-client.js";
 import {
   clearGscConnection,
   getGscStatus,
+  loadGscSites,
+  saveGscProperty,
   startGscOAuth,
   testGscConnection,
 } from "../gsc-client.js";
@@ -12,12 +15,25 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
   const [showOauthHelp, setShowOauthHelp] = useState(true);
   const [testing, setTesting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
+  const [sitesLoading, setSitesLoading] = useState(false);
+  const [propertySaving, setPropertySaving] = useState(false);
+  const [sites, setSites] = useState([]);
+  const [sitesError, setSitesError] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (status?.siteUrl) onSiteUrlChange(status.siteUrl);
   }, [onSiteUrlChange, status?.siteUrl]);
+
+  useEffect(() => {
+    if (status?.configured) {
+      refreshSites();
+    } else {
+      setSites([]);
+      setSitesError("");
+    }
+  }, [status?.configured]);
 
   useEffect(() => {
     function handleMessage(event) {
@@ -46,6 +62,39 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
       : copy.noToken;
   const connectedAccount = status?.googleAccountEmail || status?.googleAccountName || "";
 
+  async function refreshSites() {
+    setSitesLoading(true);
+    setSitesError("");
+    try {
+      const body = await loadGscSites();
+      setSites(body.sites || []);
+      if (!siteUrl && body.selectedSiteUrl) onSiteUrlChange(body.selectedSiteUrl);
+    } catch (err) {
+      setSitesError(formatApiError(err));
+    } finally {
+      setSitesLoading(false);
+    }
+  }
+
+  async function selectProperty(event) {
+    const nextSiteUrl = event.target.value;
+    const previousSiteUrl = siteUrl;
+    onSiteUrlChange(nextSiteUrl);
+    setPropertySaving(true);
+    setMessage("");
+    setError("");
+    try {
+      const body = await saveGscProperty(nextSiteUrl);
+      onStatus(body);
+      setMessage(copy.propertySaved);
+    } catch (err) {
+      onSiteUrlChange(previousSiteUrl);
+      setError(formatApiError(err));
+    } finally {
+      setPropertySaving(false);
+    }
+  }
+
   async function clearConfig() {
     if (status?.serverless && !status?.databaseConfigured) {
       setError(copy.startServerlessError);
@@ -59,7 +108,7 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
       onStatus(body);
       setMessage(body.revoke?.revoked ? copy.disconnectedMessage : `${copy.disconnectedMessage} ${copy.revokeNotConfirmed}`);
     } catch (err) {
-      setError(err.message || String(err));
+      setError(formatApiError(err));
     } finally {
       setOauthLoading(false);
     }
@@ -82,7 +131,7 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
       if (body.status) onStatus(body.status);
       setMessage(body.permissionLevel ? `${body.message} Permission: ${body.permissionLevel}.` : body.message);
     } catch (err) {
-      setError(err.message || String(err));
+      setError(formatApiError(err));
     } finally {
       setTesting(false);
     }
@@ -96,7 +145,7 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
       onStatus(body);
       setMessage(reason === "oauth-connected" ? copy.connectedRefreshed : body.refreshToken ? copy.oauthRefreshed : copy.statusRefreshed);
     } catch (err) {
-      setError(err.message || String(err));
+      setError(formatApiError(err));
     }
   }
 
@@ -139,7 +188,7 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
     } catch (err) {
       if (popupPoll) window.clearInterval(popupPoll);
       oauthWindow?.close();
-      setError(err.message || String(err));
+      setError(formatApiError(err));
     } finally {
       setOauthLoading(false);
     }
@@ -157,13 +206,43 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
             <strong className="gsc-label-row">
               {copy.propertyUrl}
               {!status?.configured ? (
-                <button className="gsc-help-button" type="button" onClick={() => setShowOauthHelp((value) => !value)} aria-label={copy.oauthHelpTitle}>
+                <button
+                  className="gsc-help-button"
+                  type="button"
+                  onClick={() => setShowOauthHelp((value) => !value)}
+                  aria-label={copy.oauthHelpTitle}
+                  aria-expanded={showOauthHelp}
+                  aria-controls="gsc-oauth-help"
+                >
                   ?
                 </button>
               ) : null}
             </strong>
-            <input type="text" placeholder="https://example.com/ or sc-domain:example.com" value={siteUrl} onChange={(event) => onSiteUrlChange(event.target.value)} disabled={status?.configured} />
-            {!status?.configured ? <small>{copy.propertyHelp}</small> : null}
+            {status?.configured ? (
+              <select aria-label={copy.propertyUrl} value={siteUrl} onChange={selectProperty} disabled={sitesLoading || propertySaving}>
+                {siteUrl && !sites.some((site) => site.siteUrl === siteUrl) ? <option value={siteUrl}>{siteUrl}</option> : null}
+                {!siteUrl ? <option value="">{copy.chooseProperty}</option> : null}
+                {sites.map((site) => (
+                  <option value={site.siteUrl} key={site.siteUrl}>
+                    {site.siteUrl} · {copy[site.permissionLevel] || site.permissionLevel}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input aria-label={copy.propertyUrl} type="text" placeholder="https://example.com/ or sc-domain:example.com" value={siteUrl} onChange={(event) => onSiteUrlChange(event.target.value)} />
+            )}
+            {!status?.configured ? (
+              <small>{copy.propertyHelp}</small>
+            ) : (
+              <small>
+                {sitesLoading
+                  ? copy.loadingProperties
+                  : sites.length
+                    ? `${sites.length} ${copy.propertiesAvailable}`
+                    : copy.noProperties}
+              </small>
+            )}
+            {sitesError ? <small className="gsc-api-error" role="alert">{sitesError}</small> : null}
           </label>
         </div>
         {status?.configured ? (
@@ -174,7 +253,7 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
           </div>
         ) : null}
         {showOauthHelp && !status?.configured ? (
-          <div className="gsc-oauth-help">
+          <div className="gsc-oauth-help" id="gsc-oauth-help">
             <strong>{copy.oauthHelpTitle}</strong>
             <ol>
               {copy.oauthHelpSteps.map((step) => (
@@ -200,6 +279,11 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
           <button className="export-button" type="button" onClick={refreshStatus} disabled={testing || oauthLoading}>
             {copy.refresh}
           </button>
+          {status?.configured ? (
+            <button className="export-button" type="button" onClick={refreshSites} disabled={sitesLoading || propertySaving}>
+              {sitesLoading ? copy.loadingProperties : copy.refreshProperties}
+            </button>
+          ) : null}
           <button className="export-button" type="button" onClick={testConfig} disabled={testing || oauthLoading}>
             {testing ? copy.testing : copy.test}
           </button>
@@ -214,8 +298,8 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
           {status?.serverless ? <small>{copy.serverlessHelp}</small> : null}
           <small>{copy.privacyNote}</small>
         </div>
-        {message ? <small className="gsc-api-message">{message}</small> : null}
-        {error ? <small className="gsc-api-error">{error}</small> : null}
+        {message ? <small className="gsc-api-message" role="status">{message}</small> : null}
+        {error ? <small className="gsc-api-error" role="alert">{error}</small> : null}
       </form>
     </section>
   );

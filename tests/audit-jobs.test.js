@@ -3,6 +3,7 @@ import {
   ACTIVE_AUDIT_JOB_KEY,
   auditProgressView,
   clearActiveAuditJob,
+  listAuditJobs,
   readActiveAuditJob,
   saveActiveAuditJob,
 } from "../src/audit-jobs.js";
@@ -55,5 +56,18 @@ assert.deepEqual(auditProgressView({
 assert.equal(auditProgressView({ status: "paused", progress: {} }, copy).label, "Paused");
 assert.equal(auditProgressView({ status: "interrupted", progress: {} }, copy).label, "Interrupted");
 assert.equal(auditProgressView({ status: "running", progress: { stage: "discovering" } }, copy).label, "Discovering");
+
+const originalFetch = globalThis.fetch;
+let listRequestUrl = "";
+globalThis.fetch = async (url) => {
+  listRequestUrl = url;
+  return new Response(JSON.stringify({ items: [], total: 0 }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+};
+await listAuditJobs({ page: 2, pageSize: 5, query: "example.com", status: "done" });
+assert.equal(listRequestUrl, "/api/audit-jobs?page=2&pageSize=5&query=example.com&status=done");
+globalThis.fetch = originalFetch;
 
 console.log("audit-jobs-tests-passed");

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { formatApiError } from "../api-client.js";
 import { loadGscSitemaps } from "../gsc-client.js";
 import { gscDataText } from "../i18n.js";
 import { normalizeReportUrl } from "../url-policy.js";
@@ -29,7 +30,7 @@ export function GscSitemapsPanel({ status, siteUrl, currentSitemapUrl, language 
     try {
       setResult(await loadGscSitemaps(siteUrl));
     } catch (err) {
-      setError(err.message || String(err));
+      setError(formatApiError(err));
     } finally {
       setLoading(false);
     }

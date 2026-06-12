@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { isPublicIp, trustedGoogleHostname } from "../server/api.js";
+import { isPublicIp, trustedGoogleHostname } from "../server/googlebot-verifier.js";
 import { absoluteLogUrl, parseAccessLog, STATIC_ASSET_PATH } from "../src/googlebot-log.js";
 
 const combined = [

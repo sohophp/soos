@@ -29,13 +29,18 @@ soos 不只是检查孤立的 HTML 标签，而是回答一个更重要的问题
 
 - React 19 + Vite。
 - 主界面：`src/main.jsx`。
+- 历史存储与版本差异：`src/history.js`。
+- 历史、保留任务和版本比较面板：`src/components/HistoryPanels.jsx`。
 - 样式：`src/styles.css`。
 - 扫描历史保存在浏览器本地。
 - 当前任务 ID 保存在浏览器本地，刷新页面后可以恢复。
 
 ### 后端
 
-- Node HTTP API：`server/api.js`。
+- Node HTTP 组合入口：`server/api.js`。
+- Search Console 加密配置存储：`server/gsc-config-store.js`。
+- OAuth 与 Google API 服务：`server/gsc-service.js`。
+- 扫描器、诊断、任务存储和端点路由均为独立模块。
 - Vercel 适配入口：`api/index.js`。
 - 本地 API 默认地址：`127.0.0.1:4177`。
 - 支持直接扫描和请求驱动的后台批次扫描。
@@ -167,8 +172,8 @@ soos 的目标关系链是：
 
 ### P0：影响继续开发
 
-- `src/main.jsx` 和 `server/api.js` 已成为大型单文件，继续叠加功能会提高回归风险。
-- 自动化测试覆盖面偏窄，尚未覆盖 OAuth 状态、GSC API、任务恢复、历史比较和主要前端流程。
+- `server/api.js` 已缩减为组合入口；`src/main.jsx` 仍承担较多跨视图状态和编排，下一轮模块化应优先继续拆分扫描、报告和历史工作区。
+- 自动化测试已覆盖 OAuth state、GSC 服务、任务恢复、历史比较和主要纯逻辑；仍缺真实浏览器 OAuth 弹窗、扫描恢复和大型报告流程的端到端测试。
 - 多语言文案经历过多轮修改，仍需要一次逐屏人工校对和编码检查。
 - API 错误格式、加载状态、空状态和重试行为尚未完全统一。
 
@@ -241,10 +246,10 @@ soos 的目标关系链是：
 
 计划：
 
-- 通过 Search Console Sites API 列出用户可访问属性，减少手动输入 Property URL。
-- 增加 Search Analytics 日期区间对比和点击、展示、CTR、排名变化解释。
+- [x] 通过 Search Console Sites API 列出用户可访问属性，减少手动输入 Property URL。
+- [x] 增加 Search Analytics 等长上一周期对比，解释点击、展示、CTR、排名变化，并标识新增/丢失搜索可见性。
 - 支持 Query、Country、Device、Page + Query 组合分析。
-- 识别关键词蚕食、同查询多页面、排名良好但 CTR 偏低、展示增长但点击未增长。
+- 已识别排名良好但 CTR 偏低、展示增长但点击未增长，以及同一查询由多个页面竞争；更深的查询意图聚类仍待实现。
 - 已为 URL Inspection 建立异常并集优先队列：本地技术阻挡、跳转/canonical 异常、GSC 非 sitemap 页面和站内发现非 sitemap URL 优先；新页面和历史回归优先级仍待加入。
 - 显示 API 配额估算、已检查数量、跳过原因和可继续批次。
 - 已接入 GSC Sitemaps API，展示 Google 看到的 sitemap、提交时间、最后读取、待处理状态、错误和警告；下一步可加入提交与删除操作。
@@ -261,11 +266,11 @@ soos 的目标关系链是：
 
 计划：
 
-- 将单页长界面调整为清晰的扫描、Google、问题、URL、历史和设置视图。
-- 为问题、URL、严重程度、来源和变化状态增加统一筛选与分页。
-- 加强版本比较：新增、修复、恶化、持续存在，并解释变化证据。
-- 支持生成可独立打开的 HTML 报告；PDF 作为后续可选导出。
-- 增加服务器端报告列表、搜索、分页、保留期限和删除确认。
+- [x] 将单页长界面调整为清晰的扫描、Google、问题、URL、历史和设置视图，并持久化当前视图。
+- [x] URL 结果支持严重程度、问题类型、关键词、Sitemap/站内/GSC/Inspection 来源与历史变化状态筛选，并提供每页 50 条分页。
+- [x] 加强版本比较：区分新增、修复、严重程度恶化、严重程度改善和持续存在，并显示逐 URL 变化证据。
+- [x] 支持生成可独立打开的响应式 HTML 报告；PDF 作为后续可选导出。
+- [x] 增加服务器端报告列表、搜索、状态筛选、分页、保留期限和删除确认。
 - 评估问题备注、负责人和处理状态；在没有真实协作需求前不引入完整账号团队系统。
 
 验收标准：
@@ -280,19 +285,19 @@ soos 的目标关系链是：
 
 计划：
 
-- 正式数据库 schema、迁移、索引、数据完整性约束和恢复演练。
-- OAuth、session 与数据加密密钥轮换流程。
-- CSP、安全响应头、Cookie 策略、CSRF/SSRF 防护复核和依赖审计。
-- 按用户、会话、IP 和高成本端点实施限流与滥用保护。
+- 已建立版本化 Neon schema 迁移、迁移记录表、首批查询索引、只读 schema 状态检查和备份/恢复/回滚手册；更细的数据完整性约束仍待完成。
+- 已完成 OAuth state 10 分钟有效期与一次性消费、OAuth 成功/断开后的 session 轮换，以及带 key ID 的 AES-GCM 令牌密钥平滑轮换；OAuth Client Secret 自身的运营轮换演练仍待完成。
+- 已完成 CSP、安全响应头、HttpOnly/SameSite/Secure Cookie 策略、浏览器写请求同源防护、扫描请求的 SSRF/DNS rebinding 防护和 npm 依赖审计。
+- 已按会话、IP 和高成本端点实施实例级限流与滥用保护；跨 Serverless 实例的共享限流可在后续接入持久存储。
 - 数据保留、用户断开、令牌撤销、报告删除和隐私说明形成完整闭环。
-- 建立可用性、错误率、任务完成率、Google API 失败率和扫描耗时指标。
-- 完成键盘操作、焦点、对比度、屏幕阅读器和移动端可用性检查。
+- 已建立当前进程的请求错误率、Google API 失败率、任务完成率和扫描耗时指标；跨 Serverless 实例的长期指标汇聚仍待接入外部监控后端。
+- 已完成主工作区、设置和 Google 配置空状态的键盘、焦点、对比度、屏幕阅读器及 320/390/1280px 可用性检查；带大型真实扫描报告的完整辅助技术回归仍需在后续浏览器流程测试中持续覆盖。
 
 验收标准：
 
 - 用户可以查看并删除服务端保存的数据，断开 Google 后令牌不可继续使用。
 - 关键故障有日志、请求 ID 和可操作错误信息。
-- 部署、迁移和回滚步骤都有文档并经过验证。
+- 部署、迁移、只读 schema 检查、Neon 恢复和 Vercel 回滚步骤已有文档与自动化契约验证；生产事故恢复演练仍需按发布周期执行。
 
 ### 暂不纳入
 
@@ -485,6 +490,98 @@ soos 的目标关系链是：
 - 增加基于真实随机端口 HTTP server 的 API 路由测试，覆盖预检、404、非法 JSON、任务创建、会话隔离、暂停/恢复和删除。
 - 审计任务端点、活动任务 localStorage 与进度快照转换已迁移到独立 `audit-jobs.js`，并覆盖损坏存储和阶段标签测试。
 - 所有 Search Console API 路由集中到 `gsc-client.js`；OAuth 配置和 Sitemap 状态面板已从 `main.jsx` 拆出，并增加请求契约测试。
+- 新增共享 `downloads.js`，统一 CSV 序列化和导出行为，并补充逗号、引号、换行等边界测试。
+- Search Analytics 面板与机会洞察规则已拆出 `SearchAnalyticsPanel.jsx` 和 `search-analytics.js`，主入口继续瘦身。
+- Search Console CSV 导入、分隔符识别与多语言表头解析已拆到 `gsc-csv.js`，并新增独立回归测试。
+- GSC 页面机会分组和搜索可见性汇总规则已拆到 `gsc-summary.js`；CSV 导入面板迁移到 `SearchConsoleImport.jsx`。
+- URL Inspection 的网址对照、收录原因、优先级、抓取时效和单网址诊断规则已拆到 `url-inspection-diagnostics.js`。
+- URL 对照矩阵、收录覆盖优先级和重要页面抓取时效视图已迁移到 `UrlInspectionDiagnostics.jsx`；主入口由 3276 行降到 2715 行。
+- 新增固定时间的 URL Inspection 回归测试，覆盖合理 canonical 排除、阻挡高优先级、抓取时效、未指定 fetch 状态和请求失败。
+- 修复 GSC helper 拆分后报告与 Googlebot 视图缺少显式导入、只能在运行时暴露的风险。
+- 新增 `server/http.js`，统一请求 ID、CORS/no-store 响应头、JSON body 限制、错误代码和结构化请求日志。
+- 增加不创建会话 Cookie 的 `/api/health` 与 `/api/healthz` 稳定探活端点。
+- API 错误在保留旧 `error` 字符串兼容性的同时增加 `code`、`requestId` 和 `retryable`；前端错误提示会附带可排查的请求编号。
+- API 路由测试新增健康检查、请求 ID 透传、非法 JSON、413 请求体限制和任务 404 错误代码验证。
+- Googlebot 公网 IP 过滤、可信主机名、反向/正向 DNS 复核、批处理和缓存已拆到 `server/googlebot-verifier.js`。
+- 新增可注入 DNS resolver 的验证测试，覆盖真实匹配、伪装主机名、缓存命中、私网过滤和 URL 去重。
+- 接入 Search Console Sites API，返回当前 OAuth 账号可访问的 property、权限等级和已验证数量。
+- OAuth 连接后自动加载三语言 property 选择器；切换 property 会保存到当前浏览器会话配置，失败时回滚原选择。
+- 保留首次 OAuth 前的手工 Property URL 输入和连接后列表刷新，Sites API 暂时失败不会阻断已保存 property 的使用。
+- Search Analytics 新增默认开启的等长上一周期对比，同时返回当前与上一周期的日期范围和原始维度行。
+- 前端显示点击、展示、CTR、平均排名变化，并诊断点击下降、展示增长但点击停滞、新增可见性和丢失可见性。
+- 周期对比可导出包含日期、维度值、当前值、上一周期值和差值的 CSV；当前 Page 行仍独立进入现有 URL/GSC 诊断。
+- 日期计算、汇总、维度行合并、新增/丢失状态、变化阈值和 API 请求参数已有自动化测试。
+- Page + Query 诊断按查询聚合多个页面；当总展示和次要页面展示占比达到阈值时，报告关键词蚕食并列出主要竞争页面、展示和排名证据。
+- 服务端 Search Analytics 日期校验、维度映射、Google 请求、响应标准化和上一周期编排已迁移到 `server/gsc-search-analytics.js`。
+- 新服务通过依赖注入连接 OAuth 配置、fetch、URL 规范化和错误翻译，并覆盖行数上限、日期错误、Google API 错误及周期比较测试。
+- 新增三语言工作区导航，将扫描概览、Google 数据、技术问题、URL 结果、历史任务和设置分开显示。
+- 视图切换通过隐藏稳定容器实现，URL Inspection 等带内部状态的面板不会因切换而丢失结果；当前视图保存在 localStorage。
+- URL 结果加入每页 50 条分页，筛选、问题类型或搜索变化时自动回到第一页；移动端导航使用可横向滚动的固定宽度按钮。
+- URL 来源筛选统一使用 sitemap、站内链接、Search Analytics 与已完成 URL Inspection 集合，并显示各来源 URL 数量。
+- 历史变化筛选逐 URL 对比 issue type 指纹，区分新增问题、持续问题、已改善、无变化和没有对比基线。
+- URL CSV 导出跟随当前筛选条件并包含全部匹配 URL，不受当前分页限制；Summary 导出继续表示完整报告。
+- 历史条目新增扫描配置快照；版本比较逐 URL/问题类型识别新增、修复、严重程度变化和持续问题。
+- 配置比较覆盖内容/性能检查、站内发现、robots 来源、查询参数、尾斜杠、URL 与 sitemap 限制；旧历史缺少快照时明确显示不可用。
+- 独立 HTML 报告包含扫描时间、输入、sitemap/robots、限制、检查配置、健康摘要、全部 URL 问题、Google 结果与已加载 GSC 页面指标。
+- HTML 生成对网站内容和问题证据统一转义，外链只允许 HTTP/HTTPS，并排除 OAuth、session 和数据库配置。
+- Retained Tasks API 支持任务 ID/网址搜索、状态筛选、页码与每页数量，并返回总数、页数、存储模式、保留秒数和逐任务过期时间。
+- Neon 使用数据库 `COUNT + LIMIT/OFFSET` 完成真实分页；本地内存模式按现有 4 小时 TTL、Neon 按 7 天保留策略准确显示。
+- 服务器任务删除增加三语言确认提示，删除成功后重新加载当前页，保持总数和分页一致。
+- API 响应新增 CSP、frame、referrer、permissions 和同源 CORS 头；Vercel 静态入口增加 HSTS 与严格 React CSP。
+- 浏览器 POST/DELETE 请求带有非同源 Origin 时返回 `ORIGIN_REJECTED`；无 Origin 的 CLI/内部请求保持兼容。
+- 扫描创建/执行、URL Inspection、Search Analytics 与 Googlebot DNS 验证按会话和客户端 IP 限流，并返回标准 429、Retry-After 与配额响应头。
+- 所有扫描 HTTP(S) 目标在每个重定向 hop 前重新解析 DNS；任一解析结果属于本机、私网、链路本地、保留或文档地址时即拒绝请求。
+- 直连请求将 Undici dispatcher 锁定到已验证公网 IP，避免验证后 DNS 再解析造成 rebinding；IPv4、IPv6、IPv4-mapped IPv6 和混合公网/私网答案均有回归测试。
+- 扫描代理默认禁用；只有受信任的本地部署显式设置 `SOOS_ALLOW_PROXY=1` 才能使用，此模式由代理承担最终 DNS 解析边界。
+- Neon 表结构已从 `server/api.js` 拆到版本化迁移模块；配置存储、任务租约和对应索引由 `soos_schema_migration` 记录版本并以单事务逐版应用。
+- 应用首次访问数据库时自动运行待执行迁移，部署前也可通过 `npm run db:migrate` 显式验证；迁移测试覆盖空库、部分版本和最新版本。
+- 存储令牌升级为带非敏感 key ID 的 `enc:v2` AES-256-GCM 格式；当前主密钥写入新密文，`SOOS_TOKEN_ENCRYPTION_KEY_PREVIOUS` 支持逗号分隔的历史密钥。
+- 旧 `enc:v1`、旧 key ID 或明文令牌在读取成功后自动使用当前主密钥重写；测试覆盖新密文、历史密钥、旧格式和错误密钥。
+- OAuth state 采用常量时间比较、10 分钟有效期并在 token exchange 前消费；成功连接和断开连接均轮换 session，Neon OAuth 配置随成功连接迁移到新 session。
+- API 生命周期测试使用独立临时配置文件，验证断开连接删除服务端凭据，即使未发生 Google 撤销也会返回未配置状态并替换 session cookie。
+- 新增不记录 URL、Property、账号、token 或错误正文的进程级运行指标；`/api/metrics` 返回 HTTP 错误率、Google 服务调用失败率、任务终态和耗时分布摘要。
+- Google 指标埋点位于真实外部 fetch 边界，区分 OAuth token、撤销、userinfo、Sites、Sitemaps、Search Analytics 和 URL Inspection，避免把输入校验错误计入 Google 故障。
+- 后台任务与同步扫描均记录完成、失败、停止和耗时；指标注册表限制已跟踪任务 ID 数量，测试覆盖比率、去重和无 session cookie 的指标端点。
+- 主界面新增三语言“跳到主要内容”链接、语言和扫描 URL 程序化标签、全局高对比焦点环，以及 reduced-motion 动画降级。
+- 扫描进度使用原生 progressbar 语义；运行状态、Google 成功消息、导入结果和错误使用 status/alert live region；展开 URL 行与严重程度筛选暴露 expanded/pressed 状态。
+- 修复移动端空状态因 grid 隐式行拉伸导致图标与说明分离的问题，并为窄屏 Google Property 与保留任务搜索补齐显式可访问名称。
+- 新增 `tests/accessibility.test.js`，将三语言键、跳转目标、表单名称、进度语义、状态播报、焦点样式和 reduced-motion 纳入 `npm run check`。
+- 浏览器实测 1280、390 和 320px：初始页、设置页、Google 页无页面级横向溢出或无名称可见控件，控件无小于 24px 的实际点击目标，对当前可见文字未发现 WCAG 阈值以下的对比度。
+- 新增 `OPERATIONS.md`，覆盖发布前门禁、Neon 分支/时间点备份、forward-only 迁移、Vercel 发布、应用回滚、数据库恢复、OAuth/加密密钥事故和运行信号。
+- 新增只读 `npm run db:status`，验证迁移 ledger、当前/最新版本、待执行版本和三张核心表；真实 Neon 已验证为 schema 2/2 ready。
+- 新增 GitHub Actions CI，在 Node 22 上执行 `npm ci`、高等级依赖审计和完整 `npm run check`；运维文档及 CI 必需命令由自动化测试锁定。
+- `npm audit` 发现 `concurrently@9.2.1` 经 `shell-quote` 引入 critical 命令注入风险；已升级到 `concurrently@10.0.3`，复核为 0 vulnerabilities。
+- Vite、React plugin、TypeScript 和 concurrently 已移至 `devDependencies`，生产依赖树由 91 个缩减到 7 个；Undici 更新到同主版本最新补丁 7.27.2。
+- 新增当前会话数据汇总与完整删除 API，统一删除 Neon GSC 配置、审计任务、报告、页面 checkpoint 和 worker lease；本地模式同步删除 `.soos-gsc.json`。
+- 完整删除会尝试撤销 Google token、停用旧 session ID、轮换 Cookie，并以任务 tombstone 防止仍在执行的 worker 将已删除任务重新写回。
+- 设置页新增三语言“隐私与数据”面板，显示服务端与浏览器数据数量；确认删除后清除 soos localStorage、扫描结果、历史、任务状态及所有 Google 子面板内存结果。
+- 会话隔离测试验证删除不会影响其他浏览器会话；新增 `PRIVACY.md` 记录数据类型、90 天/7 天保留策略、日志导入边界和删除语义。
+- React 根实例在 Vite 热更新间复用，避免开发环境重复调用 `createRoot()` 的警告。
+- 新增 `server/routes/system-routes.js`、`session-data-routes.js` 和 `audit-job-routes.js`，拆出健康/指标、当前会话数据以及审计任务列表、创建、执行、控制和删除端点。
+- `server/api.js` 保留请求日志、安全校验、session、限流和领域服务装配职责，路由模块通过显式依赖注入调用现有服务，避免引入循环依赖。
+- 新增独立服务端路由测试，覆盖无 Cookie 健康检查、指标快照、删除确认、Neon 存储模式、任务查询参数、创建和暂停/恢复；原 API 生命周期测试继续验证外部契约。
+- 新增 `server/routes/gsc-routes.js`，集中 Search Console 状态、配置、断开、OAuth start/callback、连接测试、Sites、Search Analytics、Sitemaps 和 URL Inspection 端点。
+- OAuth 路由测试验证 state 在 token exchange 前消费、成功后 session 轮换、旧 Neon 配置删除、Google 账号信息写入，以及错误页面 HTML 转义。
+- `server/api.js` 进一步缩减到约 3,400 行；GSC token 刷新、OAuth state、加密存储和 Google 请求仍由既有领域服务负责。
+- 新增 `server/audit-job-store.js`，封装内存任务、Neon 报告、页面 checkpoint 批次、worker lease、过期 worker 恢复、session retirement 和删除 tombstone。
+- 主 API 不再直接持有任务 Map、持久化 timer、活动 worker 集合或已删除任务集合；扫描和路由通过 store 方法操作统一生命周期。
+- 新增 `server/scan-parsers.js`，拆出网站/sitemap/robots 输入判断、XML loc 解析、robots 分组与规则胜出、canonical/meta/hreflang/noindex 和站内链接提取。
+- 新增任务 store 与扫描解析器回归测试，并纳入 `npm run check`；`server/api.js` 进一步缩减到约 2,960 行。
+- 修正任务终态持久化调度：done、error、stopped 和 interrupted 会替换已有延迟 timer 并立即安排写入。
+- 结构化数据规则和 `inspectJsonLd` 已迁移到 `server/structured-data.js`，原有 72 条诊断回归直接验证新模块。
+- 新增 `server/scan-fetch.js`，封装超时、手工重定向、每跳公网 DNS 复核、DNS pinned dispatcher 和资源关闭；模拟网络测试覆盖跨主机跳转、循环和代理 dispatcher。
+- 新增 `server/scan-diagnostics.js`，封装 robots/sitemap/hreflang 聚合、Google 原因、修复 backlog、健康分、状态标签和重复元数据诊断。
+- 新增 `server/scan-runner.js`，完整承载 sitemap 递归、页面检查、内部发现、批次 checkpoint、暂停/停止、进度和最终报告组装。
+- 修复 robots 决策返回证据不完整的问题：现在返回请求 path 与按优先级排列的 matched rules，阻挡详情不再因字段缺失而运行时失败。
+- 扫描 runner 测试覆盖 robots、sitemap、页面内容、JSON-LD、canonical、checkpoint、progress、报告状态和代理禁用策略。
+- `server/api.js` 从本阶段开始时的 3,637 行降到 958 行，已不再承载扫描器、解析器、结构化规则、报告诊断或任务存储领域实现。
+- 新增 `server/gsc-config-store.js`，统一 `.env`/进程环境读取、Neon/本地文件选择、token 加密解密、历史密钥轮换和 session 配置清理。
+- 新增 `server/gsc-service.js`，承载 OAuth URL、token exchange/refresh/revoke、Google 账号信息、Sites、Sitemaps、Search Analytics、URL Inspection、状态脱敏和错误翻译。
+- GSC 配置与服务测试覆盖密文存储、敏感字段剔除、环境 access token fallback、OAuth 参数、过期 token 自动刷新并持久化、属性访问和响应脱敏。
+- `server/api.js` 进一步缩减到约 440 行，只保留数据库初始化、session、安全/限流、审计任务执行和路由依赖装配。
+- 新增 `src/history.js`，统一浏览器历史读取/保存、保留数量、历史快照、趋势标签、issue fingerprint 差异和诊断分类变化。
+- 新增 `src/components/HistoryPanels.jsx`，迁出历史列表、Neon 保留任务和版本比较三个视图；`main.jsx` 只传入状态与操作回调。
+- 历史模块测试覆盖损坏 localStorage、非法保留数量、确定性快照、严重程度升降、问题解决和分类变化；`main.jsx` 从 2,914 行缩减到约 2,475 行。
 
 ## 12. 历史完成度基线
 
@@ -495,7 +592,7 @@ soos 的目标关系链是：
 | Canonical 与 hreflang | 75% |
 | 后台与 Serverless 执行 | 85% |
 | Search Console OAuth | 90% |
-| Search Analytics 诊断 | 70% |
+| Search Analytics 诊断 | 80% |
 | URL Inspection 诊断 | 95% |
 | Google URL 对照矩阵 | 85% |
 | URL 集合对比 | 100% |

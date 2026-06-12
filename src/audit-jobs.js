@@ -27,8 +27,14 @@ export function clearActiveAuditJob(storage = globalThis.localStorage) {
   storage?.removeItem(ACTIVE_AUDIT_JOB_KEY);
 }
 
-export function listAuditJobs(limit = 20) {
-  return apiGet(`/api/audit-jobs?limit=${encodeURIComponent(limit)}`, {
+export function listAuditJobs(options = {}) {
+  const normalized = typeof options === "number" ? { pageSize: options } : options;
+  const params = new URLSearchParams();
+  params.set("page", String(normalized.page || 1));
+  params.set("pageSize", String(normalized.pageSize || 10));
+  if (normalized.query) params.set("query", normalized.query);
+  if (normalized.status) params.set("status", normalized.status);
+  return apiGet(`/api/audit-jobs?${params.toString()}`, {
     fallbackMessage: "Could not load retained tasks",
   });
 }
