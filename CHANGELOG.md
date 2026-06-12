@@ -30,6 +30,9 @@ All notable changes to soos will be documented in this file.
 - A dedicated GSC configuration store for environment loading, encrypted local/Neon persistence, lazy token-key rotation, and session-scoped configuration.
 - A dedicated OAuth/GSC service for token exchange and refresh, account identity, revoke, Sites, Sitemaps, Search Analytics, URL Inspection, status sanitization, and Google error translation.
 - A dedicated frontend history module plus extracted history, retained-job, and version-comparison panels.
+- An extracted URL Findings panel owning expandable page evidence, severity/source/change filters, search, pagination, and filtered export actions.
+- Extracted scan-summary and issue-diagnosis views plus shared report badge/stat components.
+- An extracted URL Structure view for sitemap inventory, recursive discoveries, internal-link graph diagnosis, filtering, and CSV export.
 - Search Console Sites API support with normalized permission levels, property deduplication, and verified-property counts.
 - A three-language connected-property selector that automatically loads and persists the user's accessible Search Console properties.
 - Search Analytics previous-period comparison with equal-length date ranges, click/impression/CTR/position deltas, gained/lost visibility diagnosis, and evidence-rich CSV export.
@@ -133,6 +136,8 @@ All notable changes to soos will be documented in this file.
 - `server/api.js` is now a roughly 440-line composition entry instead of containing the crawler, parser, structured-data rules, report diagnosis, task store, GSC persistence, OAuth refresh, or Google API client.
 - GSC configuration and service tests verify encrypted secret storage, environment fallback, OAuth URL parameters, refresh-token persistence, status redaction, property access, and friendly Google errors.
 - `main.jsx` no longer owns browser history persistence, snapshot/delta calculation, or history/report-retention panel markup; focused tests cover malformed storage, retention settings, deterministic snapshots, severity changes, and category changes.
+- `main.jsx` no longer owns URL-row markup or URL-result filtering/pagination state; component and pure-logic tests cover controlled issue selection, source filtering, filtered exports, and the 50-row page boundary.
+- `main.jsx` no longer owns health-score summaries, detected-input/limit presentation, backlog, robots evidence, sitemap signals, or hreflang issue cards; focused tests lock health-score thresholds and robots-to-URL issue mapping.
 - Upgraded `concurrently` from 9.2.1 to 10.0.3 to remove the critical transitive `shell-quote` advisory; a fresh audit reports zero vulnerabilities.
 - Moved Vite, the React plugin, TypeScript, and concurrently to `devDependencies`, reducing the production dependency set.
 - Updated Undici within major version 7 to 7.27.2 and declared the required Node.js baseline.

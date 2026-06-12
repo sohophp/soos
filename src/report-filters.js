@@ -2,6 +2,7 @@ import { normalizeReportUrl } from "./url-policy.js";
 
 export const URL_SOURCE_FILTERS = ["all", "sitemap", "internal", "gsc", "google"];
 export const URL_CHANGE_FILTERS = ["all", "regressed", "persistent", "improved", "unchanged", "unavailable"];
+export const URL_FINDINGS_PAGE_SIZE = 50;
 
 function normalizedUrl(value) {
   return normalizeReportUrl(value || "");
@@ -103,4 +104,15 @@ export function urlFilterCounts(pages, sourceSets, comparisonEntry) {
     counts.changes[urlChangeState(page, comparisonEntry)] += 1;
   }
   return counts;
+}
+
+export function paginateUrlFindings(pages, requestedPage, pageSize = URL_FINDINGS_PAGE_SIZE) {
+  const safePageSize = Math.max(1, Number(pageSize) || URL_FINDINGS_PAGE_SIZE);
+  const pageCount = Math.max(1, Math.ceil((pages || []).length / safePageSize));
+  const page = Math.min(pageCount, Math.max(1, Number(requestedPage) || 1));
+  return {
+    page,
+    pageCount,
+    items: (pages || []).slice((page - 1) * safePageSize, page * safePageSize),
+  };
 }

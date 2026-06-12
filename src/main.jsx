@@ -1,14 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  AlertTriangle,
-  Bot,
-  CheckCircle2,
   ChartNoAxesCombined,
-  ChevronDown,
-  ExternalLink,
   FileSearch,
-  Globe2,
   History,
   Link,
   ListChecks,
@@ -16,21 +10,13 @@ import {
   Search,
   ScanSearch,
   Settings,
-  ShieldAlert,
-  XCircle,
 } from "lucide-react";
 import { absoluteLogUrl, parseAccessLog, STATIC_ASSET_PATH } from "./googlebot-log.js";
 import { buildUrlInspectionCandidates, inspectionCandidateKey } from "./url-inspection-candidates.js";
-import { buildInternalLinkGraph } from "./link-graph.js";
 import { analyzeUrlVariantGroup, comparisonUrl, normalizeReportUrl, urlVariantFamily } from "./url-policy.js";
 import { apiPost, formatApiError } from "./api-client.js";
 import { downloadCsvFile, downloadTextFile } from "./downloads.js";
 import { buildStandaloneHtmlReport } from "./html-report.js";
-import {
-  buildUrlSourceSets,
-  pageMatchesUrlFilters,
-  urlFilterCounts,
-} from "./report-filters.js";
 import {
   loadHistory,
   loadHistoryLimit,
@@ -69,6 +55,11 @@ import { SearchAnalyticsPanel } from "./components/SearchAnalyticsPanel.jsx";
 import { SearchConsoleImport } from "./components/SearchConsoleImport.jsx";
 import { SearchConsoleApiConfig } from "./components/SearchConsoleApiConfig.jsx";
 import { PrivacyDataPanel } from "./components/PrivacyDataPanel.jsx";
+import { IssuesView } from "./components/IssuesView.jsx";
+import { Badge, ReportEmptyState, Stat } from "./components/ReportUi.jsx";
+import { ScanSummaryView } from "./components/ScanSummaryView.jsx";
+import { UrlFindingsPanel } from "./components/UrlFindingsPanel.jsx";
+import { UrlStructureView } from "./components/UrlStructureView.jsx";
 import {
   ComparisonPanel,
   HistoryPanel,
@@ -82,7 +73,6 @@ import {
 import {
   detectLanguage,
   dictionaries,
-  formatText,
   googlebotLogText,
   gscDataText,
   gscSupportingText,
@@ -93,29 +83,6 @@ import {
 } from "./i18n.js";
 import { loadWorkspaceView, saveWorkspaceView } from "./workspace-views.js";
 import "./styles.css";
-
-const severityLabels = { critical: "Critical", warning: "Warning", notice: "Notice" };
-const severityIcons = { critical: XCircle, warning: AlertTriangle, notice: ShieldAlert };
-
-
-function Badge({ severity, children }) {
-  const Icon = severityIcons[severity] || CheckCircle2;
-  return (
-    <span className={`badge badge-${severity || "ok"}`}>
-      <Icon size={14} />
-      {children}
-    </span>
-  );
-}
-
-function Stat({ label, value, tone }) {
-  return (
-    <div className={`stat ${tone ? `stat-${tone}` : ""}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
 
 function ProgressBar({ progress }) {
   if (!progress) return null;
@@ -202,480 +169,6 @@ function RuntimePanel({ loading, jobStatus, progress, runtimeMeta, t }) {
     </section>
   );
 }
-function ScoreCard({ score, t }) {
-  const tone = score >= 85 ? "good" : score >= 65 ? "warn" : "bad";
-  return (
-    <section className={`score score-${tone}`}>
-      <div>
-        <span>{t.healthScore}</span>
-        <strong>{score}</strong>
-      </div>
-      <p>{score >= 85 ? t.cleanSignals : score >= 65 ? t.needsCleanup : t.likelyBlockers}</p>
-    </section>
-  );
-}
-
-function ExecutiveSummary({ summary, t }) {
-  if (!summary?.headline) return null;
-  return (
-    <section className="panel executive-summary">
-      <div className="panel-head">
-        <h2>{t.executiveSummary}</h2>
-      </div>
-      <div className="executive-body">
-        <p>{summary.headline}</p>
-        {summary.topActions?.length ? (
-          <div className="executive-actions">
-            <strong>{t.priorityActions}</strong>
-            {summary.topActions.map((action) => (
-              <small key={action}>{action}</small>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function StatusFlags({ flags, t }) {
-  if (!flags?.length) return null;
-  return (
-    <section className="panel status-flags">
-      <div className="panel-head">
-        <h2>{t.statusFlags}</h2>
-      </div>
-      <div className="status-flag-list">
-        {flags.map((flag) => (
-          <Badge key={flag.key} severity={flag.severity}>
-            {flag.label}
-          </Badge>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function EmptyState({ t }) {
-  return (
-    <section className="empty">
-      <FileSearch size={42} />
-      <p>{t.placeholder}</p>
-    </section>
-  );
-}
-
-function PerformanceSignals({ page, t }) {
-  if (!page.performance) return null;
-  const perf = page.performance;
-  const kb = Math.round((perf.htmlBytes || 0) / 1024);
-  return (
-    <div className="signals performance-signals">
-      <div><strong>{t.performance || "Performance"}</strong><span>{perf.ttfbMs ? `${perf.ttfbMs}ms TTFB` : "TTFB unknown"}</span></div>
-      <div><strong>HTML</strong><span>{kb}KB</span></div>
-      <div><strong>Resources</strong><span>{perf.scriptCount || 0} JS / {perf.stylesheetCount || 0} CSS / {perf.imageCount || 0} IMG</span></div>
-    </div>
-  );
-}
-function PageRow({ page, t }) {
-  const [open, setOpen] = useState(false);
-  const firstIssue = page.issues[0];
-  const hasSignals =
-    page.title != null ||
-    page.description != null ||
-    page.h1Count != null ||
-    page.lang != null ||
-    page.viewport != null ||
-    page.structuredData != null;
-  return (
-    <article className="row">
-      <button
-        className="row-main"
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <ChevronDown className={open ? "rotated" : ""} size={18} />
-        <div className="url-cell">
-          <span>{page.url}</span>
-          {page.finalUrl && page.finalUrl !== page.url ? <small>{t.final}: {page.finalUrl}</small> : null}
-          {page.redirectChain?.length ? <small>{t.redirectChain}: {page.redirectChain.length} {t.redirectHops}</small> : null}
-        </div>
-        <div className="row-status">
-          <span className="http">{page.status || "ERR"}</span>
-          {firstIssue ? <Badge severity={firstIssue.severity}>{severityLabels[firstIssue.severity]}</Badge> : <Badge>OK</Badge>}
-        </div>
-      </button>
-      {open ? (
-        <div className="row-detail">
-          {page.redirectChain?.length ? (
-            <div className="redirect-chain">
-              <strong>{t.redirectChain}</strong>
-              {page.redirectChain.map((hop, index) => (
-                <small key={`${hop.url}-${hop.status}-${index}`}>
-                  {index + 1}. HTTP {hop.status} / {hop.url} {"->"} {hop.targetUrl || hop.location || t.unknown}
-                </small>
-              ))}
-            </div>
-          ) : null}
-          {hasSignals ? (
-            <div className="signals">
-              <div>
-                <strong>{t.title}</strong>
-                <span>{page.title || t.missing}</span>
-              </div>
-              <div>
-                <strong>{t.description}</strong>
-                <span>{page.description || t.missing}</span>
-              </div>
-              <div>
-                <strong>{t.h1}</strong>
-                <span>{page.h1Count ?? t.unknown}</span>
-              </div>
-              <div>
-                <strong>{t.lang}</strong>
-                <span>{page.lang || t.missing}</span>
-              </div>
-              <div>
-                <strong>{t.viewport}</strong>
-                <span>{page.viewport ? t.present : t.missing}</span>
-              </div>
-              <div>
-                <strong>{t.jsonLd}</strong>
-                <span>
-                  {page.structuredData?.count
-                    ? formatText(t.validInvalid, { valid: page.structuredData.validCount, invalid: page.structuredData.invalidCount })
-                    : t.noneFound}
-                </span>
-              </div>
-            </div>
-          ) : null}
-          {page.canonical ? (
-            <p>
-              <strong>{t.canonical}</strong>
-              <a href={page.canonical} target="_blank" rel="noreferrer">
-                {page.canonical}
-                <ExternalLink size={14} />
-              </a>
-            </p>
-          ) : null}
-          {page.alternates?.length ? (
-            <p>
-              <strong>{t.alternates}</strong>
-              <span>{page.alternates.length} {t.hreflangLinks}</span>
-            </p>
-          ) : null}
-          <div className="issues">
-            {page.googleReasons?.length ? (
-              <div className="reason-box">
-                <strong>{t.likelyOutcome}</strong>
-                {page.googleReasons.map((reason) => (
-                  <div className="reason" key={reason.code}>
-                    <Badge severity={reason.severity}>{reason.label}</Badge>
-                    <span>{reason.detail}</span>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            {page.issues.length ? (
-              page.issues.map((issue, index) => (
-                <div className={`issue issue-${issue.severity}`} key={`${issue.type}-${index}`}>
-                  <Badge severity={issue.severity}>{issue.type}</Badge>
-                  <span>{issue.message}</span>
-                  {issue.detail ? <small>{issue.detail}</small> : null}
-                </div>
-              ))
-            ) : (
-              <div className="issue issue-ok">
-                <Badge>OK</Badge>
-                <span>{t.noBlockers}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      ) : null}
-    </article>
-  );
-}
-
-function Backlog({ backlog, t }) {
-  if (!backlog?.length) {
-    return (
-      <section className="panel backlog">
-        <div className="panel-head">
-          <h2>{t.fixFirst}</h2>
-        </div>
-        <div className="clean">
-          <CheckCircle2 size={20} />
-          <span>{t.noPriority}</span>
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="panel backlog">
-      <div className="panel-head">
-        <h2>{t.fixFirst}</h2>
-        <span>{backlog.length} {t.tasks}</span>
-      </div>
-      <div className="tasks">
-        {backlog.map((task) => (
-          <article className={`task task-${task.severity}`} key={task.key}>
-            <div className="task-top">
-              <Badge severity={task.severity}>{task.count} affected</Badge>
-              <h3>{task.title}</h3>
-            </div>
-            <p>{task.action}</p>
-            {task.sampleUrls?.length ? (
-              <div className="samples">
-                {task.sampleUrls.map((url) => (
-                  <small key={url}>{url}</small>
-                ))}
-              </div>
-            ) : null}
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function Sitemaps({ sitemaps, t }) {
-  if (!sitemaps?.length) return null;
-  return (
-    <section className="panel">
-      <div className="panel-head">
-        <h2>{t.sitemaps}</h2>
-        <span>{sitemaps.length}</span>
-      </div>
-      <div className="sitemap-list">
-        {sitemaps.map((sitemap) => (
-          <div className="sitemap" key={sitemap.url}>
-            <Globe2 size={16} />
-            <span>{sitemap.url}</span>
-            <em>{sitemap.kind}</em>
-            <strong>{sitemap.locCount}</strong>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function RobotsDetails({ robots, t, onSelectIssue }) {
-  const [copiedRule, setCopiedRule] = useState("");
-  if (!robots?.found) return null;
-  const analysis = robots.analysis;
-  const impactLabels = {
-    submitted_url: t.blockedSubmittedUrls,
-    canonical_target: t.blockedCanonicalTargets,
-    alternate_target: t.blockedAlternateTargets,
-  };
-  return (
-    <section className="panel robots-detail">
-      <div className="panel-head">
-        <h2>{t.robotsAnalysis}</h2>
-        <span>{analysis?.ruleCount || 0} {t.rules}</span>
-      </div>
-      <div className="robots-metrics">
-        <Stat label={t.googleGroups} value={analysis?.googleGroupCount || 0} />
-        <Stat label={t.sitemapDirectives} value={robots.sitemapDirectives?.length || 0} />
-        <Stat label={t.critical} value={analysis?.issues?.filter((issue) => issue.severity === "critical").length || 0} tone="bad" />
-      </div>
-      {analysis?.issues?.length ? (
-        <div className="issues robots-issues">
-          {analysis.issues.map((issue) => (
-            <div className={`issue issue-${issue.severity}`} key={issue.type}>
-              <Badge severity={issue.severity}>{issue.type}</Badge>
-              <span>{issue.message}</span>
-              {issue.detail ? <small>{issue.detail}</small> : null}
-            </div>
-          ))}
-        </div>
-      ) : null}
-      {robots.sitemapDirectives?.length ? (
-        <div className="robot-sitemaps">
-          {robots.sitemapDirectives.map((url) => (
-            <small key={url}>{url}</small>
-          ))}
-        </div>
-      ) : null}
-      {analysis?.blockedSummaries?.length ? (
-        <div className="robots-impact">
-          <div className="panel-head">
-            <h2>{t.robotsImpact}</h2>
-            <span>{analysis.blockedSummaries.length}</span>
-          </div>
-          <div className="impact-list">
-            {analysis.blockedSummaries.map((item) => (
-              <article className="impact-card" key={`${item.scope}-${item.rule}`}>
-                <div className="impact-top">
-                  <Badge severity="warning">{impactLabels[item.scope] || item.scope}</Badge>
-                  <strong>{item.rule}</strong>
-                  <span>{item.count}</span>
-                </div>
-                {item.details?.length ? (
-                  <div className="impact-details">
-                    {item.details.map((detail) => (
-                      <small key={detail}>{detail}</small>
-                    ))}
-                  </div>
-                ) : null}
-                {item.sampleUrls?.length ? (
-                  <div className="impact-samples">
-                    <strong>{t.sampleUrls}</strong>
-                    {item.sampleUrls.map((url) => (
-                      <small key={url}>{url}</small>
-                    ))}
-                  </div>
-                ) : null}
-                <button
-                  className="impact-filter"
-                  type="button"
-                  onClick={() =>
-                    onSelectIssue?.({
-                      type:
-                        item.scope === "submitted_url"
-                          ? "robots_disallow"
-                          : item.scope === "canonical_target"
-                            ? "canonical_blocked"
-                            : "alternate_blocked",
-                    })
-                  }
-                >
-                  {t.showMatchingUrls}
-                </button>
-                {item.affectedUrls?.length ? (
-                  <button
-                    className="impact-filter"
-                    type="button"
-                    onClick={async () => {
-                      const key = `${item.scope}-${item.rule}`;
-                      await navigator.clipboard.writeText(item.affectedUrls.join("\n"));
-                      setCopiedRule(key);
-                      window.setTimeout(() => setCopiedRule((current) => (current === key ? "" : current)), 1600);
-                    }}
-                  >
-                    {copiedRule === `${item.scope}-${item.rule}` ? t.copiedBlockedUrls : t.copyBlockedUrls}
-                  </button>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {robots.contentPreview ? (
-        <details className="robots-content">
-          <summary>{t.robotsContent}</summary>
-          <pre>{robots.contentPreview}</pre>
-        </details>
-      ) : null}
-    </section>
-  );
-}
-
-function SitemapSignals({ signals, t, onSelectIssue }) {
-  if (!signals?.length) return null;
-
-  const signalLabels = {
-    redirect: t.redirectUrlsInSitemap,
-    noindex: t.noindexUrlsInSitemap,
-    canonical_mismatch: t.canonicalizedElsewhere,
-    canonical_not_in_sitemap: t.canonicalMissingFromSitemap,
-    http_error: t.brokenUrlsInSitemap,
-  };
-
-  return (
-    <section className="panel sitemap-signals">
-      <div className="panel-head">
-        <h2>{t.sitemapSignals}</h2>
-        <span>{signals.length}</span>
-      </div>
-      <div className="impact-list">
-        {signals.map((item) => (
-          <article className="impact-card" key={item.key}>
-            <div className="impact-top">
-              <Badge severity={item.key === "http_error" || item.key === "noindex" ? "critical" : "warning"}>
-                {item.scope === "canonical_target" ? t.blockedCanonicalTargets : t.blockedSubmittedUrls}
-              </Badge>
-              <strong>{signalLabels[item.key] || item.title}</strong>
-              <span>{item.count}</span>
-            </div>
-            {item.details?.length ? (
-              <div className="impact-samples">
-                <strong>{t.relatedTargets}</strong>
-                {item.details.map((detail) => (
-                  <small key={detail}>{detail}</small>
-                ))}
-              </div>
-            ) : null}
-            {item.sampleUrls?.length ? (
-              <div className="impact-samples">
-                <strong>{t.sampleUrls}</strong>
-                {item.sampleUrls.map((url) => (
-                  <small key={url}>{url}</small>
-                ))}
-              </div>
-            ) : null}
-            <button className="impact-filter" type="button" onClick={() => onSelectIssue?.({ type: item.key })}>
-              {t.showMatchingUrls}
-            </button>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function InternationalSignals({ signals, t, onSelectIssue }) {
-  if (!signals?.length) return null;
-
-  const signalLabels = {
-    alternate_not_reciprocal: t.alternateNotReciprocal,
-    alternate_target_canonical_mismatch: t.alternateCanonicalMismatch,
-    alternate_hreflang_invalid: t.invalidHreflangValues,
-  };
-
-  return (
-    <section className="panel sitemap-signals">
-      <div className="panel-head">
-        <h2>{t.internationalSignals}</h2>
-        <span>{signals.length}</span>
-      </div>
-      <div className="impact-list">
-        {signals.map((item) => (
-          <article className="impact-card" key={item.key}>
-            <div className="impact-top">
-              <Badge severity="warning">{t.blockedAlternateTargets}</Badge>
-              <strong>{signalLabels[item.key] || item.title}</strong>
-              <span>{item.count}</span>
-            </div>
-            {item.details?.length ? (
-              <div className="impact-samples">
-                <strong>{t.relatedTargets}</strong>
-                {item.details.map((detail) => (
-                  <small key={detail}>{detail}</small>
-                ))}
-              </div>
-            ) : null}
-            {item.sampleUrls?.length ? (
-              <div className="impact-samples">
-                <strong>{t.sampleUrls}</strong>
-                {item.sampleUrls.map((url) => (
-                  <small key={url}>{url}</small>
-                ))}
-              </div>
-            ) : null}
-            <button className="impact-filter" type="button" onClick={() => onSelectIssue?.({ type: item.key })}>
-              {t.showMatchingUrls}
-            </button>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function issueCategories(page) {
   const issueTypes = new Set((page.issues || []).map((issue) => issue.type));
   const categories = [];
@@ -1736,206 +1229,21 @@ function GooglebotLogAnalysis({ report, language, gscRows }) {
   );
 }
 
-function InternalDiscovery({ report, t }) {
-  const pages = report?.discoveredPages || [];
-  if (!report?.options?.internalCrawl) return null;
-  return (
-    <section className="panel internal-discovery">
-      <div className="panel-head">
-        <h2>{t.internalDiscoveryTitle}</h2>
-        <span>{pages.length} {t.discoveredUrls}</span>
-      </div>
-      <div className="internal-discovery-copy">
-        <small>{t.internalDiscoveryHelp}</small>
-        {report.truncation?.internalCrawlLimitReached ? <small className="gsc-api-error">{t.internalCrawlLimit}</small> : null}
-      </div>
-      {pages.length ? (
-        <div className="internal-discovery-list">
-          {pages.map((page) => (
-            <article className="internal-discovery-row" key={page.url}>
-              <Badge severity={page.status >= 400 || !page.status ? "critical" : page.issues?.length ? "warning" : "ok"}>
-                {page.status || "ERR"}
-              </Badge>
-              <strong title={page.url}>{page.url}</strong>
-              <span>{t.crawlDepth}: {page.crawlDepth || 1}</span>
-              <small title={page.discoveredFrom}>{t.discoveredFrom}: {page.discoveredFrom || "-"}</small>
-              <small>{page.issues?.length || 0} {t.tasks}</small>
-            </article>
-          ))}
-        </div>
-      ) : <p className="none">{t.noDiscoveredUrls}</p>}
-    </section>
-  );
-}
-
-function InternalLinkGraph({ report, t }) {
-  const [filter, setFilter] = useState("all");
-  const graph = useMemo(() => buildInternalLinkGraph(report), [report]);
-  if (!report?.options?.internalCrawl || !graph.rows.length) return null;
-  const labels = {
-    unreachable: t.graphUnreachable,
-    orphan: t.graphOrphan,
-    deep: t.graphDeep,
-    weak: t.graphWeak,
-    dead_end: t.graphDeadEnd,
-    healthy: t.graphHealthy,
-  };
-  const visibleRows = filter === "all" ? graph.rows : graph.rows.filter((row) => row.state === filter);
-
-  function exportGraph() {
-    downloadCsvFile("soos-internal-link-graph.csv", [
-      ["state", "url", "source", "homepage_click_depth", "discovery_depth", "inbound_count", "outbound_count", "inbound_urls", "outbound_urls"],
-      ...graph.rows.map((row) => [
-        labels[row.state] || row.state,
-        row.url,
-        row.source,
-        row.clickDepth ?? "",
-        row.crawlDepth,
-        row.inboundCount,
-        row.outboundCount,
-        row.inboundUrls.join(" | "),
-        row.outboundUrls.join(" | "),
-      ]),
-    ]);
-  }
-
-  return (
-    <section className="panel internal-link-graph">
-      <div className="panel-head">
-        <h2>{t.linkGraphTitle}</h2>
-        <span>{graph.rows.length} {t.graphNodes} / {graph.edgeCount} {t.graphEdges} / {graph.reachableCount} {t.reachablePages}</span>
-      </div>
-      <div className="link-graph-toolbar">
-        <div>
-          <small>{t.linkGraphHelp}</small>
-          {!graph.rootAvailable ? <small className="gsc-api-error">{t.rootNotScanned}</small> : null}
-        </div>
-        <div className="url-alignment-actions">
-          <select value={filter} onChange={(event) => setFilter(event.target.value)}>
-            <option value="all">{t.graphAll} ({graph.rows.length})</option>
-            {Object.entries(labels).map(([state, label]) => (
-              <option value={state} key={state}>{label} ({graph.counts[state] || 0})</option>
-            ))}
-          </select>
-          <button className="export-button" type="button" onClick={exportGraph}>{t.linkGraphExport}</button>
-        </div>
-      </div>
-      <div className="coverage-disposition-summary link-graph-summary">
-        {graph.rootAvailable ? <span>{t.maxClickDepth}: {graph.maxClickDepth}</span> : null}
-        {Object.entries(labels).map(([state, label]) => (
-          <span key={state}>{label}: {graph.counts[state] || 0}</span>
-        ))}
-      </div>
-      <div className="link-graph-list">
-        {visibleRows.map((row) => (
-          <article className="link-graph-row" key={row.url}>
-            <Badge severity={row.state === "unreachable" || row.state === "orphan" ? "critical" : row.state === "deep" || row.state === "weak" ? "warning" : row.state === "dead_end" ? "notice" : "ok"}>
-              {labels[row.state]}
-            </Badge>
-            <strong title={row.url}>{row.url}</strong>
-            <span>{t.graphSource}: {row.source === "sitemap" ? t.graphSourceSitemap : t.graphSourceInternal}</span>
-            <span>{t.clickDepth}: {row.clickDepth ?? "-"}</span>
-            <span>{t.crawlDepth}: {row.crawlDepth}</span>
-            <span>{t.inboundCount}: {row.inboundCount}</span>
-            <span>{t.outboundCount}: {row.outboundCount}</span>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-const URL_PAGE_SIZE = 50;
-
 function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language, activeView, onViewChange, comparisonEntry }) {
-  const [filter, setFilter] = useState("all");
-  const [query, setQuery] = useState("");
-  const [issueFilter, setIssueFilter] = useState(null);
-  const [sourceFilter, setSourceFilter] = useState("all");
-  const [changeFilter, setChangeFilter] = useState("all");
   const [inspectionResults, setInspectionResults] = useState([]);
-  const [pageNumber, setPageNumber] = useState(1);
-  const sourceSets = useMemo(
-    () => buildUrlSourceSets(report, gscRows, inspectionResults),
-    [gscRows, inspectionResults, report],
-  );
-  const filterCounts = useMemo(
-    () => urlFilterCounts(report?.pages || [], sourceSets, comparisonEntry),
-    [comparisonEntry, report, sourceSets],
-  );
-  const pages = useMemo(() => {
-    if (!report?.pages) return [];
-    return report.pages.filter((page) => pageMatchesUrlFilters(page, {
-      severity: filter,
-      issueType: issueFilter?.type || "",
-      query,
-      source: sourceFilter,
-      change: changeFilter,
-      sourceSets,
-      comparisonEntry,
-    }));
-  }, [changeFilter, comparisonEntry, filter, issueFilter, query, report, sourceFilter, sourceSets]);
-  const pageCount = Math.max(1, Math.ceil(pages.length / URL_PAGE_SIZE));
-  const visiblePages = pages.slice((pageNumber - 1) * URL_PAGE_SIZE, pageNumber * URL_PAGE_SIZE);
-  const workspaceCopy = workspaceText[language] || workspaceText.en;
-
-  useEffect(() => {
-    setPageNumber(1);
-  }, [changeFilter, filter, issueFilter, query, report, sourceFilter]);
-
-  useEffect(() => {
-    if (pageNumber > pageCount) setPageNumber(pageCount);
-  }, [pageCount, pageNumber]);
+  const [issueFilter, setIssueFilter] = useState(null);
 
   function selectIssue(issue) {
     setIssueFilter(issue);
     onViewChange?.("urls");
   }
 
-  if (!report) return ["scan", "issues", "urls"].includes(activeView) ? <EmptyState t={t} /> : null;
+  if (!report) return ["scan", "issues", "urls"].includes(activeView) ? <ReportEmptyState t={t} /> : null;
 
   return (
     <>
       <div className="workspace-view" hidden={activeView !== "scan"}>
-        <StatusFlags flags={report.statusFlags} t={t} />
-        <ExecutiveSummary summary={report.executiveSummary} t={t} />
-        <ScoreCard score={report.summary.healthScore} t={t} />
-        <section className="summary">
-          <Stat label={t.urls} value={report.summary.urlCount} />
-          {report.options?.internalCrawl ? <Stat label={t.discoveredUrls} value={report.summary.discoveredUrlCount || 0} /> : null}
-          <Stat label={t.affected} value={report.summary.affectedUrlCount} tone="warn" />
-          <Stat label={t.googleRisk} value={report.summary.googleBlockedCount} tone="bad" />
-          <Stat label={t.critical} value={report.summary.issueCounts.critical} tone="bad" />
-          <Stat label={t.warnings} value={report.summary.issueCounts.warning} tone="warn" />
-        </section>
-        <section className="panel detected">
-        <div className="panel-head">
-          <h2>{t.detectedInputs}</h2>
-          <span>{report.input.inputType}</span>
-        </div>
-        <div className="detected-grid">
-          <p><strong>{t.original}</strong><span>{report.input.originalUrl}</span></p>
-          <p><strong>{t.siteRoot}</strong><span>{report.input.siteRootUrl}</span></p>
-          <p><strong>Sitemap</strong><span>{report.input.sitemapUrl}</span></p>
-          <p><strong>Robots</strong><span>{report.input.robotsUrl}</span></p>
-        </div>
-        </section>
-        {report.truncation?.truncated ? (
-        <section className="limit-warning">
-          <AlertTriangle size={20} />
-          <div>
-            <strong>{t.limitReachedTitle}</strong>
-            <span>{formatText(t.limitReachedText, { urls: report.limits.maxUrls, sitemaps: report.limits.maxSitemaps })}</span>
-          </div>
-        </section>
-      ) : (
-        <section className="limit-note">
-          <CheckCircle2 size={18} />
-          <span>
-            {formatText(t.limitOk, { urls: report.limits.maxUrls, sitemaps: report.limits.maxSitemaps })}
-          </span>
-        </section>
-        )}
+        <ScanSummaryView report={report} t={t} />
       </div>
 
       <div className="workspace-view" hidden={activeView !== "google"}>
@@ -1953,128 +1261,24 @@ function Report({ report, t, gscRows, gscStatus, gscSiteUrl, language, activeVie
       </div>
 
       <div className="workspace-view" hidden={activeView !== "issues"}>
-        <Backlog backlog={report.backlog} t={t} />
-        <section className="panel robots">
-        <div>
-          <Bot size={20} />
-          <div>
-            <h2>{t.robots}</h2>
-            <p>{report.robots?.url}</p>
-          </div>
-        </div>
-        {report.robots?.found ? (
-          <Badge>{t.found} - {report.robots.groupCount} {t.groups}</Badge>
-        ) : (
-          <Badge severity="warning">{report.robots?.error || "Not found"}</Badge>
-        )}
-        </section>
-        <RobotsDetails robots={report.robots} t={t} onSelectIssue={selectIssue} />
-        <SitemapSignals signals={report.sitemapSignals} t={t} onSelectIssue={selectIssue} />
-        <InternationalSignals signals={report.internationalSignals} t={t} onSelectIssue={selectIssue} />
+        <IssuesView report={report} t={t} onSelectIssue={selectIssue} />
       </div>
 
       <div className="workspace-view" hidden={activeView !== "urls"}>
-        <InternalDiscovery report={report} t={t} />
-        <InternalLinkGraph report={report} t={t} />
-        <Sitemaps sitemaps={report.sitemaps} t={t} />
-        <section className="panel">
-        <div className="panel-head">
-          <h2>{t.urlFindings}</h2>
-          <div className="findings-toolbar">
-            <div className="filters">
-              {["all", "critical", "warning", "notice", "ok"].map((item) => (
-                <button
-                  className={filter === item ? "active" : ""}
-                  key={item}
-                  type="button"
-                  aria-pressed={filter === item}
-                  onClick={() => {
-                    setFilter(item);
-                    if (item === "ok") setIssueFilter(null);
-                  }}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-            <div className="findings-actions">
-              {issueFilter?.type ? (
-                <button className="export-button" type="button" onClick={() => setIssueFilter(null)}>
-                  {issueFilter.type}
-                </button>
-              ) : null}
-              <label className="findings-select">
-                <span>{workspaceCopy.sourceFilter}</span>
-                <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
-                  <option value="all">{workspaceCopy.sourceAll} ({filterCounts.sources.all})</option>
-                  <option value="sitemap">{workspaceCopy.sourceSitemap} ({filterCounts.sources.sitemap})</option>
-                  <option value="internal">{workspaceCopy.sourceInternal} ({filterCounts.sources.internal})</option>
-                  <option value="gsc">{workspaceCopy.sourceGsc} ({filterCounts.sources.gsc})</option>
-                  <option value="google">{workspaceCopy.sourceGoogle} ({filterCounts.sources.google})</option>
-                </select>
-              </label>
-              <label className="findings-select">
-                <span>{workspaceCopy.changeFilter}</span>
-                <select value={changeFilter} onChange={(event) => setChangeFilter(event.target.value)}>
-                  <option value="all">{workspaceCopy.changeAll} ({filterCounts.changes.all})</option>
-                  <option value="regressed">{workspaceCopy.changeRegressed} ({filterCounts.changes.regressed})</option>
-                  <option value="persistent">{workspaceCopy.changePersistent} ({filterCounts.changes.persistent})</option>
-                  <option value="improved">{workspaceCopy.changeImproved} ({filterCounts.changes.improved})</option>
-                  <option value="unchanged">{workspaceCopy.changeUnchanged} ({filterCounts.changes.unchanged})</option>
-                  <option value="unavailable">{workspaceCopy.changeUnavailable} ({filterCounts.changes.unavailable})</option>
-                </select>
-              </label>
-              <input
-                className="findings-search"
-                type="search"
-                aria-label={t.searchUrls}
-                placeholder={t.searchUrls}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-              <button className="export-button" type="button" onClick={() => downloadSummary(report)}>
-                {t.exportSummary}
-              </button>
-              <button className="export-button" type="button" onClick={() => downloadHtmlReport(report, gscRows, language)}>
-                {workspaceCopy.exportHtml}
-              </button>
-              <button className="export-button" type="button" onClick={() => downloadCsv(report, gscRows, pages)}>
-                {t.exportCsv}
-              </button>
-              {(filter !== "all" || issueFilter || sourceFilter !== "all" || changeFilter !== "all" || query) ? (
-                <button
-                  className="export-button"
-                  type="button"
-                  onClick={() => {
-                    setFilter("all");
-                    setIssueFilter(null);
-                    setSourceFilter("all");
-                    setChangeFilter("all");
-                    setQuery("");
-                  }}
-                >
-                  {workspaceCopy.clearFilters}
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-          <small className="findings-match-count">{pages.length} {workspaceCopy.matchingUrls}</small>
-          <div className="rows">
-            {visiblePages.length ? visiblePages.map((page) => <PageRow page={page} key={page.url} t={t} />) : <p className="none">{t.noFilter}</p>}
-          </div>
-          {pageCount > 1 ? (
-            <nav className="result-pagination" aria-label={t.urlFindings}>
-              <button type="button" onClick={() => setPageNumber((value) => Math.max(1, value - 1))} disabled={pageNumber === 1}>
-                {workspaceCopy.previousPage}
-              </button>
-              <span>{workspaceCopy.page} {pageNumber} {workspaceCopy.of} {pageCount}</span>
-              <button type="button" onClick={() => setPageNumber((value) => Math.min(pageCount, value + 1))} disabled={pageNumber === pageCount}>
-                {workspaceCopy.nextPage}
-              </button>
-            </nav>
-          ) : null}
-        </section>
+        <UrlStructureView report={report} t={t} />
+        <UrlFindingsPanel
+          report={report}
+          gscRows={gscRows}
+          inspectionResults={inspectionResults}
+          comparisonEntry={comparisonEntry}
+          issueFilter={issueFilter}
+          t={t}
+          language={language}
+          onIssueFilterChange={setIssueFilter}
+          onExportSummary={() => downloadSummary(report)}
+          onExportHtml={() => downloadHtmlReport(report, gscRows, language)}
+          onExportCsv={(pages) => downloadCsv(report, gscRows, pages)}
+        />
       </div>
     </>
   );

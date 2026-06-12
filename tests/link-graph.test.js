@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import { buildInternalLinkGraph, linkGraphKey } from "../src/link-graph.js";
+import {
+  buildInternalLinkGraph,
+  buildInternalLinkGraphCsvRows,
+  linkGraphKey,
+} from "../src/link-graph.js";
 
 const graph = buildInternalLinkGraph({
   input: { siteRootUrl: "https://example.com/" },
@@ -69,5 +73,12 @@ const noRoot = buildInternalLinkGraph({
 assert.equal(noRoot.rootAvailable, false);
 assert.equal(noRoot.rows[0].state, "orphan");
 assert.equal(noRoot.rows[0].clickDepth, null);
+
+const csvRows = buildInternalLinkGraphCsvRows(graph, { unreachable: "Unreachable" });
+assert.equal(csvRows[0][0], "state");
+assert.equal(csvRows.length, graph.rows.length + 1);
+const orphanCsv = csvRows.find((row) => row[1] === "https://example.com/orphan");
+assert.equal(orphanCsv[0], "Unreachable");
+assert.equal(orphanCsv[3], "");
 
 console.log("link-graph-tests-passed");

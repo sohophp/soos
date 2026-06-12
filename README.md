@@ -52,6 +52,9 @@ Stored data, retention periods, Google disconnection, and complete current-sessi
 - Structured data validation and scan-level diagnosis/report scoring live in dedicated domain modules.
 - Persistent Scan, Google, Issues, URLs, History, and Settings views, with paginated URL findings and state-preserving Google diagnostics.
 - URL findings can be filtered by severity, issue type, text, Sitemap/internal/GSC/Inspection source, and historical change state; CSV export follows the active filters.
+- URL finding rows, filters, source/change counts, pagination, and filtered exports are isolated in `src/components/UrlFindingsPanel.jsx`.
+- Scan summary, issue diagnosis, and shared report badges/statistics are separated into focused report view components.
+- Sitemap inventory, recursive discoveries, internal-link graph filters, and graph CSV export are isolated in `src/components/UrlStructureView.jsx`.
 - History comparison separates introduced, resolved, worsened, improved, and persistent issues and warns when scan configuration changes may affect the result.
 - Browser history persistence, retention limits, snapshot creation, and comparison deltas live in `src/history.js`; history, retained-job, and comparison views live in `src/components/HistoryPanels.jsx`.
 - Standalone responsive HTML reports include scan scope, limits, configuration, summary, URL evidence, and available page-level Search Analytics metrics.

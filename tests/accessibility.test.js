@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { dictionaries } from "../src/i18n.js";
 
-const [mainSource, configSource, analyticsSource, importSource, styles] = await Promise.all([
+const [mainSource, findingsSource, configSource, analyticsSource, importSource, styles] = await Promise.all([
   fs.readFile(new URL("../src/main.jsx", import.meta.url), "utf8"),
+  fs.readFile(new URL("../src/components/UrlFindingsPanel.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/SearchConsoleApiConfig.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/SearchAnalyticsPanel.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/SearchConsoleImport.jsx", import.meta.url), "utf8"),
@@ -22,8 +23,8 @@ assert.match(mainSource, /htmlFor="language-select"/);
 assert.match(mainSource, /htmlFor="audit-url"/);
 assert.match(mainSource, /role="progressbar"/);
 assert.match(mainSource, /aria-valuenow=/);
-assert.match(mainSource, /aria-expanded=\{open\}/);
-assert.match(mainSource, /aria-pressed=\{filter === item\}/);
+assert.match(findingsSource, /aria-expanded=\{open\}/);
+assert.match(findingsSource, /aria-pressed=\{filter === item\}/);
 assert.match(mainSource, /className="error" role="alert"/);
 assert.match(mainSource, /Symbol\.for\("soos\.reactRoot"\)/);
 assert.match(mainSource, /reactRootElement\[reactRootKey\]/);

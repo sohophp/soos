@@ -31,6 +31,10 @@ soos 不只是检查孤立的 HTML 标签，而是回答一个更重要的问题
 - 主界面：`src/main.jsx`。
 - 历史存储与版本差异：`src/history.js`。
 - 历史、保留任务和版本比较面板：`src/components/HistoryPanels.jsx`。
+- URL 结果行、筛选与分页：`src/components/UrlFindingsPanel.jsx`。
+- 扫描摘要与限制状态：`src/components/ScanSummaryView.jsx`。
+- robots、sitemap 与 hreflang 问题视图：`src/components/IssuesView.jsx`。
+- 报告 Badge/Stat 通用组件：`src/components/ReportUi.jsx`。
 - 样式：`src/styles.css`。
 - 扫描历史保存在浏览器本地。
 - 当前任务 ID 保存在浏览器本地，刷新页面后可以恢复。
@@ -582,6 +586,15 @@ soos 的目标关系链是：
 - 新增 `src/history.js`，统一浏览器历史读取/保存、保留数量、历史快照、趋势标签、issue fingerprint 差异和诊断分类变化。
 - 新增 `src/components/HistoryPanels.jsx`，迁出历史列表、Neon 保留任务和版本比较三个视图；`main.jsx` 只传入状态与操作回调。
 - 历史模块测试覆盖损坏 localStorage、非法保留数量、确定性快照、严重程度升降、问题解决和分类变化；`main.jsx` 从 2,914 行缩减到约 2,475 行。
+- 新增 `src/components/UrlFindingsPanel.jsx`，迁出 URL 行展开证据、严重程度/来源/变化筛选、搜索、50 条分页和按当前结果导出。
+- 保留问题面板到 URL 列表的受控 issue type 联动；`report-filters.js` 新增可测试的分页边界，组件契约测试覆盖可访问状态和过滤导出。
+- `main.jsx` 进一步缩减到约 2,217 行；桌面浏览器验证网址视图可切换，无白屏、控制台错误、可见 alert 或页面级横向溢出。
+- 新增 `ScanSummaryView` 与 `IssuesView`，迁出健康分、执行摘要、输入/上限状态、修复 backlog、robots 规则证据、sitemap 和 hreflang 影响卡片。
+- `ReportUi` 统一 Badge/Stat，供 Google、URL、日志、链接图及新视图复用；`report-views.js` 固化健康分档和 robots 影响 issue type 映射。
+- 摘要/Issues 组件契约和纯逻辑测试已纳入 `npm run check`；`main.jsx` 进一步缩减到约 1,834 行。
+- 新增 `UrlStructureView`，迁出 sitemap URL 清单、递归站内发现和内部链接图的筛选、统计及导出界面。
+- `link-graph.js` 新增可独立测试的 CSV 行构建器；组件契约和导出回归测试已纳入 `npm run check`。
+- `main.jsx` 进一步缩减到约 1,705 行，报告的摘要、问题、网址和 URL 结构视图均已脱离主文件。
 
 ## 12. 历史完成度基线
 

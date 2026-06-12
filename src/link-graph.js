@@ -92,3 +92,30 @@ export function buildInternalLinkGraph(report = {}) {
     }, { unreachable: 0, orphan: 0, deep: 0, weak: 0, dead_end: 0, healthy: 0 }),
   };
 }
+
+export function buildInternalLinkGraphCsvRows(graph, labels = {}) {
+  return [
+    [
+      "state",
+      "url",
+      "source",
+      "homepage_click_depth",
+      "discovery_depth",
+      "inbound_count",
+      "outbound_count",
+      "inbound_urls",
+      "outbound_urls",
+    ],
+    ...(graph?.rows || []).map((row) => [
+      labels[row.state] || row.state,
+      row.url,
+      row.source,
+      row.clickDepth ?? "",
+      row.crawlDepth,
+      row.inboundCount,
+      row.outboundCount,
+      row.inboundUrls.join(" | "),
+      row.outboundUrls.join(" | "),
+    ]),
+  ];
+}
