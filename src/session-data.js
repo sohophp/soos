@@ -36,3 +36,23 @@ export function clearLocalSoosData(storage = globalThis.localStorage) {
   }
   return summary.count;
 }
+
+export function browserSoosDataSummary(
+  localStorage = globalThis.localStorage,
+  sessionStorage = globalThis.sessionStorage,
+) {
+  const local = localSoosDataSummary(localStorage);
+  const session = localSoosDataSummary(sessionStorage);
+  return {
+    local,
+    session,
+    count: local.count + session.count,
+  };
+}
+
+export function clearBrowserSoosData(
+  localStorage = globalThis.localStorage,
+  sessionStorage = globalThis.sessionStorage,
+) {
+  return clearLocalSoosData(localStorage) + clearLocalSoosData(sessionStorage);
+}

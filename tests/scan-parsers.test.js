@@ -5,12 +5,14 @@ import {
   detectSitemapKind,
   extractAlternates,
   extractCanonical,
+  extractCanonicalDeclarations,
   extractH1Count,
   extractHtmlLang,
   extractInternalLinks,
   extractMetaContent,
   extractTitle,
   hasNoindex,
+  hasNoindexHeader,
   locs,
   parseRobots,
   robotsDecision,
@@ -57,6 +59,27 @@ assert.equal(blockedDecision.path, "/private/page");
 assert.deepEqual(blockedDecision.matchedRules.map((rule) => rule.pattern), ["/private/"]);
 assert.equal(robotsDecision(robots.groups, "https://example.com/private/public").allowed, true);
 assert.equal(robotsDecision(robots.groups, "https://example.com/private/public/more").allowed, false);
+const tieRules = parseRobots(`
+User-agent: *
+Disallow: /same
+Allow: /same
+`);
+assert.equal(robotsDecision(tieRules.groups, "https://example.com/same").allowed, true);
+const agentGroups = parseRobots(`
+User-agent: *
+Disallow: /
+User-agent: Googlebot
+Allow: /
+`);
+assert.equal(robotsDecision(agentGroups.groups, "https://example.com/").allowed, true);
+assert.equal(
+  analyzeRobots(agentGroups, "https://example.com/robots.txt", "https://example.com/sitemap.xml").fullBlock,
+  false,
+);
+assert.equal(
+  robotsDecision(parseRobots("User-agent: *\nDisallow: /*?preview=*$").groups, "https://example.com/page?preview=1").allowed,
+  false,
+);
 const robotsAnalysis = analyzeRobots(
   robots,
   "https://example.com/robots.txt",
@@ -93,9 +116,25 @@ const html = `<!doctype html>
 assert.equal(extractTitle(html), "Test &amp; Page");
 assert.equal(extractMetaContent(html, "description"), "Description");
 assert.equal(extractCanonical(html, "https://example.com/page"), "https://example.com/canonical");
+assert.deepEqual(
+  extractCanonicalDeclarations(
+    html,
+    "https://example.com/page",
+    '<https://example.com/header>; rel="alternate canonical", <mailto:test@example.com>; rel=canonical',
+  ),
+  [
+    { source: "html", rawHref: "/canonical", href: "https://example.com/canonical" },
+    { source: "http_header", rawHref: "https://example.com/header", href: "https://example.com/header" },
+    { source: "http_header", rawHref: "mailto:test@example.com", href: null },
+  ],
+);
 assert.equal(extractHtmlLang(html), "zh-CN");
 assert.equal(extractH1Count(html), 2);
 assert.equal(hasNoindex(html), true);
+assert.equal(hasNoindex("<meta NAME=\"GoogleBot\" content=\"NOFOLLOW, NOINDEX\">"), true);
+assert.equal(hasNoindex("<meta name=\"robots\" content=\"noindexifembedded\">"), false);
+assert.equal(hasNoindexHeader("googlebot: noindex, nofollow"), true);
+assert.equal(hasNoindexHeader("otherbot: noindexifembedded"), false);
 assert.deepEqual(extractAlternates(html, "https://example.com/page"), [{
   hreflang: "en",
   href: "https://example.com/en",

@@ -105,6 +105,8 @@ export const HIGH_COST_RATE_LIMITS = [
   { method: "POST", pattern: /^\/api\/audit-jobs\/[^/]+\/run$/, group: "audit-run", limit: 180, windowMs: 60000 },
   { method: "POST", pattern: /^\/api\/gsc\/inspect$/, group: "gsc-inspect", limit: 20, windowMs: 60000 },
   { method: "POST", pattern: /^\/api\/gsc\/search-analytics$/, group: "gsc-analytics", limit: 30, windowMs: 60000 },
+  { method: "POST", pattern: /^\/api\/pagespeed\/run$/, group: "pagespeed", limit: 6, windowMs: 60000 },
+  { method: "POST", pattern: /^\/api\/crux\/run$/, group: "crux", limit: 6, windowMs: 60000 },
   { method: "POST", pattern: /^\/api\/googlebot\/verify$/, group: "dns-verify", limit: 20, windowMs: 60000 },
 ];
 

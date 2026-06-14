@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useId, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -14,6 +14,7 @@ import {
   urlFilterCounts,
 } from "../report-filters.js";
 import { formatText, workspaceText } from "../i18n.js";
+import { ResultPagination } from "./ResultPagination.jsx";
 
 const severityLabels = { critical: "Critical", warning: "Warning", notice: "Notice" };
 const severityIcons = { critical: XCircle, warning: AlertTriangle, notice: ShieldAlert };
@@ -22,7 +23,7 @@ function Badge({ severity, children }) {
   const Icon = severityIcons[severity] || CheckCircle2;
   return (
     <span className={`badge badge-${severity || "ok"}`}>
-      <Icon size={14} />
+      <Icon size={14} aria-hidden="true" focusable="false" />
       {children}
     </span>
   );
@@ -30,6 +31,7 @@ function Badge({ severity, children }) {
 
 function PageRow({ page, t }) {
   const [open, setOpen] = useState(false);
+  const detailId = useId();
   const firstIssue = page.issues[0];
   const hasSignals =
     page.title != null
@@ -45,9 +47,10 @@ function PageRow({ page, t }) {
         className="row-main"
         type="button"
         aria-expanded={open}
+        aria-controls={detailId}
         onClick={() => setOpen((value) => !value)}
       >
-        <ChevronDown className={open ? "rotated" : ""} size={18} />
+        <ChevronDown className={open ? "rotated" : ""} size={18} aria-hidden="true" focusable="false" />
         <div className="url-cell">
           <span>{page.url}</span>
           {page.finalUrl && page.finalUrl !== page.url ? <small>{t.final}: {page.finalUrl}</small> : null}
@@ -61,7 +64,7 @@ function PageRow({ page, t }) {
         </div>
       </button>
       {open ? (
-        <div className="row-detail">
+        <div className="row-detail" id={detailId} role="region" aria-label={page.url}>
           {page.redirectChain?.length ? (
             <div className="redirect-chain">
               <strong>{t.redirectChain}</strong>
@@ -97,7 +100,7 @@ function PageRow({ page, t }) {
               <strong>{t.canonical}</strong>
               <a href={page.canonical} target="_blank" rel="noreferrer">
                 {page.canonical}
-                <ExternalLink size={14} />
+                <ExternalLink size={14} aria-hidden="true" focusable="false" />
               </a>
             </p>
           ) : null}
@@ -199,7 +202,7 @@ export function UrlFindingsPanel({
       <div className="panel-head">
         <h2>{t.urlFindings}</h2>
         <div className="findings-toolbar">
-          <div className="filters">
+          <div className="filters" role="group" aria-label={t.urlFindings}>
             {["all", "critical", "warning", "notice", "ok"].map((item) => (
               <button
                 className={filter === item ? "active" : ""}
@@ -259,23 +262,20 @@ export function UrlFindingsPanel({
           </div>
         </div>
       </div>
-      <small className="findings-match-count">{pages.length} {workspaceCopy.matchingUrls}</small>
+      <small className="findings-match-count" role="status" aria-live="polite">
+        {pages.length} {workspaceCopy.matchingUrls}
+      </small>
       <div className="rows">
         {visiblePages.length
           ? visiblePages.map((page) => <PageRow page={page} key={page.url} t={t} />)
           : <p className="none">{t.noFilter}</p>}
       </div>
-      {pageCount > 1 ? (
-        <nav className="result-pagination" aria-label={t.urlFindings}>
-          <button type="button" onClick={() => setPageNumber((value) => Math.max(1, value - 1))} disabled={pageNumber === 1}>
-            {workspaceCopy.previousPage}
-          </button>
-          <span>{workspaceCopy.page} {pageNumber} {workspaceCopy.of} {pageCount}</span>
-          <button type="button" onClick={() => setPageNumber((value) => Math.min(pageCount, value + 1))} disabled={pageNumber === pageCount}>
-            {workspaceCopy.nextPage}
-          </button>
-        </nav>
-      ) : null}
+      <ResultPagination
+        pagination={pagination}
+        onPage={setPageNumber}
+        label={t.urlFindings}
+        language={language}
+      />
     </section>
   );
 }

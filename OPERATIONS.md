@@ -8,8 +8,10 @@ Use Node.js 22 or newer. From a clean checkout:
 
 ```bash
 npm ci
+npm run test:e2e:install
 npm run audit:dependencies
 npm run check
+npm run test:e2e
 npm run db:status
 ```
 
@@ -34,9 +36,10 @@ Migrations are forward-only and idempotent. Before a release containing a new mi
 
 1. Create a Neon branch or point-in-time restore point from production.
 2. Record the source branch, restore timestamp, release commit, and current `db:status` output.
-3. Run `npm run db:migrate` against the target database.
-4. Run `npm run db:status` and require `ready: true`.
-5. Deploy the application only after the schema check succeeds.
+3. Confirm every `integrity` counter in `db:status` is `0`; resolve malformed legacy rows before adding validated constraints.
+4. Run `npm run db:migrate` against the target database.
+5. Run `npm run db:status` and require `ready: true`, no pending versions, every required constraint/index `true`, and every integrity counter `0`.
+6. Deploy the application only after the schema check succeeds.
 
 Do not manually delete rows from `soos_schema_migration`. A failed migration must be corrected by a new forward migration or by restoring the pre-release database branch.
 

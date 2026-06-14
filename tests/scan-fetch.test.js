@@ -27,7 +27,11 @@ let clock = 100;
 const responses = new Map([
   ["https://example.com/start", response(301, "https://example.com/start", "", { location: "/middle" })],
   ["https://example.com/middle", response(302, "https://example.com/middle", "", { location: "https://www.example.com/final" })],
-  ["https://www.example.com/final", response(200, "https://www.example.com/final", "<html>ok</html>", { "content-type": "text/html" })],
+  ["https://www.example.com/final", response(200, "https://www.example.com/final", "<html>ok</html>", {
+    "content-type": "text/html; charset=utf-8",
+    "x-robots-tag": "googlebot: noindex, nofollow",
+    link: "<https://www.example.com/final>; rel=\"canonical\"",
+  })],
 ]);
 const fetchText = createScanFetcher({
   fetchImpl: async (url, options) => {
@@ -52,7 +56,9 @@ assert.equal(result.finalUrl, "https://www.example.com/final");
 assert.equal(result.redirectChain.length, 2);
 assert.equal(result.redirectCrossHost, true);
 assert.equal(result.text, "<html>ok</html>");
-assert.equal(result.contentType, "text/html");
+assert.equal(result.contentType, "text/html; charset=utf-8");
+assert.equal(result.xRobotsTag, "googlebot: noindex, nofollow");
+assert.equal(result.linkHeader, "<https://www.example.com/final>; rel=\"canonical\"");
 assert.equal(result.durationMs, 15);
 assert.equal(requested.length, 3);
 assert.equal(requested.every(({ options }) => options.redirect === "manual"), true);

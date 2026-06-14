@@ -1,5 +1,9 @@
 import { buildInternalLinkGraph } from "./link-graph.js";
 import { canonicalAuditUrl } from "./url-policy.js";
+import {
+  compareIssueFingerprints,
+  reportIssueFingerprints,
+} from "./version-comparison.js";
 
 const SITEMAP_BLOCKERS = new Set([
   "robots_disallow",
@@ -8,6 +12,9 @@ const SITEMAP_BLOCKERS = new Set([
   "fetch_failed",
   "canonical_blocked",
   "canonical_cross_host",
+  "canonical_conflict",
+  "canonical_invalid",
+  "canonical_header_mismatch",
   "not_html",
   "redirect_loop",
   "redirect_invalid_location",
@@ -20,6 +27,7 @@ const SITEMAP_SIGNAL_ISSUES = new Set([
   "canonical_mismatch",
   "canonical_not_in_sitemap",
   "canonical_missing",
+  "canonical_multiple",
   "redirect_chain",
   "redirect_cross_host",
 ]);
@@ -32,7 +40,7 @@ function gscPage(row) {
   return String(row?.page || (row?.dimension === "page" ? row?.keys?.[0] || "" : ""));
 }
 
-export function buildUrlInspectionCandidates(report, gscRows = []) {
+export function buildUrlInspectionCandidates(report, gscRows = [], comparisonEntry = null) {
   const pages = Array.isArray(report?.pages) ? report.pages : [];
   const discoveredPages = Array.isArray(report?.discoveredPages) ? report.discoveredPages : [];
   const allScannedPages = [...pages, ...discoveredPages];
@@ -65,6 +73,30 @@ export function buildUrlInspectionCandidates(report, gscRows = []) {
     const demand = Number(row?.impressions) || 0;
     const current = gscByKey.get(key);
     if (!current || demand > (Number(current.impressions) || 0)) gscByKey.set(key, { ...row, page });
+  }
+
+  if (comparisonEntry?.issueFingerprints) {
+    const delta = compareIssueFingerprints(
+      comparisonEntry.issueFingerprints,
+      reportIssueFingerprints(report),
+    );
+    for (const item of delta.worsened) {
+      add(item.url, 4, "history", `history_severity_worsened:${item.type}`);
+    }
+    for (const item of delta.introduced) {
+      add(item.url, 6, "history", `history_issue_introduced:${item.type}`);
+    }
+  }
+
+  if (Array.isArray(comparisonEntry?.pageUrls)) {
+    const previousPageKeys = new Set(
+      comparisonEntry.pageUrls.map((url) => inspectionCandidateKey(url)).filter(Boolean),
+    );
+    for (const page of pages) {
+      if (!previousPageKeys.has(inspectionCandidateKey(page.url))) {
+        add(page.url, 8, "history", "history_new_page");
+      }
+    }
   }
 
   for (const page of pages) {

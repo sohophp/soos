@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { formatApiError } from "../api-client.js";
 import {
   clearGscConnection,
@@ -6,14 +6,12 @@ import {
   loadGscSites,
   saveGscProperty,
   startGscOAuth,
-  testGscConnection,
 } from "../gsc-client.js";
 import { gscUiText } from "../i18n.js";
 
 export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlChange, language }) {
   const copy = gscUiText[language] || gscUiText.en;
   const [showOauthHelp, setShowOauthHelp] = useState(true);
-  const [testing, setTesting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
   const [sitesLoading, setSitesLoading] = useState(false);
   const [propertySaving, setPropertySaving] = useState(false);
@@ -21,6 +19,7 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
   const [sitesError, setSitesError] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const oauthRefreshAtRef = useRef(0);
 
   useEffect(() => {
     if (status?.siteUrl) onSiteUrlChange(status.siteUrl);
@@ -39,11 +38,11 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
     function handleMessage(event) {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type !== "soos:gsc-oauth-connected") return;
-      refreshStatus("oauth-connected");
+      refreshAfterOAuth();
     }
     function handleStorage(event) {
       if (event.key !== "soos:gsc-oauth-connected" || !event.newValue) return;
-      refreshStatus("oauth-connected");
+      refreshAfterOAuth();
     }
     window.addEventListener("message", handleMessage);
     window.addEventListener("storage", handleStorage);
@@ -114,29 +113,6 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
     }
   }
 
-  async function testConfig() {
-    if (!status?.configured) {
-      setError(copy.missingApiError);
-      return;
-    }
-    if (!siteUrl.trim()) {
-      setError(copy.missingPropertyError);
-      return;
-    }
-    setTesting(true);
-    setMessage("");
-    setError("");
-    try {
-      const body = await testGscConnection(siteUrl);
-      if (body.status) onStatus(body.status);
-      setMessage(body.permissionLevel ? `${body.message} Permission: ${body.permissionLevel}.` : body.message);
-    } catch (err) {
-      setError(formatApiError(err));
-    } finally {
-      setTesting(false);
-    }
-  }
-
   async function refreshStatus(reason = "") {
     setMessage("");
     setError("");
@@ -147,6 +123,13 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
     } catch (err) {
       setError(formatApiError(err));
     }
+  }
+
+  function refreshAfterOAuth() {
+    const now = Date.now();
+    if (now - oauthRefreshAtRef.current < 1000) return;
+    oauthRefreshAtRef.current = now;
+    refreshStatus("oauth-connected");
   }
 
   async function startOAuth() {
@@ -180,7 +163,7 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
           if (!oauthWindow.closed) return;
           window.clearInterval(popupPoll);
           popupPoll = null;
-          refreshStatus("oauth-closed");
+          refreshAfterOAuth();
         }, 600);
       } else {
         window.location.href = body.authUrl;
@@ -195,7 +178,7 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
   }
 
   return (
-    <section className="panel gsc-api-config">
+    <section className={`panel gsc-api-config ${status?.configured ? "connected" : ""}`}>
       <div className="panel-head">
         <h2>{copy.apiTitle}</h2>
         <span>{status?.configured ? tokenState : copy.notConfigured}</span>
@@ -276,25 +259,19 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
               {oauthLoading ? copy.opening : copy.reconnect}
             </button>
           ) : null}
-          <button className="export-button" type="button" onClick={refreshStatus} disabled={testing || oauthLoading}>
-            {copy.refresh}
-          </button>
-          {status?.configured ? (
+          {status?.configured && (sitesError || (!sitesLoading && !sites.length)) ? (
             <button className="export-button" type="button" onClick={refreshSites} disabled={sitesLoading || propertySaving}>
               {sitesLoading ? copy.loadingProperties : copy.refreshProperties}
             </button>
           ) : null}
-          <button className="export-button" type="button" onClick={testConfig} disabled={testing || oauthLoading}>
-            {testing ? copy.testing : copy.test}
-          </button>
           {status?.configured ? (
-            <button className="export-button" type="button" onClick={clearConfig} disabled={testing || oauthLoading}>
+            <button className="export-button" type="button" onClick={clearConfig} disabled={oauthLoading}>
               {copy.clear}
             </button>
           ) : null}
         </div>
         <div className="gsc-api-help">
-          {!status?.configured ? <small>{status?.note || "CSV import works now. API configuration enables URL Inspection and Search Analytics."}</small> : null}
+          {!status?.configured ? <small>{status?.note || copy.connectionHelp}</small> : null}
           {status?.serverless ? <small>{copy.serverlessHelp}</small> : null}
           <small>{copy.privacyNote}</small>
         </div>

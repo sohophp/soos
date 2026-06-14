@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { formatText } from "../i18n.js";
 import { healthScoreTone } from "../report-views.js";
 import { Badge, Stat } from "./ReportUi.jsx";
+import { PageSpeedInsightsPanel } from "./PageSpeedInsightsPanel.jsx";
 
 function ScoreCard({ score, t }) {
   const tone = healthScoreTone(score);
@@ -49,11 +50,12 @@ function StatusFlags({ flags, t }) {
   );
 }
 
-export function ScanSummaryView({ report, t }) {
+export function ScanSummaryView({ report, t, language }) {
   return (
     <>
       <StatusFlags flags={report.statusFlags} t={t} />
       <ExecutiveSummary summary={report.executiveSummary} t={t} />
+      <PageSpeedInsightsPanel report={report} language={language} />
       <ScoreCard score={report.summary.healthScore} t={t} />
       <section className="summary">
         <Stat label={t.urls} value={report.summary.urlCount} />

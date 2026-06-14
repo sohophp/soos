@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { buildGscOpportunities, buildSearchVisibility, uniqueGscRows } from "../src/gsc-summary.js";
+import {
+  buildGscOpportunities,
+  buildSearchVisibility,
+  isTechnicallyIndexablePage,
+  uniqueGscRows,
+} from "../src/gsc-summary.js";
 
 const report = {
   pages: [
@@ -20,6 +25,10 @@ const rows = [
 const unique = uniqueGscRows(rows);
 assert.equal(unique.length, 3);
 assert.equal(unique.find((row) => row.key === "https://example.com/a")?.impressions, 220);
+assert.equal(
+  uniqueGscRows([{ page: "https://example.com/page/", impressions: 1 }])[0].key,
+  "https://example.com/page",
+);
 
 const opportunities = buildGscOpportunities(report, rows, "en");
 assert.equal(opportunities.some((item) => item.key === "low_ranking"), true);
@@ -34,5 +43,6 @@ assert.deepEqual(visibility, {
   hardBlocked: 1,
   canonicalized: 1,
 });
+assert.equal(isTechnicallyIndexablePage({ issues: [{ type: "canonical_conflict" }] }), false);
 
 console.log("gsc-summary-tests-passed");

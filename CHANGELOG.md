@@ -4,13 +4,60 @@ All notable changes to soos will be documented in this file.
 
 ## [Unreleased]
 
+### Crawl accuracy
+
+- Preserved `X-Robots-Tag` response headers and added response-header noindex evidence to page diagnostics.
+- Updated robots evaluation to select the most specific matching user-agent group and prefer `Allow` when equally specific rules match.
+- Added regression coverage for robots wildcards and group precedence, meta/header noindex, HTML and non-HTML content types, and HTTP error responses.
+- Added a three-language scan-settings note explaining that page diagnostics use server response HTML and do not include JavaScript-rendered changes.
+- Added declaration-level canonical evidence from HTML and HTTP `Link` headers, including invalid, multiple, conflicting, and cross-source mismatch diagnostics.
+- Added hreflang diagnostics for duplicate language values, reused targets, and missing self-references.
+- Routed the new canonical and hreflang findings into backlog actions, international/sitemap summaries, exports, GSC indexability, and URL Inspection prioritization.
+
 ### Documentation
 
 - Reorganized the whole-site roadmap around product experience, crawl accuracy, Google integrations, reporting, platform hardening, and engineering quality.
 - Added version targets, acceptance criteria, technical-debt priorities, and explicit non-goals including paid scheduled scans.
 
+### Localization
+
+- Localized the high-visibility Alternates, Title, Description, Lang, and Viewport report labels in Simplified and Traditional Chinese.
+- Added automated checks for key-label localization and common Simplified/Traditional Chinese cross-script contamination.
+- Extended language parity and mojibake checks to every current resource bundle, including PageSpeed, privacy, and workspace navigation; also reject leaked local debugging URLs.
+- Reviewed all six empty-state workspace views in English, Simplified Chinese, and Traditional Chinese, and clarified PageSpeed origin-level field-data fallback wording.
+
+### Accessibility
+
+- Upgraded workspace navigation to an ARIA tablist with a linked tabpanel, roving tab stops, and automatic Left/Right/Home/End keyboard navigation.
+- Programmatic view changes now focus the workspace panel while pointer tab selection keeps focus on the selected tab.
+
+### Report performance
+
+- Added shared pagination to recursive discovery, internal-link graphs, URL-set differences, structured-data diagnostics, Googlebot log findings, URL Inspection results, alignment matrices, crawl-freshness rows, and per-reason coverage groups while keeping filters and CSV exports scoped to the complete dataset.
+- Added accessible filter names, live pagination and result-count announcements, expandable URL-detail relationships, decorative-icon hiding, and keyboard-focusable table semantics for URL alignment results.
+- Added property-specific Search Analytics brand, location, and clustering-exclusion terms, stored only in the browser and applied consistently to intent insights and keyword-opportunity CSV exports.
+- Added on-demand PageSpeed Insights for individual scanned URLs with a user-supplied session-only API key, mobile/desktop strategies, Lighthouse scores and metrics, field-data fallback labels, optimization opportunities, server-side rate limits, and no key persistence.
+- Added optional dedicated Chrome UX Report queries using the same session-only Google API key, with page/origin records, 28-day collection dates, p75 metric grading, explicit fallback, isolated errors, and separate rate limits.
+- Privacy deletion now clears soos-prefixed `sessionStorage` as well as `localStorage`, including any active PageSpeed API key.
+
+### Search Console insights
+
+- Simplified the Google workspace around connection state: disconnected users see OAuth plus CSV fallback, while connected users see the account/property summary, automatic sitemap status, Search Analytics, and URL Inspection without redundant refresh/test controls.
+- Submitted sitemap status now loads automatically for the selected property, displays its property source, rejects mismatched responses, and ignores stale responses after rapid property changes.
+- Sitemap matching now preserves protocol, path case, trailing slash, and query parameters while normalizing only fragments, default ports, and hostname letter case.
+- Property changes, disconnects, and failed Search Analytics reloads clear stale Search Analytics and URL Inspection data; only Page-dimension API results update shared page-performance diagnostics.
+- Added query normalization and intent clustering for Page + Query analysis, including branded, local, navigational, informational, and general topic intent.
+- Keyword cannibalization now groups strongly similar queries, applies stricter thresholds to branded/navigation queries, and labels local or brand competition separately.
+- Keyword opportunity CSV exports now include the classified query intent.
+- Search Analytics evidence thresholds now scale with the selected date range; low-sample click, CTR, and position changes no longer trigger period regressions.
+- Low-CTR diagnosis now uses conservative position-band benchmarks and a 90% Wilson upper confidence bound instead of a raw point estimate.
+- Opportunity cards and CSV exports now expose threshold days, minimum impressions, CTR evidence, and competing-page share.
+- Documented the decision to keep the default OAuth connection read-only; sitemap submission/deletion remains deferred instead of silently expanding Google permissions.
+
 ### Added
 
+- Playwright desktop/mobile E2E coverage for OAuth popup completion, automatic opener refresh, account display, disconnect, active-task reload recovery, checkpoint cleanup, completed-report persistence, large URL pagination, three-language report switching, Search Analytics evidence, PageSpeed/CrUX copy, keyboard tab navigation, viewport overflow, and console errors using local API fixtures.
+- OAuth completion notifications are deduplicated across `postMessage`, storage events, and popup-close polling so the connected-state refresh and status message remain stable.
 - A shared frontend JSON API client that preserves HTTP status, error code, request ID, retryability, and server details.
 - A three-language React error boundary that keeps one render failure from producing a blank page.
 - Extracted frontend translation resources with automated language-key parity and mojibake checks.
@@ -33,10 +80,28 @@ All notable changes to soos will be documented in this file.
 - An extracted URL Findings panel owning expandable page evidence, severity/source/change filters, search, pagination, and filtered export actions.
 - Extracted scan-summary and issue-diagnosis views plus shared report badge/stat components.
 - An extracted URL Structure view for sitemap inventory, recursive discoveries, internal-link graph diagnosis, filtering, and CSV export.
+- An extracted scan runtime panel plus tested progress clamping and elapsed-time formatting helpers.
+- Dedicated Google URL-set and structured-data diagnostic modules with extracted views and deterministic CSV builders.
+- Extracted URL Inspection and Googlebot log panels with tested queue, batch merge, diagnosis summary, crawl-difference, and export helpers.
+- Extracted Search Visibility/GSC Opportunities views and a report export module for audit CSV, standalone HTML, and text summaries.
+- Dedicated scan lifecycle and retained-task hooks that keep job recovery, polling, controls, search, pagination, report opening, and deletion outside `main.jsx`.
+- Pure audit transition and retained-task response helpers with regression coverage for lease waits, terminal states, errors, and Neon pagination metadata.
+- A dedicated scan-settings hook, pure audit-request builder, and extracted scan launch/settings panels with privacy-reset and history-rerun integration.
+- Dedicated GSC workspace and report-history hooks for status initialization, property synchronization, result rows, completed-report persistence, retention limits, and comparison state.
+- Extracted Google, History, and report workspace components; `main.jsx` now focuses on navigation and cross-module coordination.
+- URL Inspection quota summaries showing unique candidates, inspected/remaining URLs, total and remaining batches, next-batch size, and explicit queue scope or skipped-source reasons.
+
+### Security
+
+- Upgraded Vite to 8 and `@vitejs/plugin-react` to 6 to remove the esbuild integrity advisory; the supported Node.js range is now `^20.19.0 || >=22.12.0`.
+- Added Neon schema v3/v4 constraints for configuration JSON, exact audit-job ownership and keys, checkpoint batches, migration names, and lease identifiers/tokens.
+- Replaced wildcard-sensitive audit key matching with exact regex or prefix-length comparisons, and added optimized session/status indexes plus a unique migration-name index.
+- Extended `db:status` to fail readiness when required constraints/indexes are missing or any of seven malformed-row counters is nonzero.
+- Historical URL Inspection priority for severity regressions, newly introduced issues, and new pages, backed by page URL snapshots in newly saved browser-history entries.
 - Search Console Sites API support with normalized permission levels, property deduplication, and verified-property counts.
 - A three-language connected-property selector that automatically loads and persists the user's accessible Search Console properties.
 - Search Analytics previous-period comparison with equal-length date ranges, click/impression/CTR/position deltas, gained/lost visibility diagnosis, and evidence-rich CSV export.
-- Page + Query cannibalization diagnosis for queries where multiple pages receive meaningful competing visibility.
+- Page + Query cannibalization diagnosis for exact or strongly similar queries where multiple pages receive meaningful competing visibility.
 - Persistent three-language workspace navigation for Scan, Google, Issues, URLs, History, and Settings.
 - URL findings pagination with 50 rows per page and automatic reset when filters or search terms change.
 - Unified URL source filters for Sitemap, internal links, Search Analytics, and URL Inspection, with per-source counts.
@@ -126,6 +191,9 @@ All notable changes to soos will be documented in this file.
 - Scan runner regression coverage for sitemap collection, page inspection, structured data, robots blocking, checkpoints, progress, report flags, and proxy policy.
 
 ### Changed
+
+- Search Analytics rows that omit a precomputed URL key now retain the normalized key used during deduplication, preserving downstream page matching.
+- Audit CSV exports normalize Search Analytics rows before matching and keep filtered URL exports free of unrelated GSC-only pages.
 
 - React root mounting is reused across Vite hot updates, avoiding duplicate `createRoot()` warnings during local development.
 - `server/api.js` now composes system, session-data, and audit-job route modules instead of carrying those endpoint branches inline.

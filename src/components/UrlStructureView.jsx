@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Globe2 } from "lucide-react";
 import { downloadCsvFile } from "../downloads.js";
 import {
   buildInternalLinkGraph,
   buildInternalLinkGraphCsvRows,
 } from "../link-graph.js";
+import { paginateResultRows } from "../result-pagination.js";
 import { Badge } from "./ReportUi.jsx";
+import { ResultPagination } from "./ResultPagination.jsx";
 
 function Sitemaps({ sitemaps, t }) {
   if (!sitemaps?.length) return null;
@@ -29,8 +31,14 @@ function Sitemaps({ sitemaps, t }) {
   );
 }
 
-function InternalDiscovery({ report, t }) {
+function InternalDiscovery({ report, t, language }) {
+  const [pageNumber, setPageNumber] = useState(1);
   const pages = report?.discoveredPages || [];
+  const pagination = paginateResultRows(pages, pageNumber);
+  useEffect(() => setPageNumber(1), [report]);
+  useEffect(() => {
+    if (pageNumber > pagination.pageCount) setPageNumber(pagination.pageCount);
+  }, [pageNumber, pagination.pageCount]);
   if (!report?.options?.internalCrawl) return null;
   return (
     <section className="panel internal-discovery">
@@ -46,7 +54,7 @@ function InternalDiscovery({ report, t }) {
       </div>
       {pages.length ? (
         <div className="internal-discovery-list">
-          {pages.map((page) => (
+          {pagination.items.map((page) => (
             <article className="internal-discovery-row" key={page.url}>
               <Badge severity={page.status >= 400 || !page.status ? "critical" : page.issues?.length ? "warning" : "ok"}>
                 {page.status || "ERR"}
@@ -59,14 +67,20 @@ function InternalDiscovery({ report, t }) {
           ))}
         </div>
       ) : <p className="none">{t.noDiscoveredUrls}</p>}
+      <ResultPagination
+        pagination={pagination}
+        onPage={setPageNumber}
+        label={t.internalDiscoveryTitle}
+        language={language}
+      />
     </section>
   );
 }
 
-function InternalLinkGraph({ report, t }) {
+function InternalLinkGraph({ report, t, language }) {
   const [filter, setFilter] = useState("all");
+  const [pageNumber, setPageNumber] = useState(1);
   const graph = useMemo(() => buildInternalLinkGraph(report), [report]);
-  if (!report?.options?.internalCrawl || !graph.rows.length) return null;
   const labels = {
     unreachable: t.graphUnreachable,
     orphan: t.graphOrphan,
@@ -76,6 +90,12 @@ function InternalLinkGraph({ report, t }) {
     healthy: t.graphHealthy,
   };
   const visibleRows = filter === "all" ? graph.rows : graph.rows.filter((row) => row.state === filter);
+  const pagination = paginateResultRows(visibleRows, pageNumber);
+  useEffect(() => setPageNumber(1), [filter, report]);
+  useEffect(() => {
+    if (pageNumber > pagination.pageCount) setPageNumber(pagination.pageCount);
+  }, [pageNumber, pagination.pageCount]);
+  if (!report?.options?.internalCrawl || !graph.rows.length) return null;
 
   function exportGraph() {
     downloadCsvFile("soos-internal-link-graph.csv", buildInternalLinkGraphCsvRows(graph, labels));
@@ -93,7 +113,7 @@ function InternalLinkGraph({ report, t }) {
           {!graph.rootAvailable ? <small className="gsc-api-error">{t.rootNotScanned}</small> : null}
         </div>
         <div className="url-alignment-actions">
-          <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+          <select aria-label={t.linkGraphTitle} value={filter} onChange={(event) => setFilter(event.target.value)}>
             <option value="all">{t.graphAll} ({graph.rows.length})</option>
             {Object.entries(labels).map(([state, label]) => (
               <option value={state} key={state}>{label} ({graph.counts[state] || 0})</option>
@@ -109,7 +129,7 @@ function InternalLinkGraph({ report, t }) {
         ))}
       </div>
       <div className="link-graph-list">
-        {visibleRows.map((row) => (
+        {pagination.items.map((row) => (
           <article className="link-graph-row" key={row.url}>
             <Badge severity={
               row.state === "unreachable" || row.state === "orphan"
@@ -131,15 +151,21 @@ function InternalLinkGraph({ report, t }) {
           </article>
         ))}
       </div>
+      <ResultPagination
+        pagination={pagination}
+        onPage={setPageNumber}
+        label={t.linkGraphTitle}
+        language={language}
+      />
     </section>
   );
 }
 
-export function UrlStructureView({ report, t }) {
+export function UrlStructureView({ report, t, language }) {
   return (
     <>
-      <InternalDiscovery report={report} t={t} />
-      <InternalLinkGraph report={report} t={t} />
+      <InternalDiscovery report={report} t={t} language={language} />
+      <InternalLinkGraph report={report} t={t} language={language} />
       <Sitemaps sitemaps={report.sitemaps} t={t} />
     </>
   );

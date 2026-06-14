@@ -11,7 +11,9 @@ const source = await fs.readFile(
   "utf8",
 );
 assert.match(source, /aria-expanded=\{open\}/);
+assert.match(source, /aria-controls=\{detailId\}/);
 assert.match(source, /aria-pressed=\{filter === item\}/);
+assert.match(source, /<ResultPagination/);
 assert.match(source, /onIssueFilterChange\(null\)/);
 assert.match(source, /onExportCsv\(pages\)/);
 assert.match(source, /paginateUrlFindings\(pages, pageNumber\)/);

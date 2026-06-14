@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
 import {
   buildFreshnessRows,
   buildIndexCoverageRows,
@@ -146,5 +147,19 @@ assert.equal(diagnoses.some((item) => item.type === "fetch_problem"), false);
 
 const failed = diagnoseInspectionResult({ ok: false, error: "quota exceeded" });
 assert.deepEqual(failed.map((item) => item.type), ["inspection_error"]);
+
+const diagnosticsSource = await fs.readFile(
+  new URL("../src/components/UrlInspectionDiagnostics.jsx", import.meta.url),
+  "utf8",
+);
+assert.match(diagnosticsSource, /paginateResultRows\(visibleRows, pageNumber\)/);
+assert.match(diagnosticsSource, /paginateResultRows\(sortedRows, pageNumber\)/);
+assert.match(diagnosticsSource, /paginateResultRows\(group\.rows, groupPages\[group\.reason\] \|\| 1, 8\)/);
+assert.match(diagnosticsSource, /pagination\.items\.map/);
+assert.match(diagnosticsSource, /language=\{language\}/);
+assert.match(diagnosticsSource, /role="table"/);
+assert.match(diagnosticsSource, /aria-rowcount=\{visibleRows\.length \+ 1\}/);
+assert.match(diagnosticsSource, /aria-rowindex=/);
+assert.doesNotMatch(diagnosticsSource, /group\.rows\.slice\(0, 8\)/);
 
 console.log("url-inspection-diagnostics-tests-passed");

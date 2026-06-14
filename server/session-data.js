@@ -7,7 +7,7 @@ export async function readSessionDataFromDatabase(sql, sessionId) {
     WITH owned_jobs AS MATERIALIZED (
       SELECT value->>'id' AS job_id
       FROM soos_config
-      WHERE key LIKE 'audit_job:%'
+      WHERE key ~ '^audit_job:'
         AND value->>'sessionId' = ${sessionId}
     )
     SELECT
@@ -18,11 +18,14 @@ export async function readSessionDataFromDatabase(sql, sessionId) {
       (
         SELECT count(*)::int
         FROM soos_config AS batch
-        WHERE batch.key LIKE 'audit_job_batch:%'
+        WHERE batch.key ~ '^audit_job_batch:'
           AND EXISTS (
             SELECT 1
             FROM owned_jobs
-            WHERE batch.key LIKE ('audit_job_batch:' || owned_jobs.job_id || ':%')
+            WHERE left(
+              batch.key,
+              char_length('audit_job_batch:' || owned_jobs.job_id || ':')
+            ) = 'audit_job_batch:' || owned_jobs.job_id || ':'
           )
       ) AS batches,
       (
@@ -45,7 +48,7 @@ export async function deleteSessionDataFromDatabase(sql, sessionId) {
     WITH owned_jobs AS MATERIALIZED (
       SELECT value->>'id' AS job_id
       FROM soos_config
-      WHERE key LIKE 'audit_job:%'
+      WHERE key ~ '^audit_job:'
         AND value->>'sessionId' = ${sessionId}
     ),
     deleted_leases AS (
@@ -57,23 +60,26 @@ export async function deleteSessionDataFromDatabase(sql, sessionId) {
       DELETE FROM soos_config AS config
       WHERE config.key = ${`gsc_config:${sessionId}`}
         OR (
-          config.key LIKE 'audit_job:%'
+          config.key ~ '^audit_job:'
           AND config.value->>'sessionId' = ${sessionId}
         )
         OR (
-          config.key LIKE 'audit_job_batch:%'
+          config.key ~ '^audit_job_batch:'
           AND EXISTS (
             SELECT 1
             FROM owned_jobs
-            WHERE config.key LIKE ('audit_job_batch:' || owned_jobs.job_id || ':%')
+            WHERE left(
+              config.key,
+              char_length('audit_job_batch:' || owned_jobs.job_id || ':')
+            ) = 'audit_job_batch:' || owned_jobs.job_id || ':'
           )
         )
       RETURNING config.key
     )
     SELECT
       count(*) FILTER (WHERE key = ${`gsc_config:${sessionId}`})::int AS gsc_configs,
-      count(*) FILTER (WHERE key LIKE 'audit_job:%')::int AS jobs,
-      count(*) FILTER (WHERE key LIKE 'audit_job_batch:%')::int AS batches,
+      count(*) FILTER (WHERE key ~ '^audit_job:')::int AS jobs,
+      count(*) FILTER (WHERE key ~ '^audit_job_batch:')::int AS batches,
       (SELECT count(*)::int FROM deleted_leases) AS leases
     FROM deleted_config
   `;

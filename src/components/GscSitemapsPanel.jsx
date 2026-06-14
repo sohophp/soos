@@ -1,44 +1,54 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { formatApiError } from "../api-client.js";
 import { loadGscSitemaps } from "../gsc-client.js";
+import { normalizeGscSitemapUrl } from "../gsc-sitemaps.js";
 import { gscDataText } from "../i18n.js";
-import { normalizeReportUrl } from "../url-policy.js";
 
 export function GscSitemapsPanel({ status, siteUrl, currentSitemapUrl, language }) {
   const copy = gscDataText[language] || gscDataText.en;
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const requestIdRef = useRef(0);
 
-  useEffect(() => {
-    setResult(null);
-    setError("");
-  }, [siteUrl]);
-
-  async function loadSitemaps() {
-    if (!status?.configured) {
-      setError(copy.connectFirst);
-      return;
-    }
-    if (!siteUrl.trim()) {
-      setError(copy.propertyFirst);
-      return;
-    }
+  const loadSitemaps = useCallback(async () => {
+    const requestedSiteUrl = siteUrl.trim();
+    if (!status?.configured || !requestedSiteUrl) return;
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError("");
+    setResult(null);
     try {
-      setResult(await loadGscSitemaps(siteUrl));
+      const body = await loadGscSitemaps(requestedSiteUrl);
+      if (requestId !== requestIdRef.current || siteUrl.trim() !== requestedSiteUrl) return;
+      if (String(body.siteUrl || "") !== requestedSiteUrl) {
+        setError(copy.sitemapsPropertyMismatch);
+        return;
+      }
+      setResult(body);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       setError(formatApiError(err));
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
-  }
+  }, [copy.sitemapsPropertyMismatch, siteUrl, status?.configured]);
 
-  const currentKey = normalizeReportUrl(currentSitemapUrl || "");
+  useEffect(() => {
+    requestIdRef.current += 1;
+    setResult(null);
+    setError("");
+    setLoading(false);
+    if (status?.configured && siteUrl.trim()) loadSitemaps();
+    return () => {
+      requestIdRef.current += 1;
+    };
+  }, [loadSitemaps, siteUrl, status?.configured]);
+
+  const currentKey = normalizeGscSitemapUrl(currentSitemapUrl || "");
   const currentFound = currentKey
-    ? (result?.sitemaps || []).some((item) => normalizeReportUrl(item.path) === currentKey)
+    ? (result?.sitemaps || []).some((item) => normalizeGscSitemapUrl(item.path) === currentKey)
     : null;
 
   return (
@@ -51,9 +61,10 @@ export function GscSitemapsPanel({ status, siteUrl, currentSitemapUrl, language 
         <div>
           <strong>{copy.sitemapsTitle}</strong>
           <small>{copy.sitemapsHelp}</small>
+          <small>{copy.sitemapsProperty}: {result?.siteUrl || siteUrl}</small>
         </div>
         <button className="export-button" type="button" onClick={loadSitemaps} disabled={loading || !status?.configured}>
-          {loading ? copy.sitemapsLoading : copy.sitemapsLoad}
+          {loading ? copy.sitemapsLoading : copy.sitemapsReload}
         </button>
       </div>
       {error ? <div className="url-inspection-error">{error}</div> : null}

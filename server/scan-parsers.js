@@ -109,11 +109,10 @@ export function analyzeRobots(parsedRobots, robotsUrl, expectedSitemapUrl) {
   const sitemaps = parsedRobots?.sitemaps || [];
   const issues = [];
   const googleGroups = groups.filter((group) => (
-    group.agents.some((agent) => agent === "*" || "googlebot".includes(agent) || agent.includes("googlebot"))
+    group.agents.some((agent) => agent === "*" || "googlebot".includes(agent))
   ));
-  const fullBlock = googleGroups.some((group) => (
-    group.rules.some((rule) => rule.type === "disallow" && (rule.pattern === "/" || rule.pattern === "/*"))
-  ));
+  const rootUrl = new URL("/", robotsUrl).toString();
+  const fullBlock = !robotsDecision(groups, rootUrl).allowed;
   if (!groups.length) issues.push({ severity: "notice", type: "robots_no_rules", message: "robots.txt has no crawl rules" });
   if (!googleGroups.length) issues.push({ severity: "notice", type: "robots_no_googlebot_group", message: "No Googlebot or wildcard group found" });
   if (fullBlock) issues.push({ severity: "critical", type: "robots_full_block", message: "robots.txt blocks Googlebot from the whole site" });
@@ -151,19 +150,32 @@ function ruleMatches(pattern, pathWithQuery) {
   return Boolean(match && (!exactEnd || match[0].length === pathWithQuery.length));
 }
 
+function agentMatchLength(agent, bot) {
+  if (agent === "*") return 0;
+  return bot.includes(agent) ? agent.length : -1;
+}
+
 export function robotsDecision(groups, targetUrl, bot = "googlebot") {
   const url = new URL(targetUrl);
   const pathWithQuery = `${url.pathname}${url.search}`;
-  const matchingGroups = groups.filter((group) => (
-    group.agents.some((agent) => agent === "*" || bot.includes(agent) || agent.includes(bot))
-  ));
-  const groupsToUse = matchingGroups.length
-    ? matchingGroups
-    : groups.filter((group) => group.agents.includes("*"));
+  const normalizedBot = String(bot || "").toLowerCase();
+  const candidates = groups
+    .map((group) => ({
+      group,
+      specificity: Math.max(...group.agents.map((agent) => agentMatchLength(agent, normalizedBot)), -1),
+    }))
+    .filter(({ specificity }) => specificity >= 0);
+  const bestSpecificity = Math.max(...candidates.map(({ specificity }) => specificity), -1);
+  const groupsToUse = candidates
+    .filter(({ specificity }) => specificity === bestSpecificity)
+    .map(({ group }) => group);
   const matchingRules = groupsToUse
     .flatMap((group) => group.rules)
     .filter((rule) => ruleMatches(rule.pattern, pathWithQuery))
-    .sort((a, b) => b.pattern.length - a.pattern.length);
+    .sort((a, b) => (
+      b.pattern.length - a.pattern.length
+      || Number(b.type === "allow") - Number(a.type === "allow")
+    ));
   const winner = matchingRules[0];
   return {
     allowed: !winner || winner.type === "allow",
@@ -194,17 +206,68 @@ export function textContent(value) {
     .trim();
 }
 
-export function extractCanonical(html, baseUrl) {
+function splitLinkHeader(value) {
+  const parts = [];
+  let start = 0;
+  let inAngle = false;
+  let quote = "";
+  const text = String(value || "");
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (quote) {
+      if (character === quote && text[index - 1] !== "\\") quote = "";
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+    } else if (character === "<") {
+      inAngle = true;
+    } else if (character === ">") {
+      inAngle = false;
+    } else if (character === "," && !inAngle) {
+      parts.push(text.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+  parts.push(text.slice(start).trim());
+  return parts.filter(Boolean);
+}
+
+function linkRelation(parameters) {
+  const match = /(?:^|;)\s*rel\s*=\s*(?:"([^"]*)"|'([^']*)'|([^;\s]+))/i.exec(parameters);
+  return (match?.[1] || match?.[2] || match?.[3] || "").toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+export function extractCanonicalDeclarations(html, baseUrl, linkHeader = "") {
   const re = /<link\b([^>]*?)>/gi;
   const head = extractHead(html);
+  const declarations = [];
   let match;
   while ((match = re.exec(head))) {
     const attrs = attrMap(match[1]);
     if ((attrs.rel || "").toLowerCase().split(/\s+/).includes("canonical")) {
-      return normalizeUrl(attrs.href, baseUrl);
+      declarations.push({
+        source: "html",
+        rawHref: attrs.href || "",
+        href: normalizeUrl(attrs.href, baseUrl),
+      });
     }
   }
-  return null;
+  for (const part of splitLinkHeader(linkHeader)) {
+    const headerMatch = /^<([^>]*)>([\s\S]*)$/.exec(part);
+    if (!headerMatch || !linkRelation(headerMatch[2]).includes("canonical")) continue;
+    declarations.push({
+      source: "http_header",
+      rawHref: headerMatch[1].trim(),
+      href: normalizeUrl(headerMatch[1].trim(), baseUrl),
+    });
+  }
+  return declarations;
+}
+
+export function extractCanonical(html, baseUrl, linkHeader = "") {
+  return extractCanonicalDeclarations(html, baseUrl, linkHeader)
+    .find((declaration) => declaration.href)?.href || null;
 }
 
 export function extractTitle(html) {
@@ -287,4 +350,8 @@ export function hasNoindex(html) {
     }
   }
   return false;
+}
+
+export function hasNoindexHeader(value) {
+  return /(^|[,\s:])noindex(?=$|[,\s;])/i.test(String(value || ""));
 }

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { formatApiError } from "../api-client.js";
 import {
-  clearLocalSoosData,
+  browserSoosDataSummary,
+  clearBrowserSoosData,
   deleteSessionData,
   getSessionDataSummary,
-  localSoosDataSummary,
 } from "../session-data.js";
 import { privacyDataText } from "../i18n.js";
 
@@ -15,7 +15,7 @@ export function PrivacyDataPanel({ language, onDeleted }) {
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const localCount = localSoosDataSummary().count;
+  const localCount = browserSoosDataSummary().count;
 
   async function refresh() {
     setLoading(true);
@@ -40,7 +40,7 @@ export function PrivacyDataPanel({ language, onDeleted }) {
     setMessage("");
     try {
       const result = await deleteSessionData();
-      const localDeleted = clearLocalSoosData();
+      const localDeleted = clearBrowserSoosData();
       setSummary(result.remaining);
       setMessage(copy.deleted.replace("{local}", String(localDeleted)));
       onDeleted?.(result);

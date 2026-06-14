@@ -75,6 +75,18 @@ export function summarizeSitemapSignals(pages) {
       sample: (page) => page.canonical || "",
     },
     {
+      key: "canonical_conflict",
+      title: "Conflicting canonical declarations",
+      scope: "canonical_target",
+      sample: (page) => page.canonicalDeclarations?.map((item) => item.href || item.rawHref).filter(Boolean).slice(0, 3).join(" | ") || "",
+    },
+    {
+      key: "canonical_invalid",
+      title: "Invalid canonical declarations",
+      scope: "canonical_target",
+      sample: (page) => page.canonicalDeclarations?.map((item) => item.rawHref).filter(Boolean).slice(0, 3).join(" | ") || "",
+    },
+    {
       key: "http_error",
       title: "Broken URLs still in sitemap",
       scope: "submitted_url",
@@ -167,6 +179,24 @@ export function summarizeInternationalSignals(pages) {
       title: "Invalid hreflang values",
       scope: "alternate_target",
       sample: (page) => page.alternates?.map((item) => item.hreflang).filter(Boolean).slice(0, 2) || [],
+    },
+    {
+      key: "alternate_duplicate_language",
+      title: "Duplicate hreflang languages",
+      scope: "alternate_target",
+      sample: (page) => page.alternates?.map((item) => item.hreflang).filter(Boolean).slice(0, 3) || [],
+    },
+    {
+      key: "alternate_duplicate_target",
+      title: "Hreflang languages reuse the same target",
+      scope: "alternate_target",
+      sample: (page) => page.alternates?.map((item) => item.href).filter(Boolean).slice(0, 3) || [],
+    },
+    {
+      key: "alternate_self_missing",
+      title: "Hreflang sets miss a self-reference",
+      scope: "submitted_url",
+      sample: (page) => page.canonical || page.finalUrl || page.url,
     },
   ];
 
@@ -290,7 +320,7 @@ export function classifyGoogleReasons(page) {
   if (issueTypes.has("canonical_blocked")) {
     add("canonical_blocked", "Canonical URL is blocked", "Google may ignore the canonical target because robots.txt blocks it.", "critical");
   }
-  if (issueTypes.has("canonical_mismatch") || issueTypes.has("canonical_cross_host")) {
+  if (["canonical_mismatch", "canonical_cross_host", "canonical_conflict", "canonical_header_mismatch"].some((type) => issueTypes.has(type))) {
     add(
       "not_selected_as_canonical",
       "Submitted URL not selected as canonical",
@@ -310,7 +340,17 @@ export function classifyGoogleReasons(page) {
   if (issueTypes.has("canonical_missing")) {
     add("canonical_missing", "Canonical is missing", "Google may choose a different canonical when duplicate signals are unclear.", "notice");
   }
-  if (issueTypes.has("alternate_blocked") || issueTypes.has("alternate_invalid") || issueTypes.has("alternate_hreflang_invalid")) {
+  if (issueTypes.has("canonical_invalid")) {
+    add("canonical_invalid", "Canonical declaration is invalid", "Google cannot use an empty, malformed, or non-HTTP(S) canonical target.", "warning");
+  }
+  if ([
+    "alternate_blocked",
+    "alternate_invalid",
+    "alternate_hreflang_invalid",
+    "alternate_duplicate_language",
+    "alternate_duplicate_target",
+    "alternate_self_missing",
+  ].some((type) => issueTypes.has(type))) {
     add("hreflang_problem", "Alternate/hreflang has issues", "Incorrect alternate tags can weaken international targeting and canonical clustering.", "notice");
   }
 
@@ -398,6 +438,24 @@ export function buildBacklog(pages, sitemaps) {
       action: "Only canonicalize across hosts when that is intentional.",
     },
     {
+      key: "canonical_conflict",
+      title: "Resolve conflicting canonical declarations",
+      severity: "warning",
+      action: "Keep one consistent canonical URL across HTML and the HTTP Link header.",
+    },
+    {
+      key: "canonical_invalid",
+      title: "Fix invalid canonical declarations",
+      severity: "warning",
+      action: "Use one absolute or resolvable HTTP(S) canonical URL.",
+    },
+    {
+      key: "canonical_header_mismatch",
+      title: "Align HTML and HTTP header canonicals",
+      severity: "warning",
+      action: "Make the HTML link element and HTTP Link header point to the same canonical URL.",
+    },
+    {
       key: "redirect",
       title: "Replace redirected sitemap URLs",
       severity: "warning",
@@ -414,6 +472,18 @@ export function buildBacklog(pages, sitemaps) {
       title: "Unblock alternate URLs",
       severity: "warning",
       action: "hreflang alternates should be crawlable and indexable.",
+    },
+    {
+      key: "alternate_duplicate_language",
+      title: "Remove duplicate hreflang languages",
+      severity: "warning",
+      action: "Declare each language or language-region value once per page.",
+    },
+    {
+      key: "alternate_self_missing",
+      title: "Add hreflang self-references",
+      severity: "warning",
+      action: "Include the current canonical page in its own hreflang set.",
     },
     {
       key: "title_missing",

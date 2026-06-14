@@ -153,11 +153,11 @@ export function createAuditJobStore(options) {
   }
 
   async function readBatches(sql, jobId) {
-    const prefix = `${batchPrefix(jobId)}%`;
+    const prefix = batchPrefix(jobId);
     const rows = await sql`
       SELECT value - 'result' AS value
       FROM soos_config
-      WHERE key LIKE ${prefix}
+      WHERE left(key, char_length(${prefix})) = ${prefix}
       ORDER BY key
     `;
     return rows.flatMap((row) => {
@@ -170,8 +170,8 @@ export function createAuditJobStore(options) {
     const sql = await getSql();
     if (!sql) return false;
     await ensureDatabase(sql);
-    const prefix = `${batchPrefix(jobId)}%`;
-    await sql`DELETE FROM soos_config WHERE key LIKE ${prefix}`;
+    const prefix = batchPrefix(jobId);
+    await sql`DELETE FROM soos_config WHERE left(key, char_length(${prefix})) = ${prefix}`;
     return true;
   }
 
@@ -226,12 +226,11 @@ export function createAuditJobStore(options) {
       };
     }
     await ensureDatabase(sql);
-    const prefix = "audit_job:%";
     const queryPattern = `%${normalized.query}%`;
     const countRows = await sql`
       SELECT count(*)::int AS total
       FROM soos_config
-      WHERE key LIKE ${prefix}
+      WHERE key ~ '^audit_job:'
         AND value->>'sessionId' = ${sessionId}
         AND (${normalized.status === ""} OR value->>'status' = ${normalized.status})
         AND (
@@ -254,7 +253,7 @@ export function createAuditJobStore(options) {
     const rows = await sql`
       SELECT value
       FROM soos_config
-      WHERE key LIKE ${prefix}
+      WHERE key ~ '^audit_job:'
         AND value->>'sessionId' = ${sessionId}
         AND (${normalized.status === ""} OR value->>'status' = ${normalized.status})
         AND (
@@ -306,8 +305,12 @@ export function createAuditJobStore(options) {
     const sql = await getSql();
     if (!sql) return true;
     await ensureDatabase(sql);
-    const prefix = `${batchPrefix(jobId)}%`;
-    await sql`DELETE FROM soos_config WHERE key = ${jobKey(jobId)} OR key LIKE ${prefix}`;
+    const prefix = batchPrefix(jobId);
+    await sql`
+      DELETE FROM soos_config
+      WHERE key = ${jobKey(jobId)}
+        OR left(key, char_length(${prefix})) = ${prefix}
+    `;
     await sql`DELETE FROM soos_job_lease WHERE job_id = ${jobId}`;
     return true;
   }

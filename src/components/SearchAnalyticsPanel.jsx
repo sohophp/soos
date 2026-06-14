@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { formatApiError } from "../api-client.js";
 import { downloadCsvFile } from "../downloads.js";
 import { loadGscSearchAnalytics } from "../gsc-client.js";
@@ -7,14 +7,50 @@ import {
   buildSearchAnalyticsChangeInsights,
   buildSearchAnalyticsComparison,
   buildSearchAnalyticsInsights,
+  classifySearchQueryIntent,
   defaultGscDateRange,
+  gscDateRangeDays,
+  parseQueryIntentTerms,
+  scaledSearchThreshold,
   summarizeSearchAnalyticsRows,
+  wilsonUpperBound,
 } from "../search-analytics.js";
 
-function classifySearchQueryOpportunity(row) {
-  if ((row.impressions || 0) >= 100 && typeof row.ctr === "number" && row.ctr < 0.01) return "low_ctr";
-  if (typeof row.position === "number" && row.position >= 4 && row.position <= 10 && (row.impressions || 0) >= 50) return "striking_distance";
-  if (typeof row.position === "number" && row.position > 10 && row.position <= 20 && (row.impressions || 0) >= 100) return "page_two";
+const EMPTY_QUERY_INTENT_SETTINGS = {
+  brandTerms: "",
+  localTerms: "",
+  excludeTerms: "",
+};
+
+function queryIntentStorageKey(siteUrl) {
+  return `soos.query-intent.${String(siteUrl || "default").trim()}`;
+}
+
+function readQueryIntentSettings(siteUrl) {
+  try {
+    const saved = JSON.parse(globalThis.localStorage?.getItem(queryIntentStorageKey(siteUrl)) || "{}");
+    return {
+      brandTerms: String(saved.brandTerms || ""),
+      localTerms: String(saved.localTerms || ""),
+      excludeTerms: String(saved.excludeTerms || ""),
+    };
+  } catch {
+    return { ...EMPTY_QUERY_INTENT_SETTINGS };
+  }
+}
+
+function classifySearchQueryOpportunity(row, durationDays) {
+  const position = Number(row.position);
+  const benchmark = position <= 3 ? 0.03 : position <= 10 ? 0.01 : position <= 20 ? 0.005 : null;
+  const upperBound = wilsonUpperBound(row.clicks, row.impressions);
+  if (
+    (row.impressions || 0) >= scaledSearchThreshold(100, durationDays, 50)
+    && benchmark != null
+    && upperBound != null
+    && upperBound < benchmark
+  ) return "low_ctr";
+  if (position >= 4 && position <= 10 && (row.impressions || 0) >= scaledSearchThreshold(50, durationDays, 25)) return "striking_distance";
+  if (position > 10 && position <= 20 && (row.impressions || 0) >= scaledSearchThreshold(100, durationDays, 50)) return "page_two";
   return "monitor";
 }
 
@@ -26,22 +62,27 @@ function keywordOpportunityAction(type) {
   return "Monitor performance and prioritize if impressions or position improve.";
 }
 
-function downloadKeywordOpportunitiesCsv(rows, insights) {
+function downloadKeywordOpportunitiesCsv(rows, insights, siteUrl, queryIntentConfig, durationDays) {
   const insightByDetail = new Map((insights || []).map((insight) => [insight.detail, insight]));
   const csvRows = [
-    ["page", "query", "clicks", "impressions", "ctr", "position", "opportunity_type", "recommended_action"],
+    ["page", "query", "query_intent", "clicks", "impressions", "ctr", "position", "opportunity_type", "evidence_days", "minimum_impressions", "ctr_benchmark", "ctr_upper_bound", "recommended_action"],
   ];
   for (const row of (rows || []).filter((item) => item.page && item.query)) {
     const insight = insightByDetail.get(`${row.query} on ${row.page}`) || insightByDetail.get(row.page);
-    const type = insight?.type || classifySearchQueryOpportunity(row);
+    const type = insight?.type || classifySearchQueryOpportunity(row, durationDays);
     csvRows.push([
       row.page,
       row.query,
+      classifySearchQueryIntent(row.query, siteUrl, queryIntentConfig),
       row.clicks ?? 0,
       row.impressions ?? 0,
       typeof row.ctr === "number" ? (row.ctr * 100).toFixed(2) : "",
       typeof row.position === "number" ? row.position.toFixed(1) : "",
       type,
+      insight?.evidence?.durationDays || durationDays,
+      insight?.evidence?.minimumImpressions || "",
+      insight?.evidence?.ctrBenchmark ?? "",
+      insight?.evidence?.ctrUpperBound ?? "",
       insight?.action || keywordOpportunityAction(type),
     ]);
   }
@@ -70,6 +111,24 @@ function comparisonInsightCopy(insight, copy) {
     lost_visibility: [copy.lostVisibility, `${insight.count} ${copy.rowsLoaded}.${samples}`],
   };
   return text[insight.type] || [insight.type, ""];
+}
+
+function insightEvidenceCopy(evidence, copy) {
+  if (!evidence) return "";
+  const parts = [`${evidence.durationDays} ${copy.evidenceDays}`];
+  if (evidence.minimumImpressions != null) {
+    parts.push(`${copy.evidenceMinimum} ${evidence.minimumImpressions}`);
+  }
+  if (evidence.ctrBenchmark != null) {
+    parts.push(`${copy.evidenceCtrBenchmark} ${(evidence.ctrBenchmark * 100).toFixed(1)}%`);
+  }
+  if (evidence.ctrUpperBound != null) {
+    parts.push(`${copy.evidenceCtrUpper} ${(evidence.ctrUpperBound * 100).toFixed(1)}%`);
+  }
+  if (evidence.secondPageShare != null) {
+    parts.push(`${copy.evidenceSecondShare} ${(evidence.secondPageShare * 100).toFixed(1)}%`);
+  }
+  return `${copy.evidence}: ${parts.join(" · ")}`;
 }
 
 function downloadComparisonCsv(comparison, ranges) {
@@ -130,9 +189,48 @@ export function SearchAnalyticsPanel({ status, siteUrl, onRows, language }) {
   const [rows, setRows] = useState([]);
   const [comparison, setComparison] = useState(null);
   const [comparisonRanges, setComparisonRanges] = useState(null);
-  const insights = useMemo(() => buildSearchAnalyticsInsights(rows, summary?.dimension || dimension, language), [dimension, language, rows, summary?.dimension]);
-  const changeInsights = useMemo(() => buildSearchAnalyticsChangeInsights(comparison), [comparison]);
+  const [queryIntentSettings, setQueryIntentSettings] = useState(
+    () => readQueryIntentSettings(siteUrl),
+  );
+  const queryIntentConfig = useMemo(() => ({
+    brandTerms: parseQueryIntentTerms(queryIntentSettings.brandTerms),
+    localTerms: parseQueryIntentTerms(queryIntentSettings.localTerms),
+    excludeTerms: parseQueryIntentTerms(queryIntentSettings.excludeTerms),
+  }), [queryIntentSettings]);
+  const durationDays = useMemo(
+    () => gscDateRangeDays(startDate, endDate),
+    [endDate, startDate],
+  );
+  const insights = useMemo(
+    () => buildSearchAnalyticsInsights(rows, summary?.dimension || dimension, language, {
+      siteUrl,
+      queryIntentConfig,
+      durationDays,
+    }),
+    [dimension, durationDays, language, queryIntentConfig, rows, siteUrl, summary?.dimension],
+  );
+  const changeInsights = useMemo(
+    () => buildSearchAnalyticsChangeInsights(comparison, { durationDays }),
+    [comparison, durationDays],
+  );
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setQueryIntentSettings(readQueryIntentSettings(siteUrl));
+    setSummary(null);
+    setRows([]);
+    setComparison(null);
+    setComparisonRanges(null);
+    setError("");
+  }, [siteUrl]);
+
+  function updateQueryIntentSetting(name, value) {
+    setQueryIntentSettings((current) => {
+      const next = { ...current, [name]: value };
+      globalThis.localStorage?.setItem(queryIntentStorageKey(siteUrl), JSON.stringify(next));
+      return next;
+    });
+  }
 
   async function loadAnalytics(event) {
     event.preventDefault();
@@ -146,6 +244,11 @@ export function SearchAnalyticsPanel({ status, siteUrl, onRows, language }) {
     }
     setLoading(true);
     setError("");
+    setSummary(null);
+    setRows([]);
+    setComparison(null);
+    setComparisonRanges(null);
+    onRows([]);
     try {
       const body = await loadGscSearchAnalytics({
         startDate,
@@ -174,6 +277,11 @@ export function SearchAnalyticsPanel({ status, siteUrl, onRows, language }) {
         setComparisonRanges(null);
       }
     } catch (err) {
+      setSummary(null);
+      setRows([]);
+      setComparison(null);
+      setComparisonRanges(null);
+      onRows([]);
       setError(formatApiError(err));
     } finally {
       setLoading(false);
@@ -218,12 +326,51 @@ export function SearchAnalyticsPanel({ status, siteUrl, onRows, language }) {
             <small>{copy.comparisonHelp}</small>
           </span>
         </label>
+        {dimension === "page_query" ? (
+          <details className="query-intent-settings">
+            <summary>{copy.queryIntentSettings}</summary>
+            <div className="search-analytics-fields">
+              <label>
+                <strong>{copy.brandTerms}</strong>
+                <input
+                  type="text"
+                  value={queryIntentSettings.brandTerms}
+                  placeholder={copy.queryTermsPlaceholder}
+                  onChange={(event) => updateQueryIntentSetting("brandTerms", event.target.value)}
+                />
+              </label>
+              <label>
+                <strong>{copy.localTerms}</strong>
+                <input
+                  type="text"
+                  value={queryIntentSettings.localTerms}
+                  placeholder={copy.queryTermsPlaceholder}
+                  onChange={(event) => updateQueryIntentSetting("localTerms", event.target.value)}
+                />
+              </label>
+              <label>
+                <strong>{copy.excludeTerms}</strong>
+                <input
+                  type="text"
+                  value={queryIntentSettings.excludeTerms}
+                  placeholder={copy.queryTermsPlaceholder}
+                  onChange={(event) => updateQueryIntentSetting("excludeTerms", event.target.value)}
+                />
+              </label>
+            </div>
+            <small>{copy.queryIntentSettingsHelp}</small>
+          </details>
+        ) : null}
         <div className="gsc-api-actions">
           <button className="export-button" type="submit" disabled={loading}>
             {loading ? copy.loading : copy.load}
           </button>
           {dimension === "page_query" && rows.length ? (
-            <button className="export-button" type="button" onClick={() => downloadKeywordOpportunitiesCsv(rows, insights)}>
+            <button
+              className="export-button"
+              type="button"
+              onClick={() => downloadKeywordOpportunitiesCsv(rows, insights, siteUrl, queryIntentConfig, durationDays)}
+            >
               {copy.export}
             </button>
           ) : null}
@@ -292,6 +439,7 @@ export function SearchAnalyticsPanel({ status, siteUrl, onRows, language }) {
                 <strong>{insight.title}</strong>
                 <small>{insight.detail}</small>
                 <span>{insight.metrics}</span>
+                {insight.evidence ? <small>{insightEvidenceCopy(insight.evidence, copy)}</small> : null}
                 <em>{insight.action}</em>
               </article>
             ))}

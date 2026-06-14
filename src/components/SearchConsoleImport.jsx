@@ -47,6 +47,7 @@ export function SearchConsoleImport({ rows, onImport, onClear, language }) {
       <div className="gsc-import-body">
         <div>
           <strong>{copy.importTitle}</strong>
+          <small>{copy.csvFallback}</small>
           <small>{copy.importHelp}</small>
           {message ? <small className="gsc-import-message" role="status">{message}</small> : null}
           {error ? <small className="gsc-import-error" role="alert">{error}</small> : null}

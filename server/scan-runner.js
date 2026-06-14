@@ -6,12 +6,14 @@ import {
   detectSitemapKind,
   extractAlternates,
   extractCanonical,
+  extractCanonicalDeclarations,
   extractH1Count,
   extractHtmlLang,
   extractInternalLinks,
   extractMetaContent,
   extractTitle,
   hasNoindex,
+  hasNoindexHeader,
   locs,
   normalizeUrl,
   parseRobots,
@@ -250,7 +252,15 @@ export function createScanRunner({ fetchText, jobStore, proxyAllowed = () => pro
       };
     }
 
-    if (hasNoindex(response.text)) addIssue(issues, "critical", "noindex", "Page has noindex directive", "robots/googlebot meta tag");
+    const metaNoindex = hasNoindex(response.text);
+    const headerNoindex = hasNoindexHeader(response.xRobotsTag);
+    if (metaNoindex || headerNoindex) {
+      const sources = [
+        metaNoindex ? "robots/googlebot meta tag" : "",
+        headerNoindex ? `X-Robots-Tag: ${response.xRobotsTag}` : "",
+      ].filter(Boolean);
+      addIssue(issues, "critical", "noindex", "Page has noindex directive", sources.join(" | "));
+    }
 
     let title = null;
     let description = null;
@@ -306,10 +316,47 @@ export function createScanRunner({ fetchText, jobStore, proxyAllowed = () => pro
       }
     }
 
-    const canonical = extractCanonical(response.text, response.finalUrl || url);
-    if (!canonical) {
+    const pageUrl = response.finalUrl || url;
+    const canonicalDeclarations = extractCanonicalDeclarations(response.text, pageUrl, response.linkHeader);
+    const canonical = extractCanonical(response.text, pageUrl, response.linkHeader);
+    const validCanonicalDeclarations = canonicalDeclarations.filter((item) => item.href);
+    const uniqueCanonicals = [...new Set(validCanonicalDeclarations.map((item) => item.href))];
+    const htmlCanonicals = [...new Set(validCanonicalDeclarations.filter((item) => item.source === "html").map((item) => item.href))];
+    const headerCanonicals = [...new Set(validCanonicalDeclarations.filter((item) => item.source === "http_header").map((item) => item.href))];
+    const invalidCanonicals = canonicalDeclarations.filter((item) => !item.href);
+    if (invalidCanonicals.length) {
+      addIssue(
+        issues,
+        "warning",
+        "canonical_invalid",
+        "Canonical declaration has an invalid or missing HTTP(S) URL",
+        invalidCanonicals.map((item) => `${item.source}:${item.rawHref || "(empty)"}`).join(" | "),
+      );
+    }
+    if (canonicalDeclarations.length > 1) {
+      addIssue(
+        issues,
+        uniqueCanonicals.length > 1 ? "warning" : "notice",
+        "canonical_multiple",
+        "Multiple canonical declarations found",
+        canonicalDeclarations.map((item) => `${item.source}:${item.href || item.rawHref || "(empty)"}`).join(" | "),
+      );
+    }
+    if (uniqueCanonicals.length > 1) {
+      addIssue(issues, "warning", "canonical_conflict", "Canonical declarations point to different URLs", uniqueCanonicals.join(" | "));
+    }
+    if (htmlCanonicals.length && headerCanonicals.length && !htmlCanonicals.some((item) => headerCanonicals.includes(item))) {
+      addIssue(
+        issues,
+        "warning",
+        "canonical_header_mismatch",
+        "HTML and HTTP Link header canonicals disagree",
+        `html:${htmlCanonicals.join(", ")} | http_header:${headerCanonicals.join(", ")}`,
+      );
+    }
+    if (!canonical && !canonicalDeclarations.length) {
       addIssue(issues, "warning", "canonical_missing", "Missing canonical link");
-    } else {
+    } else if (canonical) {
       if (new URL(canonical).origin !== new URL(url).origin) addIssue(issues, "warning", "canonical_cross_host", "Canonical points to another host", canonical);
       if (canonical !== normalizeUrl(response.finalUrl || url)) addIssue(issues, "notice", "canonical_mismatch", "Canonical differs from fetched URL", canonical);
       if (robots && !robotsDecision(robots.groups, canonical).allowed) addIssue(issues, "critical", "canonical_blocked", "Canonical URL is blocked by robots.txt", canonical);
@@ -318,6 +365,8 @@ export function createScanRunner({ fetchText, jobStore, proxyAllowed = () => pro
 
     const alternates = extractAlternates(response.text, response.finalUrl || url);
     const internalLinks = extractInternalLinks(response.text, response.finalUrl || url);
+    const alternatesByLanguage = new Map();
+    const alternatesByTarget = new Map();
     for (const alternate of alternates) {
       if (!alternate.href) addIssue(issues, "warning", "alternate_invalid", "Alternate hreflang has invalid href", alternate.rawHref);
       else if (robots && !robotsDecision(robots.groups, alternate.href).allowed) {
@@ -325,6 +374,29 @@ export function createScanRunner({ fetchText, jobStore, proxyAllowed = () => pro
       }
       if (!/^[a-z]{2,3}(-[a-z0-9]{2,8})?$|^x-default$/i.test(alternate.hreflang)) {
         addIssue(issues, "warning", "alternate_hreflang_invalid", "Alternate has suspicious hreflang value", alternate.hreflang);
+      }
+      const languageKey = alternate.hreflang.toLowerCase();
+      if (!alternatesByLanguage.has(languageKey)) alternatesByLanguage.set(languageKey, []);
+      alternatesByLanguage.get(languageKey).push(alternate.href || alternate.rawHref || "(empty)");
+      if (alternate.href) {
+        if (!alternatesByTarget.has(alternate.href)) alternatesByTarget.set(alternate.href, []);
+        alternatesByTarget.get(alternate.href).push(alternate.hreflang);
+      }
+    }
+    for (const [language, targets] of alternatesByLanguage) {
+      if (targets.length > 1) {
+        addIssue(issues, "warning", "alternate_duplicate_language", "Multiple hreflang declarations use the same language", `${language}: ${targets.join(" | ")}`);
+      }
+    }
+    for (const [target, languages] of alternatesByTarget) {
+      if (languages.length > 1) {
+        addIssue(issues, "notice", "alternate_duplicate_target", "Multiple hreflang declarations point to the same URL", `${target}: ${languages.join(", ")}`);
+      }
+    }
+    if (alternates.length) {
+      const expectedSelf = normalizeUrl(canonical || response.finalUrl || url);
+      if (expectedSelf && !alternates.some((alternate) => normalizeUrl(alternate.href) === expectedSelf)) {
+        addIssue(issues, "warning", "alternate_self_missing", "Hreflang set has no self-referencing URL", expectedSelf);
       }
     }
 
@@ -340,6 +412,7 @@ export function createScanRunner({ fetchText, jobStore, proxyAllowed = () => pro
       viewport,
       structuredData,
       canonical,
+      canonicalDeclarations,
       alternates,
       internalLinks,
       issues,

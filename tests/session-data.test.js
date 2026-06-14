@@ -30,6 +30,8 @@ assert.deepEqual(await readSessionDataFromDatabase(summaryDb.sql, "session-a"), 
 });
 assert.match(summaryDb.calls[0].text, /value->>'sessionId'/);
 assert.match(summaryDb.calls[0].text, /audit_job_batch:/);
+assert.match(summaryDb.calls[0].text, /key ~ '\^audit_job:'/);
+assert.match(summaryDb.calls[0].text, /left\( batch\.key/);
 assert.equal(summaryDb.calls[0].values.includes("session-a"), true);
 
 const deleteDb = fakeSql({
@@ -48,5 +50,7 @@ assert.match(deleteDb.calls[0].text, /deleted_leases AS/);
 assert.match(deleteDb.calls[0].text, /deleted_config AS/);
 assert.equal(deleteDb.calls[0].values.includes("gsc_config:session-a"), true);
 assert.match(deleteDb.calls[0].text, /audit_job_batch:/);
+assert.match(deleteDb.calls[0].text, /config\.key ~ '\^audit_job:'/);
+assert.match(deleteDb.calls[0].text, /left\( config\.key/);
 
 console.log("session-data-tests-passed");

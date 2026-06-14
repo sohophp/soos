@@ -15,13 +15,15 @@ assert.equal(robotsImpactIssueType("submitted_url"), "robots_disallow");
 assert.equal(robotsImpactIssueType("canonical_target"), "canonical_blocked");
 assert.equal(robotsImpactIssueType("alternate_target"), "alternate_blocked");
 
-const [mainSource, summarySource, issuesSource, uiSource] = await Promise.all([
+const [mainSource, reportSource, summarySource, issuesSource, uiSource] = await Promise.all([
   fs.readFile(new URL("../src/main.jsx", import.meta.url), "utf8"),
+  fs.readFile(new URL("../src/components/WorkspaceReport.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/ScanSummaryView.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/IssuesView.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/ReportUi.jsx", import.meta.url), "utf8"),
 ]);
-assert.match(mainSource, /<ReportEmptyState t=\{t\} \/>/);
+assert.match(mainSource, /<WorkspaceReport/);
+assert.match(reportSource, /<ReportEmptyState t=\{t\} \/>/);
 assert.match(uiSource, /export function ReportEmptyState/);
 assert.match(summarySource, /<StatusFlags flags=\{report\.statusFlags\}/);
 assert.match(summarySource, /report\.summary\.healthScore/);

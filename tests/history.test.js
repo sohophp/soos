@@ -49,6 +49,7 @@ const report = {
 const entry = toHistoryEntry(report, () => 1000, () => 0.5);
 assert.equal(entry.id, "rs-i");
 assert.equal(entry.issueFingerprints.length, 1);
+assert.deepEqual(entry.pageUrls, ["https://example.com/a"]);
 assert.equal(entry.scanConfig.contentChecks, true);
 
 const previous = {

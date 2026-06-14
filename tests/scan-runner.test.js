@@ -6,6 +6,8 @@ function fetched({
   finalUrl,
   text = "",
   contentType = "text/html",
+  xRobotsTag = "",
+  linkHeader = "",
   durationMs = 25,
   redirectChain = [],
 } = {}) {
@@ -15,6 +17,8 @@ function fetched({
     finalUrl,
     text,
     contentType,
+    xRobotsTag,
+    linkHeader,
     durationMs,
     redirectChain,
     redirectLoop: false,
@@ -91,5 +95,91 @@ await assert.rejects(
   runner.audit("https://example.com/sitemap.xml", { proxyEnabled: true }),
   /Proxy fetching is disabled/,
 );
+
+const inspectRunner = createScanRunner({
+  fetchText: async (url) => {
+    if (url.endsWith("/header-noindex")) {
+      return fetched({
+        finalUrl: url,
+        contentType: "application/xhtml+xml; charset=utf-8",
+        xRobotsTag: "googlebot: noindex, nofollow",
+        text: `<html><head><link rel="canonical" href="${url}"></head><body></body></html>`,
+      });
+    }
+    if (url.endsWith("/asset.json")) {
+      return fetched({
+        finalUrl: url,
+        contentType: "application/json",
+        text: "{\"ok\":true}",
+      });
+    }
+    return fetched({ status: 503, finalUrl: url, contentType: "text/plain", text: "Unavailable" });
+  },
+  jobStore: { wait: async () => {} },
+});
+const headerNoindexUrl = "https://example.com/header-noindex";
+const headerNoindexPage = await inspectRunner.inspectPage(
+  headerNoindexUrl,
+  null,
+  new Set([headerNoindexUrl]),
+  { contentChecks: false },
+  {},
+);
+assert.match(
+  headerNoindexPage.issues.find((issue) => issue.type === "noindex").detail,
+  /X-Robots-Tag: googlebot: noindex/,
+);
+const jsonPage = await inspectRunner.inspectPage(
+  "https://example.com/asset.json",
+  null,
+  new Set(),
+  { contentChecks: false },
+  {},
+);
+assert.equal(jsonPage.issues.some((issue) => issue.type === "not_html"), true);
+const unavailablePage = await inspectRunner.inspectPage(
+  "https://example.com/unavailable",
+  null,
+  new Set(),
+  { contentChecks: false },
+  {},
+);
+assert.equal(unavailablePage.issues.some((issue) => issue.type === "http_error"), true);
+assert.equal(unavailablePage.issues.some((issue) => issue.type === "not_html"), true);
+
+const evidenceRunner = createScanRunner({
+  fetchText: async (url) => fetched({
+    finalUrl: url,
+    linkHeader: '<https://example.com/header-canonical>; rel="canonical"',
+    text: `<html><head>
+      <link rel="canonical" href="/html-canonical">
+      <link rel="canonical" href="javascript:alert(1)">
+      <link rel="alternate" hreflang="en" href="/en">
+      <link rel="alternate" hreflang="en" href="/en-duplicate">
+      <link rel="alternate" hreflang="fr" href="/en">
+    </head><body></body></html>`,
+  }),
+  jobStore: { wait: async () => {} },
+});
+const evidencePage = await evidenceRunner.inspectPage(
+  "https://example.com/evidence",
+  null,
+  new Set(["https://example.com/html-canonical"]),
+  { contentChecks: false },
+  {},
+);
+assert.equal(evidencePage.canonical, "https://example.com/html-canonical");
+assert.equal(evidencePage.canonicalDeclarations.length, 3);
+for (const type of [
+  "canonical_invalid",
+  "canonical_multiple",
+  "canonical_conflict",
+  "canonical_header_mismatch",
+  "alternate_duplicate_language",
+  "alternate_duplicate_target",
+  "alternate_self_missing",
+]) {
+  assert.equal(evidencePage.issues.some((issue) => issue.type === type), true, type);
+}
 
 console.log("scan-runner-tests-passed");

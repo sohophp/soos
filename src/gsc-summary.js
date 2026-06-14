@@ -11,7 +11,9 @@ export function uniqueGscRows(rows) {
     const key = row.key || normalizeReportUrl(row.page || "");
     if (!key) continue;
     const current = byKey.get(key);
-    if (!current || (row.impressions || 0) > (current.impressions || 0)) byKey.set(key, row);
+    if (!current || (row.impressions || 0) > (current.impressions || 0)) {
+      byKey.set(key, row.key === key ? row : { ...row, key });
+    }
   }
   return [...byKey.values()];
 }
@@ -24,6 +26,9 @@ export function isTechnicallyIndexablePage(page) {
     "noindex",
     "canonical_blocked",
     "canonical_cross_host",
+    "canonical_conflict",
+    "canonical_invalid",
+    "canonical_header_mismatch",
     "canonical_mismatch",
   ]);
   return !(page.issues || []).some((issue) => blockers.has(issue.type));

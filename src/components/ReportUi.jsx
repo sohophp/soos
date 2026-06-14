@@ -17,7 +17,7 @@ export function Badge({ severity, children }) {
   const Icon = severityIcons[severity] || CheckCircle2;
   return (
     <span className={`badge badge-${severity || "ok"}`}>
-      <Icon size={14} />
+      <Icon size={14} aria-hidden="true" focusable="false" />
       {children}
     </span>
   );
@@ -35,7 +35,7 @@ export function Stat({ label, value, tone }) {
 export function ReportEmptyState({ t }) {
   return (
     <section className="empty">
-      <FileSearch size={42} />
+      <FileSearch size={42} aria-hidden="true" focusable="false" />
       <p>{t.placeholder}</p>
     </section>
   );

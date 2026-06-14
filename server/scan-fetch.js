@@ -85,6 +85,8 @@ export function createScanFetcher(options = {}) {
           ? redirect.finalTarget
           : normalizeUrl(response.url) || currentUrl,
         contentType: response.headers.get("content-type") || "",
+        xRobotsTag: response.headers.get("x-robots-tag") || "",
+        linkHeader: response.headers.get("link") || "",
         durationMs: now() - requestStartedAt,
         text,
         redirectChain: redirect.chain,

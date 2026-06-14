@@ -2,6 +2,8 @@
 
 soos is a local-first React + Node SEO audit tool for sitemap, robots.txt, indexability, international SEO, lightweight performance checks, and Google Search Console diagnostics.
 
+Runtime requirement: Node.js `^20.19.0` or `>=22.12.0`.
+
 Detailed architecture, implementation status and the active roadmap are maintained in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 The roadmap is organized by release:
@@ -23,16 +25,25 @@ Stored data, retention periods, Google disconnection, and complete current-sessi
 - Reads `sitemap.xml` and `sitemapindex` files, including child sitemaps.
 - Optional recursive same-site discovery to depth 2 with separate URL budgets and resumable background checkpoints.
 - Internal link graph diagnostics for inbound/outbound links, homepage shortest paths, unreachable sitemap pages, weak linkage, and deep click paths.
+- Recursive discovery, link graphs, URL-set differences, structured-data diagnostics, Googlebot log findings, URL Inspection results, alignment matrices, crawl-freshness rows, and per-reason coverage groups paginate without truncating analysis or exports.
+- Report controls expose accessible names, live pagination/result counts, expandable-region relationships, and keyboard-scrollable URL alignment tables.
 - Audits canonical, hreflang/alternate, title, description, H1, lang, viewport, JSON-LD, robots rules, and sitemap consistency.
+- Preserves canonical declarations from both HTML and HTTP `Link` headers and reports invalid, duplicate, or conflicting signals.
+- Detects duplicate hreflang languages, reused alternate targets, missing self-references, missing return links, and alternate canonical conflicts.
 - Traces redirects hop by hop and detects loops, long chains, invalid destinations, hostname changes, and HTTPS downgrades.
-- Optional page content checks and lightweight performance checks.
+- Optional raw-HTML page content checks and lightweight performance checks.
+- On-demand PageSpeed Insights and optional dedicated Chrome UX Report tests for one scanned URL at a time, using a user-supplied Google API key held only in browser session storage.
+- Meta robots, Googlebot meta, and `X-Robots-Tag` noindex diagnostics.
 - Pause, resume, stop, background worker scans, history, CSV export, and summary export.
 - Neon-backed background jobs, completed reports, and URL-batch checkpoints with automatic recovery after page refresh.
+- Versioned Neon constraints validate migration names, JSON object storage, exact audit-job keys, 32-character session ownership, checkpoint batch shapes, lease IDs/tokens, and optimized session/status indexes.
 - Request-driven serverless workers with Neon leases, so scan work completes inside each API request instead of relying on background promises.
 - Google Search Console CSV import with English and Chinese column support.
 - Google Search Console API integration for Search Analytics dimensions and URL Inspection.
+- Search Analytics opportunities scale evidence thresholds to the selected date range, suppress low-sample period regressions, and confirm low CTR against conservative position bands with a 90% Wilson upper bound.
 - Prioritized URL Inspection batches across sitemap technical anomalies, GSC pages outside sitemap, and internally discovered URLs outside sitemap.
 - Search Console Sitemaps API status for submitted files, last download time, pending state, errors, warnings, and current-audit sitemap matching.
+- A state-aware Google workspace: CSV import is offered only as a disconnected fallback; connected accounts get a compact property selector, automatic property-scoped sitemap status, Search Analytics, and URL Inspection without redundant connection-test controls.
 - URL set comparison across sitemap, scanned internal links, Search Analytics, and Google sitemap/referrer signals.
 - Sitemap orphan detection and HTTP/HTTPS, www, trailing-slash, and query URL variant diagnosis.
 - Configurable URL comparison rules for preserving queries, removing tracking parameters, ignoring queries, and normalizing trailing slashes without rewriting crawl requests.
@@ -41,7 +52,10 @@ Stored data, retention periods, Google disconnection, and complete current-sessi
 - Local access-log analysis with verified Googlebot IPs and sitemap crawl comparison.
 - Neon retained-task management and URL-level regression comparisons across repeated scans.
 - OAuth refresh token support so access tokens can refresh automatically.
+- Google OAuth uses the read-only Search Console scope. soos does not submit or delete sitemaps with the current connection.
 - Shared frontend API client with structured request errors and a three-language React render fallback.
+- Translation parity across every current resource bundle, mojibake, local-debug-URL leakage, key-label localization, and common Simplified/Traditional Chinese cross-script checks run in `npm run check`.
+- Playwright desktop/mobile E2E tests use local API interception to verify OAuth popup completion and disconnect, active-task recovery, report persistence after reload, large URL-result pagination, three-language report switching, Search Analytics evidence, keyboard tab navigation, viewport overflow, and browser console stability without contacting external sites.
 - Dedicated `server/gsc-search-analytics.js` service for Search Analytics validation, Google requests, row normalization, and previous-period orchestration.
 - Dedicated GSC configuration storage and Google service modules for encrypted local/Neon persistence, OAuth refresh, account identity, Sites, Sitemaps, Search Analytics, and URL Inspection.
 - Dedicated server route modules for health/metrics, current-session data lifecycle, GSC/OAuth, and audit-job list/create/run/control/delete endpoints.
@@ -51,10 +65,22 @@ Stored data, retention periods, Google disconnection, and complete current-sessi
 - A scan runner owns sitemap recursion, page inspection, recursive internal discovery, checkpoints, report assembly, and scan limits.
 - Structured data validation and scan-level diagnosis/report scoring live in dedicated domain modules.
 - Persistent Scan, Google, Issues, URLs, History, and Settings views, with paginated URL findings and state-preserving Google diagnostics.
+- Workspace views expose ARIA tab semantics and support Left/Right/Home/End keyboard navigation.
 - URL findings can be filtered by severity, issue type, text, Sitemap/internal/GSC/Inspection source, and historical change state; CSV export follows the active filters.
 - URL finding rows, filters, source/change counts, pagination, and filtered exports are isolated in `src/components/UrlFindingsPanel.jsx`.
 - Scan summary, issue diagnosis, and shared report badges/statistics are separated into focused report view components.
 - Sitemap inventory, recursive discoveries, internal-link graph filters, and graph CSV export are isolated in `src/components/UrlStructureView.jsx`.
+- Scan progress, pause/resume/stop controls, and elapsed-stage runtime details are isolated in `src/components/ScanRuntimePanel.jsx`.
+- Scan creation, active-job recovery, polling, terminal transitions, and runtime state live in `src/hooks/useAuditRunner.js`.
+- Scan input and option state live in `src/hooks/useScanSettings.js`; the request contract is built by the tested `src/scan-settings.js` helper.
+- Scan launch/runtime controls and the Settings view are isolated in `src/components/ScanSetupPanels.jsx`.
+- Retained-task search, pagination, report opening, deletion, and refresh state live in `src/hooks/useRetainedJobs.js`.
+- Search Console status, selected property, imported/API rows, and privacy-reset remounts live in `src/hooks/useGscWorkspace.js`.
+- Current reports, browser history, retention limits, and comparison baselines live in `src/hooks/useReportHistory.js`.
+- Google controls, retained/browser history, and report result views are assembled by focused workspace components rather than `main.jsx`.
+- Google URL-set differences and structured-data/Rich Results diagnosis use dedicated domain modules and focused report components.
+- URL Inspection queue/result orchestration and Googlebot log import/diagnosis live in dedicated Google workspace components with tested pure helpers.
+- Search visibility/opportunity views and CSV, HTML, and text report exports are separated from the application entry point.
 - History comparison separates introduced, resolved, worsened, improved, and persistent issues and warns when scan configuration changes may affect the result.
 - Browser history persistence, retention limits, snapshot creation, and comparison deltas live in `src/history.js`; history, retained-job, and comparison views live in `src/components/HistoryPanels.jsx`.
 - Standalone responsive HTML reports include scan scope, limits, configuration, summary, URL evidence, and available page-level Search Analytics metrics.
@@ -174,6 +200,10 @@ soos requests Search Console read-only access plus basic Google account identity
 
 After OAuth succeeds, the callback page notifies the main soos window and tries to close itself. Disconnect removes the local/Neon connection and attempts to revoke the Google OAuth token.
 
+When Search Console is connected, soos automatically loads the submitted sitemap list for the selected property. Switching properties clears Search Analytics and URL Inspection data from the previous property before loading the new sitemap status. Sitemap matching is exact apart from URL fragments, default ports, and hostname letter case; protocol, path case, trailing slashes, and query parameters remain significant.
+
+CSV import is a fallback for users who do not connect Search Console. It is hidden after OAuth connects so imported and live API data cannot be mixed accidentally.
+
 Property URL examples:
 
 - URL-prefix property: `https://www.example.com/`
@@ -213,7 +243,7 @@ SOOS_TOKEN_ENCRYPTION_KEY=generate-a-long-random-value
 SOOS_TOKEN_ENCRYPTION_KEY_PREVIOUS=
 ```
 
-Run `npm run db:status` to inspect the current Neon schema without changing it. After creating a Neon restore branch or point-in-time recovery reference, run `npm run db:migrate`, then require `db:status` to report `ready: true`. The API also applies pending idempotent migrations automatically on its first database-backed request.
+Run `npm run db:status` to inspect the current Neon schema without changing it. It reports pending migrations, required tables, validated constraints, required indexes, and malformed-row counts. After creating a Neon restore branch or point-in-time recovery reference, run `npm run db:migrate`, then require `db:status` to report `ready: true`. The API also applies pending idempotent migrations automatically on its first database-backed request.
 
 Notes:
 
@@ -241,7 +271,19 @@ Search Analytics notes:
 - Query, Page + Query, Country, and Device dimensions are displayed in the Search Analytics panel for exploration.
 - Page + Query rows also generate lightweight opportunities for high impressions with low CTR, top rankings with almost no clicks, rankings in positions 4-10, page-two rankings, and pages spread across many queries.
 - Page + Query analysis flags likely keyword cannibalization when multiple pages receive a meaningful share of visibility for the same query.
+- Similar Page + Query terms are clustered by normalized intent; branded, local, navigation, informational, and topic queries are distinguished to reduce cannibalization false positives.
+- Brand, location, and clustering-exclusion terms can be customized per Search Console property and are stored only in the current browser.
 - Page + Query rows can be exported as a keyword opportunities CSV.
+- Opportunity cards and CSV exports include the date-window evidence, minimum impression threshold, CTR benchmark, confidence upper bound, and competing-page share when applicable.
+
+PageSpeed Insights notes:
+
+- The PageSpeed panel appears in a completed scan report and keeps Google Lighthouse lab data separate from soos lightweight HTML performance checks.
+- The selected URL and user-supplied API key pass through the soos API to Google only when the user starts a test. The key is not written to reports, history, logs, `.env`, or Neon.
+- Enable the PageSpeed Insights API for Lighthouse results and the Chrome UX Report API for optional CrUX data. The same session-only key can be used when both APIs are enabled in its Google Cloud project.
+- Dedicated CrUX results show daily-updated 28-day p75 field data, collection dates, and explicit page-to-origin fallback. PageSpeed's legacy field-data copy remains separate because Google has announced its removal.
+- Google documentation: [Get Started](https://developers.google.com/speed/docs/insights/v5/get-started), [runPagespeed API](https://developers.google.com/speed/docs/insights/rest/v5/pagespeedapi/runpagespeed), and [lab vs field data](https://developers.google.com/speed/docs/insights/v5/about).
+- Chrome documentation: [CrUX API](https://developer.chrome.com/docs/crux/api/).
 - Previous-period comparison loads the immediately preceding date range with the same number of days and explains click, impression, CTR, and average-position changes.
 - Comparison results identify newly visible and lost dimension rows and can be exported with both date ranges, current values, previous values, and deltas.
 
@@ -249,12 +291,21 @@ URL Inspection notes:
 
 - URL Inspection imports Google coverage, robots, fetch, canonical, sitemap/referrer, mobile usability, and rich results signals when available.
 - The diagnosis cards highlight not-indexed states, discovered-not-crawled URLs, duplicate/alternate pages, soft 404s, canonical mismatches, mobile issues, and missing discovery signals.
+- The priority queue shows unique candidates, inspected and remaining totals, estimated remaining 25-URL batches, Google quota context, and sources omitted by the current scan/GSC configuration.
+- Selecting a history comparison prioritizes URLs with worsened severity, newly introduced issues, and pages absent from the previous page snapshot. Legacy history still prioritizes issue regressions without guessing clean new pages.
 - URL set comparison uses the URLs included in the current audit, so configured scan limits and truncation also define its sitemap scope.
 - Internal-link orphan findings cover only pages completed in the current audit; older saved reports without link data suppress those findings.
+
+Canonical and hreflang notes:
+
+- `canonical` remains the primary normalized target used by URL comparisons; `canonicalDeclarations` preserves each HTML or HTTP-header declaration as supporting evidence.
+- When HTML and HTTP `Link` header canonicals disagree, the report keeps both sources and prioritizes the URL for Google inspection.
+- Hreflang checks operate on the raw server response and validate language syntax, duplicate declarations, target reuse, self-reference, reciprocal links, robots access, and target canonical alignment.
 
 Structured data notes:
 
 - Enable Page content checks to parse JSON-LD and run local structured data validation.
+- Page content, canonical, hreflang, noindex, links, and JSON-LD checks use the server response HTML. They do not execute JavaScript or inspect the rendered DOM.
 - soos parses top-level objects, arrays, and `@graph` nodes, then checks syntax, local `@id` references, common Google-required fields, and recommended enhancements.
 - The rule set covers common Article, Product, Review, Breadcrumb, FAQ, LocalBusiness, Video, Recipe, Event, JobPosting, Course, Dataset, SoftwareApplication, ProfilePage, QAPage, discussion post, ItemList, Movie, employer rating, fact check, image licensing, vacation rental, MathSolver, Organization, and WebSite markup.
 - Nested checks cover addresses, event and job locations, employers, authors, comments, answers, offers, ratings, dates, prices, counts, and ordered list positions.

@@ -29,8 +29,12 @@ import {
   sendJson,
 } from "./http.js";
 import { verifyGooglebotIps } from "./googlebot-verifier.js";
+import { runCrux } from "./crux-service.js";
+import { runPageSpeed } from "./pagespeed-service.js";
 import { handleAuditJobRoute } from "./routes/audit-job-routes.js";
+import { handleCruxRoute } from "./routes/crux-routes.js";
 import { handleGscRoute } from "./routes/gsc-routes.js";
+import { handlePageSpeedRoute } from "./routes/pagespeed-routes.js";
 import { handleSessionDataRoute } from "./routes/session-data-routes.js";
 import { handleSystemRoute } from "./routes/system-routes.js";
 
@@ -147,10 +151,10 @@ async function ensureNeonConfigTable(sql) {
   `;
   await sql`
     DELETE FROM soos_config
-    WHERE (key LIKE 'audit_job:%' OR key LIKE 'audit_job_batch:%')
+    WHERE key ~ '^audit_job:' OR key ~ '^audit_job_batch:'
       AND updated_at < now() - (${PERSISTED_JOB_TTL_DAYS} * interval '1 day')
   `;
-  await sql`DELETE FROM soos_config WHERE key LIKE 'audit_schedule:%'`;
+  await sql`DELETE FROM soos_config WHERE key ~ '^audit_schedule:'`;
   await sql`DELETE FROM soos_job_lease WHERE leased_until < now()`;
   neonReady = true;
 }
@@ -415,6 +419,14 @@ export function handleRequest(req, res) {
     compareSearchAnalytics: compareGscSearchAnalytics,
     listSitemaps: listGscSitemaps,
     inspectUrls: inspectGscUrls,
+    sendRouteError,
+  })) return;
+  if (handlePageSpeedRoute(req, res, requestPath, {
+    runPageSpeed,
+    sendRouteError,
+  })) return;
+  if (handleCruxRoute(req, res, requestPath, {
+    runCrux,
     sendRouteError,
   })) return;
   if (handleAuditJobRoute(req, res, requestPath, {

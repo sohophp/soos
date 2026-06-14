@@ -17,6 +17,10 @@ const pages = [
     url: "https://example.com/a",
     finalUrl: "https://example.com/a",
     canonical: "https://example.com/b",
+    canonicalDeclarations: [
+      { source: "html", href: "https://example.com/b", rawHref: "/b" },
+      { source: "http_header", href: "https://example.com/c", rawHref: "https://example.com/c" },
+    ],
     title: "Duplicate",
     description: "Same description",
     status: 200,
@@ -25,6 +29,8 @@ const pages = [
       { severity: "critical", type: "robots_disallow", message: "Blocked", detail: "Disallow: /a" },
       { severity: "warning", type: "canonical_mismatch", message: "Canonical differs" },
       { severity: "warning", type: "canonical_not_in_sitemap", message: "Missing canonical" },
+      { severity: "warning", type: "canonical_conflict", message: "Canonical conflict" },
+      { severity: "warning", type: "alternate_self_missing", message: "Missing self-reference" },
     ],
   },
   {
@@ -53,9 +59,11 @@ assert.equal(robots[0].count, 1);
 const sitemapSignals = summarizeSitemapSignals(pages);
 assert.equal(sitemapSignals.some((item) => item.key === "canonical_mismatch"), true);
 assert.equal(sitemapSignals.some((item) => item.key === "canonical_not_in_sitemap"), true);
+assert.equal(sitemapSignals.some((item) => item.key === "canonical_conflict"), true);
 
 const international = summarizeInternationalSignals(pages);
 assert.equal(international.some((item) => item.key === "alternate_not_reciprocal"), true);
+assert.equal(international.some((item) => item.key === "alternate_self_missing"), true);
 
 const reasons = classifyGoogleReasons(pages[0]);
 assert.equal(reasons.some((reason) => reason.code === "blocked_by_robots"), true);

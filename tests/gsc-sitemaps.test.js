@@ -1,5 +1,29 @@
 import assert from "node:assert/strict";
-import { normalizeGscSitemapResponse } from "../src/gsc-sitemaps.js";
+import {
+  normalizeGscSitemapResponse,
+  normalizeGscSitemapUrl,
+} from "../src/gsc-sitemaps.js";
+
+assert.equal(
+  normalizeGscSitemapUrl("HTTPS://Example.COM:443/sitemap.xml?type=pages#section"),
+  "https://example.com/sitemap.xml?type=pages",
+);
+assert.notEqual(
+  normalizeGscSitemapUrl("https://example.com/sitemap.xml?type=pages"),
+  normalizeGscSitemapUrl("https://example.com/sitemap.xml?type=news"),
+);
+assert.notEqual(
+  normalizeGscSitemapUrl("https://example.com/sitemaps/"),
+  normalizeGscSitemapUrl("https://example.com/sitemaps"),
+);
+assert.notEqual(
+  normalizeGscSitemapUrl("http://example.com/sitemap.xml"),
+  normalizeGscSitemapUrl("https://example.com/sitemap.xml"),
+);
+assert.notEqual(
+  normalizeGscSitemapUrl("https://example.com/Sitemap.xml"),
+  normalizeGscSitemapUrl("https://example.com/sitemap.xml"),
+);
 
 const result = normalizeGscSitemapResponse({
   sitemap: [

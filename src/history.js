@@ -52,6 +52,7 @@ export function toHistoryEntry(report, now = Date.now, random = Math.random) {
     executiveSummary: report.executiveSummary,
     statusFlags: report.statusFlags,
     scanConfig: reportComparisonConfig(report),
+    pageUrls: (report.pages || []).map((page) => page.url).filter(Boolean).slice(0, 10000),
     issueFingerprints: reportIssueFingerprints(report).slice(0, 10000),
   };
 }

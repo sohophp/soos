@@ -3,6 +3,21 @@ function safeNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
+export function normalizeGscSitemapUrl(value) {
+  try {
+    const url = new URL(value);
+    if (!["http:", "https:"].includes(url.protocol)) return "";
+    url.hash = "";
+    url.hostname = url.hostname.toLowerCase();
+    if ((url.protocol === "http:" && url.port === "80") || (url.protocol === "https:" && url.port === "443")) {
+      url.port = "";
+    }
+    return url.toString();
+  } catch {
+    return String(value || "").trim();
+  }
+}
+
 export function normalizeGscSitemapResponse(body = {}) {
   const sitemaps = (Array.isArray(body.sitemap) ? body.sitemap : []).map((item) => {
     const contents = (Array.isArray(item.contents) ? item.contents : []).map((content) => ({

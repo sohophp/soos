@@ -72,4 +72,45 @@ assert.equal(graphCandidates.find((item) => item.url === "https://graph.example/
 assert.ok(graphCandidates.find((item) => item.url === "https://graph.example/unreachable").reasons.includes("homepage_unreachable"));
 assert.equal(graphCandidates.find((item) => item.url === "https://graph.example/deep").priority, 35);
 
+const historicalCandidates = buildUrlInspectionCandidates({
+  pages: [
+    {
+      url: "https://example.com/existing",
+      issues: [{ type: "title_missing", severity: "critical" }],
+      internalLinks: [],
+    },
+    {
+      url: "https://example.com/new-clean",
+      issues: [],
+      internalLinks: [],
+    },
+    {
+      url: "https://example.com/new-issue",
+      issues: [{ type: "canonical_missing", severity: "warning" }],
+      internalLinks: [],
+    },
+  ],
+}, [], {
+  pageUrls: ["https://example.com/existing"],
+  issueFingerprints: [
+    {
+      key: "https://example.com/existing|title_missing",
+      url: "https://example.com/existing",
+      type: "title_missing",
+      severity: "warning",
+    },
+  ],
+});
+const worsened = historicalCandidates.find((item) => item.url === "https://example.com/existing");
+assert.equal(worsened.priority, 4);
+assert.ok(worsened.reasons.includes("history_severity_worsened:title_missing"));
+assert.ok(worsened.sources.includes("history"));
+const introduced = historicalCandidates.find((item) => item.url === "https://example.com/new-issue");
+assert.equal(introduced.priority, 6);
+assert.ok(introduced.reasons.includes("history_issue_introduced:canonical_missing"));
+assert.ok(introduced.reasons.includes("history_new_page"));
+const newClean = historicalCandidates.find((item) => item.url === "https://example.com/new-clean");
+assert.equal(newClean.priority, 8);
+assert.ok(newClean.reasons.includes("history_new_page"));
+
 console.log("url-inspection-candidates-tests-passed");
