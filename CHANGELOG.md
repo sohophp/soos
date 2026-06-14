@@ -7,6 +7,7 @@ All notable changes to soos will be documented in this file.
 ### PageSpeed Insights
 
 - Normalized failed Lighthouse SEO audits, non-opportunity performance diagnostics, runtime context, redirects, and Core Web Vitals field-data status for actionable reporting.
+- Added a single preferred field-data view, Core Web Vitals verdicts, Lighthouse warnings, redirect evidence, SEO findings, performance diagnostics, and clearer savings.
 
 ### Google Sitemap accuracy
 

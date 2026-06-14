@@ -32,7 +32,7 @@ Stored data, retention periods, Google disconnection, and complete current-sessi
 - Detects duplicate hreflang languages, reused alternate targets, missing self-references, missing return links, and alternate canonical conflicts.
 - Traces redirects hop by hop and detects loops, long chains, invalid destinations, hostname changes, and HTTPS downgrades.
 - Optional raw-HTML page content checks and lightweight performance checks.
-- On-demand PageSpeed Insights and optional dedicated Chrome UX Report tests for one scanned URL at a time, using a user-supplied Google API key held only in browser session storage.
+- On-demand PageSpeed Insights and optional dedicated Chrome UX Report tests with Core Web Vitals verdicts, SEO failures, performance diagnostics, redirects, warnings, and optimization opportunities, using a user-supplied Google API key held only in browser session storage.
 - Meta robots, Googlebot meta, and `X-Robots-Tag` noindex diagnostics.
 - Pause, resume, stop, background worker scans, history, CSV export, and summary export.
 - Neon-backed background jobs, completed reports, and URL-batch checkpoints with automatic recovery after page refresh.

@@ -2792,7 +2792,8 @@ a:focus-visible,
 }
 
 .pagespeed-field,
-.pagespeed-opportunities {
+.pagespeed-opportunities,
+.pagespeed-audits {
   display: grid;
   gap: 8px;
 }
@@ -2808,6 +2809,58 @@ a:focus-visible,
 .pagespeed-field > small,
 .pagespeed-deprecation {
   display: block;
+}
+
+.pagespeed-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pagespeed-section-heading > div {
+  display: grid;
+  gap: 4px;
+}
+
+.pagespeed-section-heading small,
+.pagespeed-audits small {
+  color: #687169;
+}
+
+.pagespeed-callout {
+  display: grid;
+  gap: 5px;
+  border-left: 3px solid #c48620;
+  background: #fff9ee;
+  padding: 10px 12px;
+}
+
+.pagespeed-callout ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.pagespeed-callout span,
+.pagespeed-audits span,
+.pagespeed-audits small {
+  overflow-wrap: anywhere;
+}
+
+.pagespeed-audits article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  border: 1px solid #e3e9e1;
+  border-radius: 6px;
+  background: #f9fbf8;
+  padding: 10px;
+}
+
+.pagespeed-audits article > div {
+  display: grid;
+  gap: 4px;
 }
 
 .search-analytics-compare input {

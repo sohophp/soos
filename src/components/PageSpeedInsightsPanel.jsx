@@ -41,6 +41,23 @@ function metricValue(metric, name) {
   return `${Math.round(metric.numericValue)} ms`;
 }
 
+function coreWebVitalsStatus(field) {
+  const required = ["lcp", "cls", "inp"];
+  const available = required.filter((name) => field?.metrics?.[name]);
+  if (available.length < required.length) return "insufficient-data";
+  return available.some((name) => fieldSeverity(field.metrics[name].category) !== "ok") ? "failed" : "passed";
+}
+
+function auditDescription(value) {
+  return String(value || "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+}
+
+function formatBytes(value) {
+  if (!value) return "";
+  if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.round(value / 1024)} KB`;
+}
+
 export function PageSpeedInsightsPanel({ report, language }) {
   const copy = pageSpeedText[language] || pageSpeedText.en;
   const urls = useMemo(() => [...new Set(
@@ -130,6 +147,9 @@ export function PageSpeedInsightsPanel({ report, language }) {
     : cruxResult?.origin?.available
       ? cruxResult.origin
       : null;
+  const preferredField = cruxField || field;
+  const preferredFieldSource = cruxField ? "crux" : field ? "pagespeed" : "";
+  const webVitalsStatus = coreWebVitalsStatus(preferredField);
 
   return (
     <section className="panel pagespeed-panel">
@@ -207,56 +227,69 @@ export function PageSpeedInsightsPanel({ report, language }) {
             <small>{copy.finalUrl}: {result.finalUrl}</small>
             <small>{copy.analyzedAt}: {result.analyzedAt}</small>
             <small>Lighthouse {result.lighthouseVersion || "-"}</small>
+            {result.runtime?.totalMs != null ? <small>{copy.runtime}: {(result.runtime.totalMs / 1000).toFixed(1)} s</small> : null}
           </div>
+          {result.redirected ? (
+            <div className="pagespeed-callout warning" role="status">
+              <strong>{copy.redirected}</strong>
+              <span>{result.requestedUrl} → {result.finalUrl}</span>
+            </div>
+          ) : null}
+          {result.lab.warnings?.length ? (
+            <div className="pagespeed-callout warning" role="status">
+              <strong>{copy.runWarnings}</strong>
+              <ul>{result.lab.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+            </div>
+          ) : null}
           <section className="pagespeed-section">
             <strong>{copy.labTitle}</strong>
             <small>{copy.labHelp}</small>
             <div className="pagespeed-metrics">
               {Object.entries(result.lab.metrics || {}).map(([name, metric]) => (
                 <div key={name}>
-                  <span>{name.toUpperCase()}</span>
+                  <span>{copy[name] || name.toUpperCase()}</span>
                   <strong>{metricValue(metric, name)}</strong>
+                  <Badge severity={scoreSeverity(metric.score == null ? null : Math.round(metric.score * 100))}>
+                    {metric.score == null ? copy.unknown : Math.round(metric.score * 100)}
+                  </Badge>
                 </div>
               ))}
             </div>
           </section>
-          {includeCrux ? <section className="pagespeed-section">
-            <strong>{copy.cruxTitle}</strong>
-            <small>{copy.cruxHelp}</small>
-            {cruxField ? (
+          <section className="pagespeed-section">
+            <div className="pagespeed-section-heading">
+              <div>
+                <strong>{copy.fieldDataTitle}</strong>
+                <small>{preferredFieldSource === "crux" ? copy.cruxHelp : copy.fieldHelp}</small>
+              </div>
+              {preferredField ? (
+                <Badge severity={webVitalsStatus === "passed" ? "ok" : webVitalsStatus === "failed" ? "critical" : "notice"}>
+                  {copy[webVitalsStatus]}
+                </Badge>
+              ) : null}
+            </div>
+            {preferredField ? (
               <div className="pagespeed-field">
                 <small>
-                  {cruxField.scope === "origin" ? copy.originFallback : copy.pageFieldData}
-                  {cruxField.collectionPeriod?.firstDate && cruxField.collectionPeriod?.lastDate
-                    ? ` · ${copy.collectionPeriod}: ${cruxField.collectionPeriod.firstDate} - ${cruxField.collectionPeriod.lastDate}`
+                  {preferredFieldSource === "crux" ? copy.cruxSource : copy.pagespeedFieldSource}
+                  {" · "}
+                  {preferredField.scope === "origin" || preferredField.originFallback || preferredField === result.field.origin
+                    ? copy.originFallback
+                    : copy.pageFieldData}
+                  {preferredField.collectionPeriod?.firstDate && preferredField.collectionPeriod?.lastDate
+                    ? ` · ${copy.collectionPeriod}: ${preferredField.collectionPeriod.firstDate} - ${preferredField.collectionPeriod.lastDate}`
                     : ""}
                 </small>
-                {Object.entries(cruxField.metrics || {}).map(([name, metric]) => (
+                {Object.entries(preferredField.metrics || {}).map(([name, metric]) => (
                   <div key={name}>
                     <Badge severity={fieldSeverity(metric.category)}>{copy[metric.category] || copy.unknown}</Badge>
-                    <strong>{name.toUpperCase()}</strong>
+                    <strong>{copy[name] || name.toUpperCase()}</strong>
                     <span>{fieldValue(metric, name)}</span>
                   </div>
                 ))}
               </div>
-            ) : cruxResult ? <p className="none">{copy.noCruxData}</p> : null}
-          </section> : null}
-          <section className="pagespeed-section">
-            <strong>{copy.fieldTitle}</strong>
-            <small>{copy.fieldHelp}</small>
-            {field ? (
-              <div className="pagespeed-field">
-                <small>{field.originFallback || field === result.field.origin ? copy.originFallback : copy.pageFieldData}</small>
-                {Object.entries(field.metrics || {}).map(([name, metric]) => (
-                  <div key={name}>
-                    <Badge severity={fieldSeverity(metric.category)}>{metric.category || copy.unknown}</Badge>
-                    <strong>{name.toUpperCase()}</strong>
-                    <span>{fieldValue(metric, name)}</span>
-                  </div>
-                ))}
-              </div>
-            ) : <p className="none">{copy.noFieldData}</p>}
-            <small className="pagespeed-deprecation">{copy.fieldDeprecation}</small>
+            ) : <p className="none">{includeCrux && cruxResult ? copy.noCruxData : copy.noFieldData}</p>}
+            {preferredFieldSource === "pagespeed" ? <small className="pagespeed-deprecation">{copy.fieldDeprecation}</small> : null}
           </section>
           {result.lab.opportunities?.length ? (
             <section className="pagespeed-section">
@@ -266,12 +299,56 @@ export function PageSpeedInsightsPanel({ report, language }) {
                   <div key={item.id}>
                     <Badge severity={scoreSeverity(Math.round(item.score * 100))}>{Math.round(item.score * 100)}</Badge>
                     <strong>{item.title}</strong>
-                    <span>{item.displayValue || (item.savingsMs ? `${item.savingsMs} ms` : "")}</span>
+                    <span>
+                      {item.displayValue || [
+                        item.savingsMs ? `${item.savingsMs} ms` : "",
+                        formatBytes(item.savingsBytes),
+                      ].filter(Boolean).join(" · ")}
+                    </span>
                   </div>
                 ))}
               </div>
             </section>
           ) : null}
+          {result.lab.diagnostics?.length ? (
+            <section className="pagespeed-section">
+              <strong>{copy.performanceDiagnostics}</strong>
+              <div className="pagespeed-audits">
+                {result.lab.diagnostics.map((item) => (
+                  <article key={item.id}>
+                    <Badge severity={scoreSeverity(item.score == null ? null : Math.round(item.score * 100))}>
+                      {item.score == null ? copy.review : Math.round(item.score * 100)}
+                    </Badge>
+                    <div>
+                      <strong>{item.title}</strong>
+                      {item.displayValue ? <span>{item.displayValue}</span> : null}
+                      {item.description ? <small>{auditDescription(item.description)}</small> : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
+          <section className="pagespeed-section">
+            <strong>{copy.seoAudits}</strong>
+            <small>{copy.seoAuditsHelp}</small>
+            {result.seo?.audits?.length ? (
+              <div className="pagespeed-audits">
+                {result.seo.audits.map((item) => (
+                  <article key={item.id}>
+                    <Badge severity={item.scoreDisplayMode === "manual" ? "notice" : "critical"}>
+                      {item.scoreDisplayMode === "manual" ? copy.review : copy.failedAudit}
+                    </Badge>
+                    <div>
+                      <strong>{item.title}</strong>
+                      {item.displayValue ? <span>{item.displayValue}</span> : null}
+                      {item.description ? <small>{auditDescription(item.description)}</small> : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : <p className="none">{copy.noSeoFailures}</p>}
+          </section>
         </div>
       ) : null}
     </section>
