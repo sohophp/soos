@@ -48,8 +48,21 @@ const fixture = {
     finalUrl: "https://example.com/final",
     lighthouseVersion: "12.5.0",
     categories: {
-      performance: { score: 0.82 },
-      seo: { score: 0.94 },
+      performance: {
+        score: 0.82,
+        auditRefs: [
+          { id: "largest-contentful-paint", weight: 25, group: "metrics" },
+          { id: "render-blocking-resources", weight: 0, group: "load-opportunities" },
+          { id: "uses-long-cache-ttl", weight: 1, group: "diagnostics" },
+        ],
+      },
+      seo: {
+        score: 0.94,
+        auditRefs: [
+          { id: "document-title", weight: 1, group: "seo-content" },
+          { id: "crawlable-anchors", weight: 1, group: "seo-crawl" },
+        ],
+      },
     },
     audits: {
       "largest-contentful-paint": {
@@ -71,8 +84,32 @@ const fixture = {
         displayValue: "Potential savings of 600 ms",
         details: { type: "opportunity", overallSavingsMs: 600, overallSavingsBytes: 12000 },
       },
+      "uses-long-cache-ttl": {
+        id: "uses-long-cache-ttl",
+        title: "Use efficient cache lifetimes",
+        description: "Long cache lifetimes can speed up repeat visits.",
+        score: 0.5,
+        scoreDisplayMode: "metricSavings",
+        displayValue: "12 resources found",
+      },
+      "document-title": {
+        id: "document-title",
+        title: "Document has a title",
+        score: 1,
+        scoreDisplayMode: "binary",
+      },
+      "crawlable-anchors": {
+        id: "crawlable-anchors",
+        title: "Links are crawlable",
+        description: "Search engines may use href attributes on links.",
+        score: 0,
+        scoreDisplayMode: "binary",
+      },
     },
     runWarnings: ["Values are estimated."],
+    timing: { total: 14678.4 },
+    configSettings: { formFactor: "mobile", locale: "en-US" },
+    environment: { benchmarkIndex: 1198.5 },
   },
 };
 
@@ -84,7 +121,14 @@ assert.equal(normalized.scores.performance, 82);
 assert.equal(normalized.scores.seo, 94);
 assert.equal(normalized.lab.metrics.lcp.numericValue, 3100);
 assert.equal(normalized.lab.opportunities[0].savingsMs, 600);
+assert.equal(normalized.lab.diagnostics[0].id, "uses-long-cache-ttl");
+assert.equal(normalized.seo.audits[0].id, "crawlable-anchors");
+assert.equal(normalized.runtime.totalMs, 14678);
+assert.equal(normalized.runtime.formFactor, "mobile");
+assert.equal(normalized.runtime.benchmarkIndex, 1198.5);
+assert.equal(normalized.redirected, true);
 assert.equal(normalized.field.page.metrics.lcp.percentile, 2800);
+assert.equal(normalized.field.page.coreWebVitals.status, "insufficient-data");
 assert.equal(normalized.field.origin.originFallback, true);
 assert.equal(normalized.field.deprecationNotice, true);
 

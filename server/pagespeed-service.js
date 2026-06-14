@@ -18,6 +18,9 @@ const LAB_METRICS = {
   interactive: "tti",
 };
 
+const CORE_WEB_VITALS = ["lcp", "cls", "inp"];
+const LAB_METRIC_AUDIT_IDS = new Set(Object.keys(LAB_METRICS));
+
 function requestError(message, code) {
   const error = new Error(message);
   error.code = code;
@@ -60,12 +63,23 @@ function normalizeFieldExperience(experience) {
       category: metric.category || "",
     };
   }
+  const availableVitals = CORE_WEB_VITALS.filter((name) => metrics[name]);
+  const failingVitals = availableVitals.filter((name) => !["FAST", "good"].includes(metrics[name].category));
   return {
     available: Boolean(Object.keys(metrics).length),
     id: experience?.id || "",
     originFallback: Boolean(experience?.origin_fallback),
     overallCategory: experience?.overall_category || "",
     metrics,
+    coreWebVitals: {
+      status: availableVitals.length < CORE_WEB_VITALS.length
+        ? "insufficient-data"
+        : failingVitals.length
+          ? "failed"
+          : "passed",
+      available: availableVitals,
+      failing: failingVitals,
+    },
   };
 }
 
@@ -104,18 +118,57 @@ function normalizeOpportunities(audits = {}) {
     .slice(0, 10);
 }
 
+function normalizeCategoryAudits(category, audits = {}, options = {}) {
+  const excludedIds = options.excludedIds || new Set();
+  return (Array.isArray(category?.auditRefs) ? category.auditRefs : [])
+    .map((reference) => {
+      const audit = audits[reference?.id];
+      if (!audit || excludedIds.has(reference.id)) return null;
+      const score = typeof audit.score === "number" ? audit.score : null;
+      const displayMode = audit.scoreDisplayMode || "";
+      const failed = score !== null && score < 0.9;
+      const manual = displayMode === "manual";
+      const error = displayMode === "error";
+      if (!failed && !manual && !error) return null;
+      return {
+        id: reference.id,
+        title: audit.title || reference.id,
+        description: audit.description || "",
+        displayValue: audit.displayValue || "",
+        score,
+        scoreDisplayMode: displayMode,
+        weight: typeof reference.weight === "number" ? reference.weight : 0,
+        group: reference.group || "",
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => (
+      Number(right.scoreDisplayMode === "error") - Number(left.scoreDisplayMode === "error")
+      || right.weight - left.weight
+      || (left.score ?? 1) - (right.score ?? 1)
+    ))
+    .slice(0, options.limit || 20);
+}
+
 export function normalizePageSpeedResponse(body, request) {
   const lighthouse = body?.lighthouseResult || {};
   const runtimeError = lighthouse.runtimeError;
   if (runtimeError?.message) {
     throw requestError(runtimeError.message, "PAGESPEED_LIGHTHOUSE_ERROR");
   }
+  const opportunities = normalizeOpportunities(lighthouse.audits);
+  const opportunityIds = new Set(opportunities.map((item) => item.id));
   return {
     requestedUrl: lighthouse.requestedUrl || request.url,
     finalUrl: lighthouse.finalUrl || body?.id || request.url,
     strategy: request.strategy,
     analyzedAt: body?.analysisUTCTimestamp || lighthouse.fetchTime || new Date().toISOString(),
     lighthouseVersion: lighthouse.lighthouseVersion || "",
+    redirected: Boolean(
+      lighthouse.requestedUrl
+      && lighthouse.finalUrl
+      && lighthouse.requestedUrl !== lighthouse.finalUrl
+    ),
     scores: {
       performance: score(lighthouse.categories?.performance),
       seo: score(lighthouse.categories?.seo),
@@ -123,8 +176,24 @@ export function normalizePageSpeedResponse(body, request) {
     lab: {
       source: "lighthouse",
       metrics: normalizeLabMetrics(lighthouse.audits),
-      opportunities: normalizeOpportunities(lighthouse.audits),
+      opportunities,
+      diagnostics: normalizeCategoryAudits(
+        lighthouse.categories?.performance,
+        lighthouse.audits,
+        { excludedIds: new Set([...LAB_METRIC_AUDIT_IDS, ...opportunityIds]) },
+      ),
       warnings: Array.isArray(lighthouse.runWarnings) ? lighthouse.runWarnings.map(String).slice(0, 10) : [],
+    },
+    seo: {
+      audits: normalizeCategoryAudits(lighthouse.categories?.seo, lighthouse.audits),
+    },
+    runtime: {
+      totalMs: typeof lighthouse.timing?.total === "number" ? Math.round(lighthouse.timing.total) : null,
+      formFactor: lighthouse.configSettings?.formFactor || request.strategy,
+      locale: lighthouse.configSettings?.locale || "",
+      benchmarkIndex: typeof lighthouse.environment?.benchmarkIndex === "number"
+        ? lighthouse.environment.benchmarkIndex
+        : null,
     },
     field: {
       source: "pagespeed_crux",

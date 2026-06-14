@@ -1,5 +1,10 @@
 # soos 开发文档
 
+## 当前批次：PageSpeed Insights 完善
+
+- 已完成：服务端输出 SEO 失败项、性能诊断、运行上下文、重定向及 Core Web Vitals 判定。
+- 进行中：前端诊断视图、三语言文案和浏览器验收。
+
 ## 当前批次：Google Sitemap 数据源准确性
 
 - 已完成：站点和 robots URL 输入优先使用 `robots.txt` 声明的有效 Sitemap。

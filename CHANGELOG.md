@@ -4,6 +4,10 @@ All notable changes to soos will be documented in this file.
 
 ## [Unreleased]
 
+### PageSpeed Insights
+
+- Normalized failed Lighthouse SEO audits, non-opportunity performance diagnostics, runtime context, redirects, and Core Web Vitals field-data status for actionable reporting.
+
 ### Google Sitemap accuracy
 
 - Site and robots URL scans now use valid Sitemap declarations from `robots.txt`, including multiple entry points, instead of always guessing `/sitemap.xml`.
