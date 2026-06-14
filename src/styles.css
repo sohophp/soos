@@ -2847,6 +2847,34 @@ a:focus-visible,
   overflow-wrap: anywhere;
 }
 
+.pagespeed-crux-error {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  border-left: 3px solid #c48620;
+  background: #fff9ee;
+  padding: 12px;
+}
+
+.pagespeed-crux-error > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.pagespeed-crux-error small {
+  color: #687169;
+  overflow-wrap: anywhere;
+}
+
+.pagespeed-crux-error .export-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .pagespeed-audits article {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -3240,6 +3268,10 @@ a:focus-visible,
   .pagespeed-field > div,
   .pagespeed-opportunities > div {
     grid-template-columns: 1fr;
+  }
+
+  .pagespeed-crux-error {
+    display: grid;
   }
 
   .retained-job-row {

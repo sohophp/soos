@@ -58,6 +58,27 @@ function formatBytes(value) {
   return `${Math.round(value / 1024)} KB`;
 }
 
+function cruxErrorState(error, copy) {
+  if (error?.code !== "CRUX_API_NOT_ENABLED") {
+    return {
+      message: formatApiError(error),
+      code: error?.code || "",
+      requestId: error?.requestId || "",
+      enableUrl: "",
+    };
+  }
+  const urlMatch = String(error?.message || "").match(
+    /https:\/\/(?:console\.developers\.google\.com|console\.cloud\.google\.com)\/[^\s)]+/,
+  );
+  return {
+    message: copy.cruxApiNotEnabled,
+    code: error.code,
+    requestId: error.requestId || "",
+    enableUrl: urlMatch?.[0]?.replace(/[.,;]+$/, "")
+      || "https://console.cloud.google.com/apis/library/chromeuxreport.googleapis.com",
+  };
+}
+
 export function PageSpeedInsightsPanel({ report, language }) {
   const copy = pageSpeedText[language] || pageSpeedText.en;
   const urls = useMemo(() => [...new Set(
@@ -94,7 +115,7 @@ export function PageSpeedInsightsPanel({ report, language }) {
   }
 
   async function run(event) {
-    event.preventDefault();
+    event?.preventDefault();
     setLoading(true);
     setResult(null);
     setCruxResult(null);
@@ -128,7 +149,7 @@ export function PageSpeedInsightsPanel({ report, language }) {
         setCruxResult(cruxOutcome.value);
       } else {
         setCruxResult(null);
-        setCruxError(formatApiError(cruxOutcome.reason));
+        setCruxError(cruxErrorState(cruxOutcome.reason, copy));
       }
     } catch (requestError) {
       setError(formatApiError(requestError));
@@ -215,7 +236,29 @@ export function PageSpeedInsightsPanel({ report, language }) {
         <small className="pagespeed-privacy">{copy.privacy}</small>
       </form>
       {error ? <div className="gsc-api-error" role="alert">{error}</div> : null}
-      {cruxError ? <div className="gsc-api-error" role="status">{cruxError}</div> : null}
+      {cruxError ? (
+        <div className="pagespeed-crux-error" role="status">
+          <div>
+            <strong>{cruxError.message}</strong>
+            <small>{copy.cruxEnableWait}</small>
+            {cruxError.code || cruxError.requestId ? (
+              <small>
+                {[cruxError.code, cruxError.requestId ? `request ${cruxError.requestId}` : ""].filter(Boolean).join(" · ")}
+              </small>
+            ) : null}
+          </div>
+          <div className="pagespeed-actions">
+            {cruxError.enableUrl ? (
+              <a className="export-button" href={cruxError.enableUrl} target="_blank" rel="noreferrer">
+                {copy.enableCruxApi}
+              </a>
+            ) : null}
+            <button className="export-button" type="button" onClick={() => run()} disabled={loading}>
+              {copy.retryCrux}
+            </button>
+          </div>
+        </div>
+      ) : null}
       {result ? (
         <div className="pagespeed-results">
           <div className="inspection-summary">

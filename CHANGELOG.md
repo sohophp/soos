@@ -8,6 +8,7 @@ All notable changes to soos will be documented in this file.
 
 - Normalized failed Lighthouse SEO audits, non-opportunity performance diagnostics, runtime context, redirects, and Core Web Vitals field-data status for actionable reporting.
 - Added a single preferred field-data view, Core Web Vitals verdicts, Lighthouse warnings, redirect evidence, SEO findings, performance diagnostics, and clearer savings.
+- Replaced the raw `CRUX_API_NOT_ENABLED` response with a three-language enable-API action, propagation guidance, request reference, and retry control while preserving the successful PageSpeed result.
 
 ### Google Sitemap accuracy
 

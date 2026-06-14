@@ -148,3 +148,36 @@ test("renders actionable PageSpeed and CrUX diagnostics", async ({ page }) => {
   expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.width);
   expect(consoleErrors).toEqual([]);
 });
+
+test("turns a disabled CrUX API response into an enable and retry action", async ({ page }) => {
+  const enableUrl = "https://console.developers.google.com/apis/api/chromeuxreport.googleapis.com/overview?project=1086129575293";
+  await page.route("**/api/crux/run", async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: `Chrome UX Report API has not been used before. Enable it by visiting ${enableUrl} then retry.`,
+        code: "CRUX_API_NOT_ENABLED",
+        requestId: "crux-disabled-test",
+        retryable: false,
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Google API key").fill("browser-session-key");
+  await page.getByRole("button", { name: "Run PageSpeed", exact: true }).click();
+
+  await expect(page.getByText("Chrome UX Report API is not enabled for this Google Cloud project.", { exact: true })).toBeVisible();
+  await expect(page.getByText("CRUX_API_NOT_ENABLED · request crux-disabled-test", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Enable CrUX API", exact: true })).toHaveAttribute("href", enableUrl);
+  await expect(page.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
+  await expect(page.getByText("Performance", { exact: true })).toBeVisible();
+  await expect(page.getByText("Chrome UX Report API has not been used before.", { exact: false })).toHaveCount(0);
+
+  const viewport = await page.evaluate(() => ({
+    width: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.width);
+});
