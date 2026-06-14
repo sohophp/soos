@@ -5,7 +5,7 @@ import { loadGscSitemaps } from "../gsc-client.js";
 import { normalizeGscSitemapUrl } from "../gsc-sitemaps.js";
 import { gscDataText } from "../i18n.js";
 
-export function GscSitemapsPanel({ status, siteUrl, currentSitemapUrl, language }) {
+export function GscSitemapsPanel({ status, siteUrl, currentSitemapUrls = [], language }) {
   const copy = gscDataText[language] || gscDataText.en;
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -46,10 +46,10 @@ export function GscSitemapsPanel({ status, siteUrl, currentSitemapUrl, language 
     };
   }, [loadSitemaps, siteUrl, status?.configured]);
 
-  const currentKey = normalizeGscSitemapUrl(currentSitemapUrl || "");
-  const currentFound = currentKey
-    ? (result?.sitemaps || []).some((item) => normalizeGscSitemapUrl(item.path) === currentKey)
-    : null;
+  const currentKeys = [...new Set(currentSitemapUrls.map(normalizeGscSitemapUrl).filter(Boolean))];
+  const googleKeys = new Set((result?.sitemaps || []).map((item) => normalizeGscSitemapUrl(item.path)).filter(Boolean));
+  const currentMatchCount = currentKeys.filter((key) => googleKeys.has(key)).length;
+  const currentFound = currentKeys.length ? currentMatchCount === currentKeys.length : null;
 
   return (
     <section className="panel gsc-sitemaps-panel">
@@ -80,7 +80,11 @@ export function GscSitemapsPanel({ status, siteUrl, currentSitemapUrl, language 
           {currentFound !== null ? (
             <div className={`gsc-sitemap-current ${currentFound ? "found" : "missing"}`}>
               {currentFound ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-              <span>{currentFound ? copy.sitemapsCurrentFound : copy.sitemapsCurrentMissing}</span>
+              <span>
+                {currentFound
+                  ? copy.sitemapsCurrentFound
+                  : `${copy.sitemapsCurrentMissing} (${currentMatchCount}/${currentKeys.length})`}
+              </span>
             </div>
           ) : null}
           {(result.sitemaps || []).length ? (

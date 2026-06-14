@@ -1,5 +1,12 @@
 # soos 开发文档
 
+## 当前批次：Google Sitemap 数据源准确性
+
+- 已完成：站点和 robots URL 输入优先使用 `robots.txt` 声明的有效 Sitemap。
+- 已完成：扫描并保存多个 Sitemap 入口到 `report.input.sitemapUrls`。
+- 已完成：Google Sitemap 面板精确对照当前检查实际使用的全部 Sitemap。
+- 已验收：专项测试、`npm run check`、12 个 Playwright 流程、依赖审计和差异检查均通过。
+
 ## 1. 项目目标
 
 soos 是一个面向多用户的在线 SEO 诊断工具，目标是把以下数据整合起来：

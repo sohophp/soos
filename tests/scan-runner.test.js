@@ -96,6 +96,92 @@ await assert.rejects(
   /Proxy fetching is disabled/,
 );
 
+const declaredSitemapRequests = [];
+const declaredSitemapRunner = createScanRunner({
+  fetchText: async (url) => {
+    declaredSitemapRequests.push(url);
+    if (url === "https://multi.example/robots.txt") {
+      return fetched({
+        finalUrl: url,
+        contentType: "text/plain",
+        text: [
+          "User-agent: *",
+          "Sitemap: https://multi.example/sitemap-pages.xml",
+          "Sitemap: https://multi.example/sitemap-news.xml?edition=current",
+        ].join("\n"),
+      });
+    }
+    if (url === "https://multi.example/sitemap-pages.xml") {
+      return fetched({
+        finalUrl: url,
+        contentType: "application/xml",
+        text: "<urlset><url><loc>https://multi.example/page</loc></url></urlset>",
+      });
+    }
+    if (url === "https://multi.example/sitemap-news.xml?edition=current") {
+      return fetched({
+        finalUrl: url,
+        contentType: "application/xml",
+        text: "<urlset><url><loc>https://multi.example/news</loc></url></urlset>",
+      });
+    }
+    if (url === "https://multi.example/page" || url === "https://multi.example/news") {
+      return fetched({
+        finalUrl: url,
+        text: `<html><head><link rel="canonical" href="${url}"></head><body></body></html>`,
+      });
+    }
+    throw new Error(`Unexpected URL ${url}`);
+  },
+  jobStore: { wait: async () => {}, saveCheckpoint: async () => {} },
+});
+const declaredSitemapReport = await declaredSitemapRunner.audit("https://multi.example/", {});
+assert.deepEqual(declaredSitemapReport.input.sitemapUrls, [
+  "https://multi.example/sitemap-pages.xml",
+  "https://multi.example/sitemap-news.xml?edition=current",
+]);
+assert.equal(declaredSitemapReport.input.sitemapUrl, "https://multi.example/sitemap-pages.xml");
+assert.equal(declaredSitemapReport.summary.sitemapCount, 2);
+assert.equal(declaredSitemapReport.summary.urlCount, 2);
+assert.equal(declaredSitemapRequests.includes("https://multi.example/sitemap.xml"), false);
+
+const indexRunner = createScanRunner({
+  fetchText: async (url) => {
+    if (url === "https://index.example/robots.txt") {
+      return fetched({
+        finalUrl: url,
+        contentType: "text/plain",
+        text: "User-agent: *\nSitemap: https://index.example/sitemap-index.xml",
+      });
+    }
+    if (url === "https://index.example/sitemap-index.xml") {
+      return fetched({
+        finalUrl: url,
+        contentType: "application/xml",
+        text: "<sitemapindex><sitemap><loc>https://index.example/child.xml</loc></sitemap></sitemapindex>",
+      });
+    }
+    if (url === "https://index.example/child.xml") {
+      return fetched({
+        finalUrl: url,
+        contentType: "application/xml",
+        text: "<urlset><url><loc>https://index.example/page</loc></url></urlset>",
+      });
+    }
+    if (url === "https://index.example/page") {
+      return fetched({
+        finalUrl: url,
+        text: `<html><head><link rel="canonical" href="${url}"></head><body></body></html>`,
+      });
+    }
+    throw new Error(`Unexpected URL ${url}`);
+  },
+  jobStore: { wait: async () => {}, saveCheckpoint: async () => {} },
+});
+const indexReport = await indexRunner.audit("https://index.example/", {});
+assert.deepEqual(indexReport.input.sitemapUrls, ["https://index.example/sitemap-index.xml"]);
+assert.equal(indexReport.summary.sitemapCount, 2);
+
 const inspectRunner = createScanRunner({
   fetchText: async (url) => {
     if (url.endsWith("/header-noindex")) {

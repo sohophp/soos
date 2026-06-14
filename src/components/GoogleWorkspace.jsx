@@ -22,7 +22,7 @@ export function GoogleWorkspace({ gsc, report, language }) {
             key={`gsc-sitemaps-${gsc.resetKey}-${gsc.siteUrl}`}
             status={gsc.status}
             siteUrl={gsc.siteUrl}
-            currentSitemapUrl={report?.input?.sitemapUrl}
+            currentSitemapUrls={report?.input?.sitemapUrls || [report?.input?.sitemapUrl].filter(Boolean)}
             language={language}
           />
           <SearchAnalyticsPanel

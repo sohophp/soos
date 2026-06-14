@@ -4,6 +4,11 @@ All notable changes to soos will be documented in this file.
 
 ## [Unreleased]
 
+### Google Sitemap accuracy
+
+- Site and robots URL scans now use valid Sitemap declarations from `robots.txt`, including multiple entry points, instead of always guessing `/sitemap.xml`.
+- Google submitted Sitemap status now compares every Sitemap actually used by the current audit.
+
 ### Crawl accuracy
 
 - Preserved `X-Robots-Tag` response headers and added response-header noindex evidence to page diagnostics.

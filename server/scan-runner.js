@@ -47,8 +47,8 @@ const PAGE_CHECKPOINT_BATCH_SIZE = 10;
 export function createScanRunner({ fetchText, jobStore, proxyAllowed = () => process.env.SOOS_ALLOW_PROXY === "1" }) {
   const waitForJob = jobStore.wait;
   const saveAuditCheckpoint = jobStore.saveCheckpoint;
-  async function collectSitemaps(startUrl, fetchContext, maxUrls = MAX_URLS) {
-    const queue = [startUrl];
+  async function collectSitemaps(startUrls, fetchContext, maxUrls = MAX_URLS) {
+    const queue = Array.isArray(startUrls) ? [...startUrls] : [startUrls];
     const seen = new Set();
     const sitemapReports = [];
     const pageUrls = [];
@@ -97,8 +97,8 @@ export function createScanRunner({ fetchText, jobStore, proxyAllowed = () => pro
     };
   }
 
-  async function collectSitemapsWithProgress(startUrl, fetchContext, onProgress, job, maxUrls = MAX_URLS) {
-    const queue = [startUrl];
+  async function collectSitemapsWithProgress(startUrls, fetchContext, onProgress, job, maxUrls = MAX_URLS) {
+    const queue = Array.isArray(startUrls) ? [...startUrls] : [startUrls];
     const seen = new Set();
     const sitemapReports = [];
     const pageUrls = [];
@@ -477,6 +477,9 @@ export function createScanRunner({ fetchText, jobStore, proxyAllowed = () => pro
     let truncated;
     let urlLimitReached;
     let sitemapLimitReached;
+    let sitemapStartUrls = Array.isArray(savedCheckpoint?.sitemapStartUrls) && savedCheckpoint.sitemapStartUrls.length
+      ? savedCheckpoint.sitemapStartUrls
+      : [detected.sitemapUrl];
     if (
       ["inspecting", "discovering"].includes(savedCheckpoint?.phase)
       && Array.isArray(savedCheckpoint.pageUrls)
@@ -503,6 +506,10 @@ export function createScanRunner({ fetchText, jobStore, proxyAllowed = () => pro
         await waitForJob(job);
         const fetchedRobots = await fetchText(robotsUrl, fetchContext);
         const parsedRobots = fetchedRobots.ok ? parseRobots(fetchedRobots.text) : { groups: [], sitemaps: [] };
+        const declaredSitemaps = unique(parsedRobots.sitemaps.map((value) => normalizeUrl(value)).filter(Boolean));
+        if (detected.inputType !== "sitemap" && declaredSitemaps.length) {
+          sitemapStartUrls = declaredSitemaps;
+        }
         robots = {
           url: robotsUrl,
           status: fetchedRobots.status,
@@ -510,14 +517,14 @@ export function createScanRunner({ fetchText, jobStore, proxyAllowed = () => pro
           groups: parsedRobots.groups,
           sitemaps: parsedRobots.sitemaps,
           contentPreview: fetchedRobots.ok ? fetchedRobots.text.slice(0, 4000) : "",
-          analysis: fetchedRobots.ok ? analyzeRobots(parsedRobots, robotsUrl, detected.sitemapUrl) : null,
+          analysis: fetchedRobots.ok ? analyzeRobots(parsedRobots, robotsUrl, sitemapStartUrls[0]) : null,
         };
       } catch (error) {
         robots = { url: robotsUrl, status: null, found: false, groups: [], sitemaps: [], error: String(error.message || error), analysis: null };
       }
 
       const sitemapCollection = await collectSitemapsWithProgress(
-        detected.sitemapUrl,
+        sitemapStartUrls,
         fetchContext,
         (progress) => {
           const sitemapBase = progress.discoveredSitemaps ? Math.min(progress.processedSitemaps / progress.discoveredSitemaps, 1) : 0;
@@ -536,6 +543,7 @@ export function createScanRunner({ fetchText, jobStore, proxyAllowed = () => pro
         key: checkpointKey,
         phase: "inspecting",
         robots,
+        sitemapStartUrls,
         sitemapReports,
         pageUrls,
         truncated,
@@ -761,7 +769,8 @@ export function createScanRunner({ fetchText, jobStore, proxyAllowed = () => pro
         originalUrl: normalizedInput,
         inputType: detected.inputType,
         siteRootUrl: detected.siteRootUrl,
-        sitemapUrl: detected.sitemapUrl,
+        sitemapUrl: sitemapStartUrls[0] || detected.sitemapUrl,
+        sitemapUrls: sitemapStartUrls,
         robotsUrl: detected.robotsUrl,
       },
       options: auditOptions,

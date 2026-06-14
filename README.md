@@ -22,7 +22,7 @@ Stored data, retention periods, Google disconnection, and complete current-sessi
 ## Features
 
 - Accepts a website URL, sitemap URL, or robots.txt URL and detects the best audit target.
-- Reads `sitemap.xml` and `sitemapindex` files, including child sitemaps.
+- Reads Sitemap files and sitemap indexes, including multiple entry points declared in `robots.txt` and their child sitemaps.
 - Optional recursive same-site discovery to depth 2 with separate URL budgets and resumable background checkpoints.
 - Internal link graph diagnostics for inbound/outbound links, homepage shortest paths, unreachable sitemap pages, weak linkage, and deep click paths.
 - Recursive discovery, link graphs, URL-set differences, structured-data diagnostics, Googlebot log findings, URL Inspection results, alignment matrices, crawl-freshness rows, and per-reason coverage groups paginate without truncating analysis or exports.

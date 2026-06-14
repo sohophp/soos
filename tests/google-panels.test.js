@@ -206,6 +206,8 @@ assert.match(sitemapSource, /normalizeGscSitemapUrl/);
 assert.match(sitemapSource, /requestIdRef/);
 assert.match(sitemapSource, /loadSitemaps\(\)/);
 assert.match(sitemapSource, /body\.siteUrl/);
+assert.match(sitemapSource, /currentSitemapUrls/);
+assert.match(sitemapSource, /currentMatchCount/);
 assert.doesNotMatch(configSource, />\{copy\.refresh\}</);
 assert.doesNotMatch(configSource, />\{testing \? copy\.testing : copy\.test\}</);
 assert.match(analyticsSource, /if \(body\.dimension === "page"\) onRows/);
