@@ -24,7 +24,7 @@ function Backlog({ backlog, t }) {
             </div>
             <p>{task.action}</p>
             {task.sampleUrls?.length ? (
-              <div className="samples">{task.sampleUrls.map((url) => <small key={url}>{url}</small>)}</div>
+              <div className="samples">{task.sampleUrls.map((url, index) => <small key={`${url}-${index}`}>{url}</small>)}</div>
             ) : null}
           </article>
         ))}
@@ -62,7 +62,7 @@ function RobotsDetails({ robots, t, onSelectIssue }) {
         </div>
       ) : null}
       {robots.sitemapDirectives?.length ? (
-        <div className="robot-sitemaps">{robots.sitemapDirectives.map((url) => <small key={url}>{url}</small>)}</div>
+        <div className="robot-sitemaps">{robots.sitemapDirectives.map((url, index) => <small key={`${url}-${index}`}>{url}</small>)}</div>
       ) : null}
       {analysis?.blockedSummaries?.length ? (
         <div className="robots-impact">
@@ -78,11 +78,11 @@ function RobotsDetails({ robots, t, onSelectIssue }) {
                     <strong>{item.rule}</strong>
                     <span>{item.count}</span>
                   </div>
-                  {item.details?.length ? <div className="impact-details">{item.details.map((detail) => <small key={detail}>{detail}</small>)}</div> : null}
+                  {item.details?.length ? <div className="impact-details">{item.details.map((detail, index) => <small key={`${detail}-${index}`}>{detail}</small>)}</div> : null}
                   {item.sampleUrls?.length ? (
                     <div className="impact-samples">
                       <strong>{t.sampleUrls}</strong>
-                      {item.sampleUrls.map((url) => <small key={url}>{url}</small>)}
+                      {item.sampleUrls.map((url, index) => <small key={`${url}-${index}`}>{url}</small>)}
                     </div>
                   ) : null}
                   <button className="impact-filter" type="button" onClick={() => onSelectIssue?.({ type: issueType })}>
@@ -128,10 +128,10 @@ function SignalList({ title, signals, labels, t, badgeLabel, severityFor, onSele
               <span>{item.count}</span>
             </div>
             {item.details?.length ? (
-              <div className="impact-samples"><strong>{t.relatedTargets}</strong>{item.details.map((detail) => <small key={detail}>{detail}</small>)}</div>
+              <div className="impact-samples"><strong>{t.relatedTargets}</strong>{item.details.map((detail, index) => <small key={`${detail}-${index}`}>{detail}</small>)}</div>
             ) : null}
             {item.sampleUrls?.length ? (
-              <div className="impact-samples"><strong>{t.sampleUrls}</strong>{item.sampleUrls.map((url) => <small key={url}>{url}</small>)}</div>
+              <div className="impact-samples"><strong>{t.sampleUrls}</strong>{item.sampleUrls.map((url, index) => <small key={`${url}-${index}`}>{url}</small>)}</div>
             ) : null}
             <button className="impact-filter" type="button" onClick={() => onSelectIssue?.({ type: item.key })}>
               {t.showMatchingUrls}

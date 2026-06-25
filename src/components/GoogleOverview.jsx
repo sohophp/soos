@@ -27,8 +27,8 @@ function GscOpportunities({ report, rows, language }) {
             {item.sampleUrls.length ? (
               <div className="impact-samples">
                 <strong>{copy.sampleUrls}</strong>
-                {item.sampleUrls.map((url) => (
-                  <small key={`${item.key}-${url}`}>{url}</small>
+                {item.sampleUrls.map((url, index) => (
+                  <small key={`${item.key}-${url}-${index}`}>{url}</small>
                 ))}
               </div>
             ) : null}

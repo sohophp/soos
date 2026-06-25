@@ -196,8 +196,8 @@ export function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRo
           <ImportantPageFreshness inspectionResults={result.results} gscRows={gscRows} copy={copy} language={language} Badge={Badge} />
           <UrlAlignmentMatrix report={report} inspectionResults={result.results} copy={copy} language={language} Badge={Badge} />
           <div className="inspection-list">
-            {resultPagination.items.map((item) => (
-              <article className="inspection-card" key={item.url}>
+            {resultPagination.items.map((item, index) => (
+              <article className="inspection-card" key={`${item.url}-${item.verdict || ""}-${item.coverageState || item.error || ""}-${index}`}>
                 <div className="impact-top">
                   <Badge severity={item.ok && item.verdict === "PASS" ? "ok" : item.ok ? "warning" : "critical"}>{item.verdict || (item.ok ? "UNKNOWN" : "ERROR")}</Badge>
                   <strong>{item.url}</strong>
@@ -220,8 +220,8 @@ export function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRo
                 </div>
                 {item.diagnoses.length ? (
                   <div className="inspection-diagnoses">
-                    {item.diagnoses.map((diagnosis) => (
-                      <div className={`inspection-diagnosis ${diagnosis.severity}`} key={`${item.url}-${diagnosis.type}`}>
+                    {item.diagnoses.map((diagnosis, diagnosisIndex) => (
+                      <div className={`inspection-diagnosis ${diagnosis.severity}`} key={`${item.url}-${diagnosis.type}-${diagnosisIndex}`}>
                         <strong>{diagnosis.title}</strong>
                         <small>{diagnosis.detail}</small>
                         <span>{diagnosis.action}</span>

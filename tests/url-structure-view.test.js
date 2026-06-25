@@ -23,6 +23,9 @@ assert.match(source, /<InternalDiscovery report=\{report\}/);
 assert.match(source, /<InternalLinkGraph report=\{report\}/);
 assert.match(source, /pagination\.items\.map/);
 assert.match(source, /<ResultPagination/);
+assert.doesNotMatch(source, /key=\{sitemap\.url\}/);
+assert.doesNotMatch(source, /key=\{page\.url\}/);
+assert.doesNotMatch(source, /key=\{row\.url\}/);
 assert.match(paginationSource, /className="result-pagination"/);
 assert.match(paginationSource, /pagination\.pageCount <= 1/);
 

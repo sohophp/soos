@@ -267,7 +267,9 @@ export function UrlFindingsPanel({
       </small>
       <div className="rows">
         {visiblePages.length
-          ? visiblePages.map((page) => <PageRow page={page} key={page.url} t={t} />)
+          ? visiblePages.map((page, index) => (
+            <PageRow page={page} key={`${page.url}-${page.finalUrl || ""}-${page.status || ""}-${index}`} t={t} />
+          ))
           : <p className="none">{t.noFilter}</p>}
       </div>
       <ResultPagination

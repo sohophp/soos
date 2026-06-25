@@ -82,7 +82,7 @@ export function UrlAlignmentMatrix({ report, inspectionResults, copy, language, 
             className="url-alignment-row"
             role="row"
             aria-rowindex={(pagination.page - 1) * LARGE_RESULT_PAGE_SIZE + index + 2}
-            key={row.submittedUrl}
+            key={`${row.submittedUrl}-${row.fetchedUrl || ""}-${row.googleCanonical || ""}-${index}`}
           >
             <span role="cell"><Badge severity={row.severity === "good" ? "ok" : row.severity}>{row.label}</Badge></span>
             <span role="cell" title={row.submittedUrl}>{row.submittedUrl || "-"}</span>
@@ -168,8 +168,8 @@ export function IndexCoveragePriorities({ report, inspectionResults, gscRows, co
                   <span>{group.rows.reduce((sum, row) => sum + row.impressions, 0)} {copy.impressions}</span>
                 </div>
                 <div className="coverage-priority-rows">
-                  {pagination.items.map((row) => (
-                    <div className="coverage-priority-row" key={row.url}>
+                  {pagination.items.map((row, index) => (
+                    <div className="coverage-priority-row" key={`${row.url}-${row.reason}-${index}`}>
                       <Badge severity={row.priority === "high" ? "critical" : row.priority === "medium" ? "warning" : "notice"}>{priorityLabel(row.priority)}</Badge>
                       <strong title={row.url}>{row.url}</strong>
                       <span>{row.dispositionLabel}</span>
@@ -262,8 +262,8 @@ export function ImportantPageFreshness({ inspectionResults, gscRows, copy, langu
         <span>{copy.freshnessStale}: {rows.filter((row) => row.freshness === "stale").length}</span>
       </div>
       <div className="crawl-freshness-list">
-        {pagination.items.map((row) => (
-          <div className="crawl-freshness-row" key={row.url}>
+        {pagination.items.map((row, index) => (
+          <div className="crawl-freshness-row" key={`${row.url}-${row.lastCrawlTime || ""}-${index}`}>
             <Badge severity={row.freshness === "critical" ? "critical" : row.freshness === "stale" ? "warning" : row.freshness === "watch" || row.freshness === "unknown" ? "notice" : "ok"}>
               {freshnessLabel(row.freshness)}
             </Badge>

@@ -76,8 +76,8 @@ export function StructuredDataDiagnostics({ report, inspectionResults, copy, lan
         </div>
       </div>
       <div className="structured-data-list">
-        {pagination.items.map((row) => (
-          <div className="structured-data-row" key={row.url}>
+        {pagination.items.map((row, index) => (
+          <div className="structured-data-row" key={`${row.url}-${row.googleVerdict || ""}-${index}`}>
             <div>
               <strong title={row.url}>{row.url}</strong>
               <small>{copy.structuredTypes}: {row.types.join(", ") || "Unknown"} / {row.nodeCount} {copy.structuredNodes}</small>

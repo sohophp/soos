@@ -17,6 +17,8 @@ assert.match(source, /<ResultPagination/);
 assert.match(source, /onIssueFilterChange\(null\)/);
 assert.match(source, /onExportCsv\(pages\)/);
 assert.match(source, /paginateUrlFindings\(pages, pageNumber\)/);
+assert.doesNotMatch(source, /key=\{page\.url\}/);
+assert.match(source, /key=\{`\$\{page\.url\}-\$\{page\.finalUrl/);
 
 const pages = Array.from({ length: 51 }, (_, index) => ({
   url: `https://example.com/page-${index + 1}`,

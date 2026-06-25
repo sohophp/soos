@@ -18,8 +18,8 @@ function Sitemaps({ sitemaps, t }) {
         <span>{sitemaps.length}</span>
       </div>
       <div className="sitemap-list">
-        {sitemaps.map((sitemap) => (
-          <div className="sitemap" key={sitemap.url}>
+        {sitemaps.map((sitemap, index) => (
+          <div className="sitemap" key={`${sitemap.url}-${sitemap.kind || ""}-${index}`}>
             <Globe2 size={16} />
             <span>{sitemap.url}</span>
             <em>{sitemap.kind}</em>
@@ -54,8 +54,8 @@ function InternalDiscovery({ report, t, language }) {
       </div>
       {pages.length ? (
         <div className="internal-discovery-list">
-          {pagination.items.map((page) => (
-            <article className="internal-discovery-row" key={page.url}>
+          {pagination.items.map((page, index) => (
+            <article className="internal-discovery-row" key={`${page.url}-${page.discoveredFrom || ""}-${index}`}>
               <Badge severity={page.status >= 400 || !page.status ? "critical" : page.issues?.length ? "warning" : "ok"}>
                 {page.status || "ERR"}
               </Badge>
@@ -129,8 +129,8 @@ function InternalLinkGraph({ report, t, language }) {
         ))}
       </div>
       <div className="link-graph-list">
-        {pagination.items.map((row) => (
-          <article className="link-graph-row" key={row.url}>
+        {pagination.items.map((row, index) => (
+          <article className="link-graph-row" key={`${row.url}-${row.state}-${index}`}>
             <Badge severity={
               row.state === "unreachable" || row.state === "orphan"
                 ? "critical"
