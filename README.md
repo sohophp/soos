@@ -144,6 +144,8 @@ npm run check:release
 
 This runs the high-severity dependency audit and `npm run check`; when `DATABASE_URL` is set it also runs the read-only database status check.
 
+The production build keeps Vite's chunk-size warning active at a 600 kB baseline. A larger warning should be treated as a release review item rather than ignored.
+
 Health responses include a request ID, service version, timestamp, and process uptime. API errors also return a stable error code and request ID; include that request ID when investigating a production failure.
 
 HTTP routing is split under `server/routes/`. `server/api.js` is a compact composition root for request security, session ownership, rate limiting, database initialization, and domain-service injection. Encrypted Search Console storage lives in `server/gsc-config-store.js`; OAuth and Google API calls live in `server/gsc-service.js`.

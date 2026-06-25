@@ -14,6 +14,7 @@ All notable changes to soos will be documented in this file.
 - Surfaced report coverage in the Scan summary, including evidence strength, source coverage, sampled URL Inspection limits, and unsafe conclusions to avoid.
 - Documented self-hosted VPS deployment with optional Postgres so production use is not tied to Vercel or Neon.
 - Added `npm run check:release` to combine dependency audit, full checks, and optional database readiness into one release gate.
+- Pinned the production chunk-size warning baseline at 600 kB and added a regression test so build warnings remain meaningful.
 - Added report coverage summaries that make scan limits, GSC connection, URL Inspection sampling, PageSpeed/CrUX usage, and unsafe conclusions explicit.
 - Added regression coverage for issue normalization, confidence classification, priority scoring, fix instructions, and report limitations.
 

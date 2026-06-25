@@ -15,6 +15,8 @@ npm run test:e2e
 
 `check:release` runs the high-severity dependency audit, the full syntax/unit/API/build gate, and `db:status` when `DATABASE_URL` is configured. `db:status` is read-only. Exit code `0` means the migration ledger and required tables are current. Exit code `2` means migrations or tables are missing.
 
+The Vite chunk-size warning threshold is pinned at 600 kB. If a production build warns above that threshold, review whether the growth is expected before promoting the release.
+
 Confirm the production environment contains:
 
 ```env
