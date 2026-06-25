@@ -33,6 +33,8 @@ assert.match(summarySource, /report\.truncation\?\.truncated/);
 assert.match(issuesSource, /robotsImpactIssueType\(item\.scope\)/);
 assert.match(issuesSource, /normalizeReportIssues\(report, \{ gscRows, inspectionResults \}\)/);
 assert.match(issuesSource, /function FixPlan/);
+assert.match(issuesSource, /buildFixPlanCsvRows\(issues\)/);
+assert.match(issuesSource, /downloadCsvFile\(/);
 assert.match(issuesSource, /priorityScore/);
 assert.match(issuesSource, /issue\.recommendedFix\.steps/);
 assert.match(issuesSource, /issue\.verification\[0\]\?\.steps/);

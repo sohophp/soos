@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { Bot, CheckCircle2 } from "lucide-react";
+import { downloadCsvFile } from "../downloads.js";
+import { buildFixPlanCsvRows } from "../fix-plan-export.js";
 import { normalizeReportIssues } from "../issue-model.js";
 import { robotsImpactIssueType } from "../report-views.js";
 import { Badge, Stat } from "./ReportUi.jsx";
@@ -20,9 +22,21 @@ function FixPlan({ issues, t, onSelectIssue }) {
       </section>
     );
   }
+  function exportFixPlan() {
+    downloadCsvFile(
+      `soos-fix-plan-${new Date().toISOString().slice(0, 19).replaceAll(":", "-")}.csv`,
+      buildFixPlanCsvRows(issues),
+    );
+  }
   return (
     <section className="panel backlog fix-plan">
-      <div className="panel-head"><h2>{t.fixPlan}</h2><span>{issues.length} {t.tasks}</span></div>
+      <div className="panel-head">
+        <h2>{t.fixPlan}</h2>
+        <div className="panel-actions">
+          <span>{issues.length} {t.tasks}</span>
+          <button className="export-button" type="button" onClick={exportFixPlan}>{t.exportFixPlan}</button>
+        </div>
+      </div>
       <div className="tasks">
         {issues.slice(0, 8).map((issue) => (
           <article className={`task task-${issueBadgeSeverity(issue.severity)}`} key={issue.fingerprint}>

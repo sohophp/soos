@@ -1330,6 +1330,14 @@ a:focus-visible,
   color: #16452c;
 }
 
+.panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .impact-filter {
   height: 32px;
   margin-top: 10px;
