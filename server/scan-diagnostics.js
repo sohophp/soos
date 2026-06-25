@@ -432,6 +432,12 @@ export function buildBacklog(pages, sitemaps) {
       action: "Use the final self-canonical URL in the sitemap.",
     },
     {
+      key: "canonical_not_in_sitemap",
+      title: "Add canonical targets to the sitemap",
+      severity: "warning",
+      action: "When a submitted URL canonicalizes elsewhere, submit the canonical target instead of the duplicate URL.",
+    },
+    {
       key: "canonical_cross_host",
       title: "Review cross-host canonicals",
       severity: "warning",
@@ -442,6 +448,12 @@ export function buildBacklog(pages, sitemaps) {
       title: "Resolve conflicting canonical declarations",
       severity: "warning",
       action: "Keep one consistent canonical URL across HTML and the HTTP Link header.",
+    },
+    {
+      key: "canonical_multiple",
+      title: "Reduce duplicate canonical declarations",
+      severity: "notice",
+      action: "Keep a single canonical declaration unless the HTML and HTTP header intentionally repeat the same URL.",
     },
     {
       key: "canonical_invalid",
@@ -462,6 +474,12 @@ export function buildBacklog(pages, sitemaps) {
       action: "Submit destination URLs instead of redirecting URLs.",
     },
     {
+      key: "not_html",
+      title: "Remove non-HTML URLs from the sitemap",
+      severity: "warning",
+      action: "Keep only indexable HTML landing pages in XML sitemaps unless a non-HTML asset is intentionally submitted.",
+    },
+    {
       key: "canonical_missing",
       title: "Add canonical tags",
       severity: "warning",
@@ -474,10 +492,40 @@ export function buildBacklog(pages, sitemaps) {
       action: "hreflang alternates should be crawlable and indexable.",
     },
     {
+      key: "alternate_invalid",
+      title: "Fix invalid hreflang target URLs",
+      severity: "warning",
+      action: "Use valid absolute or resolvable HTTP(S) URLs for every hreflang alternate.",
+    },
+    {
+      key: "alternate_hreflang_invalid",
+      title: "Fix invalid hreflang values",
+      severity: "warning",
+      action: "Use valid language or language-region codes, or x-default where appropriate.",
+    },
+    {
       key: "alternate_duplicate_language",
       title: "Remove duplicate hreflang languages",
       severity: "warning",
       action: "Declare each language or language-region value once per page.",
+    },
+    {
+      key: "alternate_duplicate_target",
+      title: "Review hreflang targets reused by multiple languages",
+      severity: "notice",
+      action: "Point each hreflang language to the correct localized canonical URL, unless the shared target is intentional.",
+    },
+    {
+      key: "alternate_not_reciprocal",
+      title: "Fix missing hreflang return links",
+      severity: "warning",
+      action: "Every alternate URL should link back to the matching canonical page in the hreflang set.",
+    },
+    {
+      key: "alternate_target_canonical_mismatch",
+      title: "Align hreflang targets with canonicals",
+      severity: "warning",
+      action: "Point hreflang URLs at pages that self-canonicalize, or update the hreflang set to use the canonical targets.",
     },
     {
       key: "alternate_self_missing",
@@ -492,16 +540,52 @@ export function buildBacklog(pages, sitemaps) {
       action: "Every indexable page should have a unique, descriptive title.",
     },
     {
+      key: "title_short",
+      title: "Expand very short title tags",
+      severity: "notice",
+      action: "Write titles that clearly describe the page intent and primary topic.",
+    },
+    {
+      key: "title_long",
+      title: "Tighten overly long title tags",
+      severity: "notice",
+      action: "Keep titles concise enough for search snippets while preserving the main query intent.",
+    },
+    {
       key: "description_missing",
       title: "Add missing meta descriptions",
       severity: "warning",
       action: "Descriptions do not directly control crawling, but they improve snippet quality and audit clarity.",
     },
     {
+      key: "description_short",
+      title: "Expand very short meta descriptions",
+      severity: "notice",
+      action: "Summarize the page value clearly enough to support better search result snippets.",
+    },
+    {
+      key: "description_long",
+      title: "Tighten overly long meta descriptions",
+      severity: "notice",
+      action: "Keep descriptions focused so important snippet text is less likely to be truncated.",
+    },
+    {
       key: "h1_missing",
       title: "Add missing H1 headings",
       severity: "warning",
       action: "Use one clear H1 that matches the page intent.",
+    },
+    {
+      key: "h1_multiple",
+      title: "Review pages with multiple H1 headings",
+      severity: "notice",
+      action: "Use a clear primary H1 and move secondary section titles to lower heading levels when needed.",
+    },
+    {
+      key: "html_lang_missing",
+      title: "Add HTML lang attributes",
+      severity: "notice",
+      action: "Declare the page language to support accessibility, browser behavior, and international SEO signals.",
     },
     {
       key: "viewport_missing",
@@ -514,6 +598,48 @@ export function buildBacklog(pages, sitemaps) {
       title: "Fix invalid JSON-LD structured data",
       severity: "warning",
       action: "Invalid structured data can prevent rich result eligibility.",
+    },
+    {
+      key: "structured_data_validation",
+      title: "Fix structured data validation issues",
+      severity: "warning",
+      action: "Add required fields and repair graph references for Google-supported structured data types.",
+    },
+    {
+      key: "structured_data_recommended",
+      title: "Improve structured data completeness",
+      severity: "notice",
+      action: "Add recommended structured data fields where they match visible page content.",
+    },
+    {
+      key: "perf_ttfb_slow",
+      title: "Improve slow server response time",
+      severity: "warning",
+      action: "Investigate hosting, caching, backend queries, and edge delivery for URLs with slow TTFB.",
+    },
+    {
+      key: "perf_html_large",
+      title: "Reduce oversized HTML documents",
+      severity: "notice",
+      action: "Trim server-rendered markup and inline payloads so crawlers and users receive core content faster.",
+    },
+    {
+      key: "perf_many_scripts",
+      title: "Reduce excessive script tags",
+      severity: "notice",
+      action: "Remove unused scripts and defer non-critical JavaScript where it does not affect indexable content.",
+    },
+    {
+      key: "perf_many_stylesheets",
+      title: "Reduce excessive stylesheet tags",
+      severity: "notice",
+      action: "Consolidate or defer non-critical CSS so rendering and crawling are less delayed.",
+    },
+    {
+      key: "perf_many_images",
+      title: "Review image-heavy HTML pages",
+      severity: "notice",
+      action: "Lazy-load non-critical images and keep important textual content available in the initial HTML.",
     },
     {
       key: "title_duplicate",

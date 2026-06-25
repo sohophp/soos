@@ -4,6 +4,13 @@ All notable changes to soos will be documented in this file.
 
 ## [Unreleased]
 
+### Product convergence
+
+- Added a June 2026 product audit that identifies current capabilities, UI noise, diagnostic trust gaps, product-closure gaps, Phase 1 scope, and explicit non-goals.
+- Added a unified issue model for normalizing scan, Google, and search-visibility findings into Issue -> Evidence -> Fix -> Verify objects with confidence and explainable priority scoring.
+- Added report coverage summaries that make scan limits, GSC connection, URL Inspection sampling, PageSpeed/CrUX usage, and unsafe conclusions explicit.
+- Added regression coverage for issue normalization, confidence classification, priority scoring, fix instructions, and report limitations.
+
 ### PageSpeed Insights
 
 - Normalized failed Lighthouse SEO audits, non-opportunity performance diagnostics, runtime context, redirects, and Core Web Vitals field-data status for actionable reporting.

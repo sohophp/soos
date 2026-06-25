@@ -5,6 +5,7 @@ soos is a local-first React + Node SEO audit tool for sitemap, robots.txt, index
 Runtime requirement: Node.js `^20.19.0` or `>=22.12.0`.
 
 Detailed architecture, implementation status and the active roadmap are maintained in [DEVELOPMENT.md](DEVELOPMENT.md).
+The June 2026 product-scope audit is maintained in [docs/product-audit-2026-06.md](docs/product-audit-2026-06.md).
 
 The roadmap is organized by release:
 
@@ -64,6 +65,8 @@ Stored data, retention periods, Google disconnection, and complete current-sessi
 - A scan fetcher owns timeout, public-DNS verification, pinned dispatchers, and controlled redirect tracing.
 - A scan runner owns sitemap recursion, page inspection, recursive internal discovery, checkpoints, report assembly, and scan limits.
 - Structured data validation and scan-level diagnosis/report scoring live in dedicated domain modules.
+- A unified issue model normalizes scan, Google, and search-visibility findings into Issue -> Evidence -> Fix -> Verify objects with confidence and explainable priority scoring.
+- Report coverage summaries state scan limits, Google connection state, URL Inspection sampling, PageSpeed/CrUX usage, and conclusions the report cannot safely make.
 - Persistent Scan, Google, Issues, URLs, History, and Settings views, with paginated URL findings and state-preserving Google diagnostics.
 - Workspace views expose ARIA tab semantics and support Left/Right/Home/End keyboard navigation.
 - URL findings can be filtered by severity, issue type, text, Sitemap/internal/GSC/Inspection source, and historical change state; CSV export follows the active filters.

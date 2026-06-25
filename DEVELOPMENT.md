@@ -1,5 +1,20 @@
 # soos 开发文档
 
+## 当前批次：Phase 1 产品审计与 Issue 模型收敛
+
+- 已完成：创建 `docs/product-audit-2026-06.md`，记录当前能力、UI 噪音、诊断可信度缺口、产品闭环缺口、本次范围与明确不做范围。
+- 已完成：新增统一 Issue 数据层，将扫描、Google Inspection 和 Search Analytics 机会归一为 Issue -> Evidence -> Fix -> Verify 结构，并区分 confirmed / likely / inferred。
+- 已完成：新增 priority scoring、fix instruction 和 report coverage 纯函数，明确高优先级诊断、修复步骤、验证步骤与报告不能下的结论。
+- 已验收：新增 issue model 与 report coverage 测试，并接入 `npm run check`。
+- 本批取舍：不重构大 UI、不新增 Google 权限、不做 sitemap 写操作、不实现内容生成、自动改站或定时监控；Overview/Fix Plan/Issues/URLs/Google UI 收口进入后续 Phase。
+
+## 当前批次：SEO 修复建议收口
+
+- 已完成：补齐修复 backlog 中缺失的 canonical target 未进入 sitemap、hreflang 缺少回链，以及 hreflang 目标 canonical 不一致行动项。
+- 已完成：补齐页面级扫描 issue 到修复 backlog 的建议覆盖，包括 non-HTML sitemap URL、canonical 多声明、无效 hreflang、标题/描述长度、多个 H1、HTML lang、结构化数据验证/推荐字段和轻量性能信号。
+- 已验收：新增 `scan-diagnostics` 回归断言与源码覆盖守门，确保扫描器产生的页面级 issue 能同步进入可执行优化建议。
+- 本批取舍：继续暂缓 GSC sitemap 提交/删除、渲染后批量检查和跨实例共享限流；这些要么扩大 OAuth 权限，要么偏平台能力，不作为当前 SEO 优化建议主线。
+
 ## 当前批次：PageSpeed Insights 完善
 
 - 已完成：服务端输出 SEO 失败项、性能诊断、运行上下文、重定向及 Core Web Vitals 判定。
