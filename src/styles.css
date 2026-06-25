@@ -1065,6 +1065,45 @@ a:focus-visible,
   gap: 4px;
 }
 
+.fix-plan .task .impact-filter {
+  margin-right: 8px;
+}
+
+.closed-issue-decisions {
+  margin-top: 14px;
+  border-top: 1px solid #e7ece5;
+  padding-top: 12px;
+}
+
+.closed-issue-decisions summary {
+  cursor: pointer;
+  color: #425047;
+  font-weight: 800;
+}
+
+.closed-issue-decisions > div {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.closed-issue-decisions article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #e7ece5;
+  border-radius: 6px;
+}
+
+.closed-issue-decisions strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #172018;
+  font-size: 13px;
+}
+
 .samples {
   display: grid;
   gap: 4px;
@@ -1629,6 +1668,11 @@ a:focus-visible,
   .coverage-stats,
   .coverage-limits {
     grid-template-columns: 1fr;
+  }
+
+  .closed-issue-decisions article {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
   }
 
   .score {

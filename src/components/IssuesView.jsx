@@ -1,8 +1,14 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Bot, CheckCircle2 } from "lucide-react";
 import { downloadCsvFile } from "../downloads.js";
 import { buildFixPlanCsvRows } from "../fix-plan-export.js";
 import { normalizeReportIssues } from "../issue-model.js";
+import {
+  applyIssueStatuses,
+  loadIssueStatuses,
+  saveIssueStatuses,
+  setIssueStatus,
+} from "../issue-status.js";
 import { robotsImpactIssueType } from "../report-views.js";
 import { Badge, Stat } from "./ReportUi.jsx";
 
@@ -13,8 +19,8 @@ function issueBadgeSeverity(severity) {
   return severity || "notice";
 }
 
-function FixPlan({ issues, t, onSelectIssue }) {
-  if (!issues?.length) {
+function FixPlan({ issues, closedIssues, t, onSelectIssue, onStatusChange }) {
+  if (!issues?.length && !closedIssues?.length) {
     return (
       <section className="panel backlog">
         <div className="panel-head"><h2>{t.fixPlan}</h2></div>
@@ -37,8 +43,9 @@ function FixPlan({ issues, t, onSelectIssue }) {
           <button className="export-button" type="button" onClick={exportFixPlan}>{t.exportFixPlan}</button>
         </div>
       </div>
-      <div className="tasks">
-        {issues.slice(0, 8).map((issue) => (
+      {issues?.length ? (
+        <div className="tasks">
+          {issues.slice(0, 8).map((issue) => (
           <article className={`task task-${issueBadgeSeverity(issue.severity)}`} key={issue.fingerprint}>
             <div className="task-top">
               <Badge severity={issueBadgeSeverity(issue.severity)}>{issue.severity}</Badge>
@@ -80,9 +87,32 @@ function FixPlan({ issues, t, onSelectIssue }) {
             <button className="impact-filter" type="button" onClick={() => onSelectIssue?.({ type: issue.type })}>
               {t.showMatchingUrls}
             </button>
+            <button className="impact-filter" type="button" onClick={() => onStatusChange?.(issue, "resolved")}>
+              {t.markResolved}
+            </button>
+            <button className="impact-filter" type="button" onClick={() => onStatusChange?.(issue, "ignored")}>
+              {t.ignoreIssue}
+            </button>
           </article>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : <div className="clean"><CheckCircle2 size={20} /><span>{t.noOpenIssues}</span></div>}
+      {closedIssues?.length ? (
+        <details className="closed-issue-decisions">
+          <summary>{t.closedIssueDecisions}: {closedIssues.length}</summary>
+          <div>
+            {closedIssues.slice(0, 12).map((issue) => (
+              <article key={`closed-${issue.fingerprint}`}>
+                <Badge severity="notice">{t[issue.status] || issue.status}</Badge>
+                <strong>{issue.title}</strong>
+                <button className="impact-filter" type="button" onClick={() => onStatusChange?.(issue, "open")}>
+                  {t.reopenIssue}
+                </button>
+              </article>
+            ))}
+          </div>
+        </details>
+      ) : null}
     </section>
   );
 }
@@ -228,7 +258,23 @@ function SignalList({ title, signals, labels, t, badgeLabel, severityFor, onSele
 }
 
 export function IssuesView({ report, t, onSelectIssue, gscRows = [], inspectionResults = [] }) {
-  const normalizedIssues = normalizeReportIssues(report, { gscRows, inspectionResults });
+  const [issueStatuses, setIssueStatuses] = useState({});
+  useEffect(() => {
+    setIssueStatuses(loadIssueStatuses(report));
+  }, [report?.input?.siteRootUrl, report?.input?.originalUrl]);
+  const normalizedIssues = applyIssueStatuses(
+    normalizeReportIssues(report, { gscRows, inspectionResults }),
+    issueStatuses,
+  );
+  const openIssues = normalizedIssues.filter((issue) => issue.status === "open");
+  const closedIssues = normalizedIssues.filter((issue) => issue.status !== "open");
+  function changeIssueStatus(issue, status) {
+    setIssueStatuses((current) => {
+      const next = setIssueStatus(current, issue.fingerprint, status);
+      saveIssueStatuses(report, next);
+      return next;
+    });
+  }
   const sitemapLabels = {
     redirect: t.redirectUrlsInSitemap,
     noindex: t.noindexUrlsInSitemap,
@@ -243,7 +289,13 @@ export function IssuesView({ report, t, onSelectIssue, gscRows = [], inspectionR
   };
   return (
     <>
-      <FixPlan issues={normalizedIssues} t={t} onSelectIssue={onSelectIssue} />
+      <FixPlan
+        issues={openIssues}
+        closedIssues={closedIssues}
+        t={t}
+        onSelectIssue={onSelectIssue}
+        onStatusChange={changeIssueStatus}
+      />
       <Backlog backlog={report.backlog} t={t} />
       <section className="panel robots">
         <div>
