@@ -10,6 +10,7 @@ All notable changes to soos will be documented in this file.
 - Added a unified issue model for normalizing scan, Google, and search-visibility findings into Issue -> Evidence -> Fix -> Verify objects with confidence and explainable priority scoring.
 - Connected the unified issue model to the Issues workspace as a prioritized Fix Plan with impact, evidence, fix steps, verification steps, confidence, and URL filtering.
 - Added a focused Fix Plan CSV export so prioritized remediation work can be shared without exporting the full audit.
+- Surfaced report coverage in the Scan summary, including evidence strength, source coverage, sampled URL Inspection limits, and unsafe conclusions to avoid.
 - Added report coverage summaries that make scan limits, GSC connection, URL Inspection sampling, PageSpeed/CrUX usage, and unsafe conclusions explicit.
 - Added regression coverage for issue normalization, confidence classification, priority scoring, fix instructions, and report limitations.
 

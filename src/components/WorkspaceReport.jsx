@@ -4,6 +4,7 @@ import {
   downloadHtmlReport,
   downloadSummaryReport,
 } from "../report-exports.js";
+import { buildUrlInspectionCandidates } from "../url-inspection-candidates.js";
 import { GooglebotLogAnalysis } from "./GooglebotLogAnalysis.jsx";
 import { GoogleOverview } from "./GoogleOverview.jsx";
 import { IssuesView } from "./IssuesView.jsx";
@@ -24,6 +25,9 @@ export function WorkspaceReport({
 }) {
   const [inspectionResults, setInspectionResults] = useState([]);
   const [issueFilter, setIssueFilter] = useState(null);
+  const inspectionCandidates = report
+    ? buildUrlInspectionCandidates(report, gsc.rows, comparisonEntry)
+    : [];
 
   useEffect(() => {
     setInspectionResults([]);
@@ -43,7 +47,14 @@ export function WorkspaceReport({
   return (
     <>
       <div className="workspace-view" hidden={activeView !== "scan"}>
-        <ScanSummaryView report={report} t={t} language={language} />
+        <ScanSummaryView
+          report={report}
+          t={t}
+          language={language}
+          gscStatus={gsc.status}
+          inspectionResults={inspectionResults}
+          inspectionCandidateCount={inspectionCandidates.length}
+        />
       </div>
       <div className="workspace-view" hidden={activeView !== "google"}>
         <GoogleOverview report={report} t={t} gscRows={gsc.rows} language={language} />

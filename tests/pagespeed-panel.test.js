@@ -30,7 +30,10 @@ assert.match(panelSource, /console\.cloud\.google\.com\/apis\/library\/chromeuxr
 assert.match(panelSource, /copy\.enableCruxApi/);
 assert.match(panelSource, /copy\.retryCrux/);
 assert.match(summarySource, /<PageSpeedInsightsPanel report=\{report\} language=\{language\}/);
-assert.match(workspaceSource, /<ScanSummaryView report=\{report\} t=\{t\} language=\{language\}/);
+assert.match(workspaceSource, /<ScanSummaryView/);
+assert.match(workspaceSource, /language=\{language\}/);
+assert.match(workspaceSource, /gscStatus=\{gsc\.status\}/);
+assert.match(workspaceSource, /inspectionResults=\{inspectionResults\}/);
 assert.match(routeSource, /requestPath !== "\/api\/pagespeed\/run"/);
 assert.match(routeSource, /readJsonBody\(req, 10000\)/);
 assert.match(cruxRouteSource, /requestPath !== "\/api\/crux\/run"/);

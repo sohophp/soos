@@ -6,6 +6,7 @@
 - 已完成：新增统一 Issue 数据层，将扫描、Google Inspection 和 Search Analytics 机会归一为 Issue -> Evidence -> Fix -> Verify 结构，并区分 confirmed / likely / inferred。
 - 已完成：将统一 Issue 数据层接入 Issues 工作区，显示可执行 Fix Plan、证据、影响、修复步骤、验证步骤、可信度和 URL 筛选入口。
 - 已完成：为 Fix Plan 增加独立 CSV 导出，方便把优先修复事项、证据、修复步骤和验证步骤直接交给执行人员。
+- 已完成：将 Report Coverage 接入扫描摘要页，显示证据强度、已覆盖数据源、URL Inspection 样本边界和不能据此下结论的事项。
 - 已完成：新增 priority scoring、fix instruction 和 report coverage 纯函数，明确高优先级诊断、修复步骤、验证步骤与报告不能下的结论。
 - 已验收：新增 issue model 与 report coverage 测试，并接入 `npm run check`。
 - 本批取舍：不重构大 UI、不新增 Google 权限、不做 sitemap 写操作、不实现内容生成、自动改站或定时监控；Overview/Fix Plan/Issues/URLs/Google UI 收口进入后续 Phase。
