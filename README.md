@@ -219,11 +219,33 @@ GitHub Pages can host only the static frontend build. It cannot run `server/api.
 Recommended deployment options:
 
 - Static frontend on GitHub Pages plus a separate Node API host.
-- Full app on a platform that supports Node services, such as Render.
+- Full app on a platform that supports Node services, such as Render or a self-hosted VPS.
 - Vercel, using the included Serverless Function adapter in `api/index.js`.
 - Netlify, after adapting the API into Netlify Functions.
 
 For production OAuth, add the deployed API callback URL in Google Cloud.
+
+### Self-hosted VPS
+
+On a VPS or any long-running Node host, soos can run without Vercel. Use a process manager such as systemd, PM2, Docker, or your preferred supervisor, and put Nginx/Caddy/Apache in front of the app for HTTPS.
+
+Recommended setup:
+
+1. Install Node.js `^20.19.0` or `>=22.12.0`.
+2. Clone the repository and run `npm ci`.
+3. Copy `.env.example` to `.env` and set `SOOS_PUBLIC_BASE_URL`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `SOOS_TOKEN_ENCRYPTION_KEY`.
+4. Set `DATABASE_URL` to Neon, Supabase, RDS, or a self-hosted Postgres database if you want multi-user OAuth isolation, retained reports, and resumable background jobs.
+5. Run `npm run db:migrate` and `npm run db:status` when `DATABASE_URL` is configured.
+6. Run `npm run build`.
+7. Start the API with `npm run dev:api` or `node --env-file-if-exists=.env server/api.js`.
+8. Serve `dist/` from the same origin or proxy the frontend and `/api/*` API through the same public HTTPS host.
+
+Notes:
+
+- Without `DATABASE_URL`, soos stores Search Console config in `.soos-gsc.json` and jobs in process memory. This is acceptable for single-user local/private use, but not for public multi-user deployment.
+- With `DATABASE_URL`, the same database-backed session isolation, OAuth token encryption, retained reports, checkpoints, and worker leases used on Vercel also work on a VPS.
+- Set `SOOS_PUBLIC_BASE_URL` to the exact public HTTPS origin so OAuth redirect URLs, cookie security, and origin checks match production.
+- Do not enable `SOOS_ALLOW_PROXY=1` unless the deployment is private and the configured proxy enforces its own network boundary.
 
 ### Vercel
 

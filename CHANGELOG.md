@@ -12,6 +12,7 @@ All notable changes to soos will be documented in this file.
 - Added a focused Fix Plan CSV export so prioritized remediation work can be shared without exporting the full audit.
 - Added local Fix Plan issue decisions for marking prioritized issues as resolved or ignored without mutating raw scan results.
 - Surfaced report coverage in the Scan summary, including evidence strength, source coverage, sampled URL Inspection limits, and unsafe conclusions to avoid.
+- Documented self-hosted VPS deployment with optional Postgres so production use is not tied to Vercel or Neon.
 - Added report coverage summaries that make scan limits, GSC connection, URL Inspection sampling, PageSpeed/CrUX usage, and unsafe conclusions explicit.
 - Added regression coverage for issue normalization, confidence classification, priority scoring, fix instructions, and report limitations.
 

@@ -1,6 +1,6 @@
 # soos Production Operations
 
-This runbook covers the Vercel + Neon deployment supported by this repository.
+This runbook covers both supported production shapes: Vercel + Neon/Postgres and a self-hosted VPS or long-running Node service with optional Postgres.
 
 ## Release Preconditions
 
@@ -26,7 +26,11 @@ GOOGLE_OAUTH_CLIENT_ID=...
 GOOGLE_OAUTH_CLIENT_SECRET=...
 SOOS_TOKEN_ENCRYPTION_KEY=...
 SOOS_TOKEN_ENCRYPTION_KEY_PREVIOUS=
+SOOS_API_PORT=4177
+SOOS_ALLOW_PROXY=0
 ```
+
+`DATABASE_URL` can point to Neon, Supabase, RDS, or a self-hosted Postgres database. Public multi-user deployments should set it so OAuth tokens, retained reports, and resumable jobs are isolated per browser session. Private single-user deployments may omit it, but `.soos-gsc.json` and in-memory jobs are then local to one process.
 
 Never enable `SOOS_ALLOW_PROXY=1` on the public deployment.
 
@@ -43,6 +47,16 @@ Migrations are forward-only and idempotent. Before a release containing a new mi
 
 Do not manually delete rows from `soos_schema_migration`. A failed migration must be corrected by a new forward migration or by restoring the pre-release database branch.
 
+## Self-hosted VPS Release
+
+1. Deploy the exact commit intended for production to the server.
+2. Run `npm ci`, `npm run audit:dependencies`, and `npm run check` on the release artifact or in CI for that commit.
+3. If `DATABASE_URL` is set, run `npm run db:status`, apply `npm run db:migrate` when needed, and require `db:status` to report ready before restarting the service.
+4. Run `npm run build`.
+5. Restart the Node service with the production `.env`, for example through systemd, PM2, Docker, or another supervisor.
+6. Verify `/api/health`, `/api/metrics`, the scan form, OAuth start/callback, property selection, one small audit, retained-task open/delete, and HTML/CSV export.
+7. Confirm the reverse proxy serves HTTPS, preserves `/api/*`, forwards the original host/protocol, and points Google OAuth redirect URI to `SOOS_PUBLIC_BASE_URL/api/gsc/oauth/callback`.
+
 ## Vercel Release
 
 1. Deploy a preview from the exact commit intended for production.
@@ -54,12 +68,12 @@ Do not manually delete rows from `soos_schema_migration`. A failed migration mus
 
 ## Application Rollback
 
-Vercel rollback changes application code, not Neon data.
+Application rollback changes application code, not Postgres data.
 
-1. Roll back to the last known-good Vercel deployment.
+1. Roll back to the last known-good Vercel deployment or VPS artifact.
 2. Verify `/api/health` and a small scan.
 3. If the release added only backward-compatible schema, keep the current database.
-4. If old code cannot read the new schema, point `DATABASE_URL` to the pre-release Neon branch and redeploy.
+4. If old code cannot read the new schema, point `DATABASE_URL` to the pre-release Neon/Postgres restore branch and redeploy.
 5. Preserve the failed database branch for investigation; do not delete it during the incident.
 
 All new migrations should be additive first: add nullable columns/tables/indexes, deploy compatible readers/writers, backfill if needed, and remove old structures only in a later release.
@@ -69,9 +83,9 @@ All new migrations should be additive first: add nullable columns/tables/indexes
 Use restore only for confirmed data corruption or an incompatible migration:
 
 1. Stop promoting new deployments and record the incident time.
-2. Create a Neon branch restored to immediately before the bad change.
+2. Create a Neon branch, Postgres backup restore, or point-in-time recovery target from immediately before the bad change.
 3. Run `npm run db:status` against the restored branch.
-4. Set Vercel `DATABASE_URL` to the restored branch and redeploy the known-good application commit.
+4. Set deployment `DATABASE_URL` to the restored branch or database and redeploy the known-good application commit.
 5. Verify OAuth status, retained reports, task recovery, and deletion using a test browser session.
 6. Keep the damaged branch read-only for comparison until the incident is closed.
 
