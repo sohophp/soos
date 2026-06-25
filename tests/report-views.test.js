@@ -24,11 +24,18 @@ const [mainSource, reportSource, summarySource, issuesSource, uiSource] = await 
 ]);
 assert.match(mainSource, /<WorkspaceReport/);
 assert.match(reportSource, /<ReportEmptyState t=\{t\} \/>/);
+assert.match(reportSource, /gscRows=\{gsc\.rows\}/);
+assert.match(reportSource, /inspectionResults=\{inspectionResults\}/);
 assert.match(uiSource, /export function ReportEmptyState/);
 assert.match(summarySource, /<StatusFlags flags=\{report\.statusFlags\}/);
 assert.match(summarySource, /report\.summary\.healthScore/);
 assert.match(summarySource, /report\.truncation\?\.truncated/);
 assert.match(issuesSource, /robotsImpactIssueType\(item\.scope\)/);
+assert.match(issuesSource, /normalizeReportIssues\(report, \{ gscRows, inspectionResults \}\)/);
+assert.match(issuesSource, /function FixPlan/);
+assert.match(issuesSource, /priorityScore/);
+assert.match(issuesSource, /issue\.recommendedFix\.steps/);
+assert.match(issuesSource, /issue\.verification\[0\]\?\.steps/);
 assert.match(issuesSource, /navigator\.clipboard\.writeText/);
 assert.match(issuesSource, /onSelectIssue\?\.\(\{ type: issueType \}\)/);
 assert.match(issuesSource, /report\.internationalSignals/);

@@ -8,6 +8,7 @@ All notable changes to soos will be documented in this file.
 
 - Added a June 2026 product audit that identifies current capabilities, UI noise, diagnostic trust gaps, product-closure gaps, Phase 1 scope, and explicit non-goals.
 - Added a unified issue model for normalizing scan, Google, and search-visibility findings into Issue -> Evidence -> Fix -> Verify objects with confidence and explainable priority scoring.
+- Connected the unified issue model to the Issues workspace as a prioritized Fix Plan with impact, evidence, fix steps, verification steps, confidence, and URL filtering.
 - Added report coverage summaries that make scan limits, GSC connection, URL Inspection sampling, PageSpeed/CrUX usage, and unsafe conclusions explicit.
 - Added regression coverage for issue normalization, confidence classification, priority scoring, fix instructions, and report limitations.
 

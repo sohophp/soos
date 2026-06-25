@@ -1,7 +1,77 @@
 import React, { useState } from "react";
 import { Bot, CheckCircle2 } from "lucide-react";
+import { normalizeReportIssues } from "../issue-model.js";
 import { robotsImpactIssueType } from "../report-views.js";
 import { Badge, Stat } from "./ReportUi.jsx";
+
+function issueBadgeSeverity(severity) {
+  if (severity === "critical" || severity === "high") return "critical";
+  if (severity === "medium") return "warning";
+  if (severity === "low" || severity === "info") return "notice";
+  return severity || "notice";
+}
+
+function FixPlan({ issues, t, onSelectIssue }) {
+  if (!issues?.length) {
+    return (
+      <section className="panel backlog">
+        <div className="panel-head"><h2>{t.fixPlan}</h2></div>
+        <div className="clean"><CheckCircle2 size={20} /><span>{t.noUnifiedIssues}</span></div>
+      </section>
+    );
+  }
+  return (
+    <section className="panel backlog fix-plan">
+      <div className="panel-head"><h2>{t.fixPlan}</h2><span>{issues.length} {t.tasks}</span></div>
+      <div className="tasks">
+        {issues.slice(0, 8).map((issue) => (
+          <article className={`task task-${issueBadgeSeverity(issue.severity)}`} key={issue.fingerprint}>
+            <div className="task-top">
+              <Badge severity={issueBadgeSeverity(issue.severity)}>{issue.severity}</Badge>
+              <h3>{issue.title}</h3>
+              <span className="priority-score">{t.priorityScore}: {issue.priorityScore}</span>
+            </div>
+            <p>{issue.summary}</p>
+            <div className="fix-plan-meta">
+              <small>{t.confidence}: {t[issue.confidence] || issue.confidence}</small>
+              <small>{t.category}: {issue.category}</small>
+              <small>{t.affectedUrls}: {issue.affectedUrlCount}</small>
+            </div>
+            <div className="fix-plan-block">
+              <strong>{t.impact}</strong>
+              <small>{issue.impact}</small>
+            </div>
+            <div className="fix-plan-block">
+              <strong>{t.fixSteps}</strong>
+              {issue.recommendedFix.steps.slice(0, 3).map((step, index) => (
+                <small key={`${issue.fingerprint}-fix-${index}`}>{index + 1}. {step}</small>
+              ))}
+            </div>
+            <div className="fix-plan-block">
+              <strong>{t.verifySteps}</strong>
+              {issue.verification[0]?.steps.slice(0, 2).map((step, index) => (
+                <small key={`${issue.fingerprint}-verify-${index}`}>{index + 1}. {step}</small>
+              ))}
+            </div>
+            {issue.evidence?.length ? (
+              <div className="samples">
+                <strong>{t.evidence}</strong>
+                {issue.evidence.slice(0, 3).map((item, index) => (
+                  <small key={`${issue.fingerprint}-evidence-${index}`}>
+                    {item.url || "-"} · {item.label}{item.detail ? ` · ${item.detail}` : ""}
+                  </small>
+                ))}
+              </div>
+            ) : null}
+            <button className="impact-filter" type="button" onClick={() => onSelectIssue?.({ type: issue.type })}>
+              {t.showMatchingUrls}
+            </button>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function Backlog({ backlog, t }) {
   if (!backlog?.length) {
@@ -143,7 +213,8 @@ function SignalList({ title, signals, labels, t, badgeLabel, severityFor, onSele
   );
 }
 
-export function IssuesView({ report, t, onSelectIssue }) {
+export function IssuesView({ report, t, onSelectIssue, gscRows = [], inspectionResults = [] }) {
+  const normalizedIssues = normalizeReportIssues(report, { gscRows, inspectionResults });
   const sitemapLabels = {
     redirect: t.redirectUrlsInSitemap,
     noindex: t.noindexUrlsInSitemap,
@@ -158,6 +229,7 @@ export function IssuesView({ report, t, onSelectIssue }) {
   };
   return (
     <>
+      <FixPlan issues={normalizedIssues} t={t} onSelectIssue={onSelectIssue} />
       <Backlog backlog={report.backlog} t={t} />
       <section className="panel robots">
         <div>

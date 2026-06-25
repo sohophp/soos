@@ -1037,6 +1037,34 @@ a:focus-visible,
   color: #526057;
 }
 
+.fix-plan .task {
+  display: grid;
+  gap: 10px;
+}
+
+.priority-score {
+  margin-left: auto;
+  color: #526057;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.fix-plan-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fix-plan-meta small,
+.fix-plan-block small {
+  color: #687169;
+}
+
+.fix-plan-block {
+  display: grid;
+  gap: 4px;
+}
+
 .samples {
   display: grid;
   gap: 4px;

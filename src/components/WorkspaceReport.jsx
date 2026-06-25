@@ -59,7 +59,13 @@ export function WorkspaceReport({
         />
       </div>
       <div className="workspace-view" hidden={activeView !== "issues"}>
-        <IssuesView report={report} t={t} onSelectIssue={selectIssue} />
+        <IssuesView
+          report={report}
+          t={t}
+          gscRows={gsc.rows}
+          inspectionResults={inspectionResults}
+          onSelectIssue={selectIssue}
+        />
       </div>
       <div className="workspace-view" hidden={activeView !== "urls"}>
         <UrlStructureView report={report} t={t} language={language} />

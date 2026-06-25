@@ -4,6 +4,7 @@
 
 - 已完成：创建 `docs/product-audit-2026-06.md`，记录当前能力、UI 噪音、诊断可信度缺口、产品闭环缺口、本次范围与明确不做范围。
 - 已完成：新增统一 Issue 数据层，将扫描、Google Inspection 和 Search Analytics 机会归一为 Issue -> Evidence -> Fix -> Verify 结构，并区分 confirmed / likely / inferred。
+- 已完成：将统一 Issue 数据层接入 Issues 工作区，显示可执行 Fix Plan、证据、影响、修复步骤、验证步骤、可信度和 URL 筛选入口。
 - 已完成：新增 priority scoring、fix instruction 和 report coverage 纯函数，明确高优先级诊断、修复步骤、验证步骤与报告不能下的结论。
 - 已验收：新增 issue model 与 report coverage 测试，并接入 `npm run check`。
 - 本批取舍：不重构大 UI、不新增 Google 权限、不做 sitemap 写操作、不实现内容生成、自动改站或定时监控；Overview/Fix Plan/Issues/URLs/Google UI 收口进入后续 Phase。
