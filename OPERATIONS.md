@@ -9,13 +9,11 @@ Use Node.js 22 or newer. From a clean checkout:
 ```bash
 npm ci
 npm run test:e2e:install
-npm run audit:dependencies
-npm run check
+npm run check:release
 npm run test:e2e
-npm run db:status
 ```
 
-`db:status` is read-only. Exit code `0` means the migration ledger and required tables are current. Exit code `2` means migrations or tables are missing.
+`check:release` runs the high-severity dependency audit, the full syntax/unit/API/build gate, and `db:status` when `DATABASE_URL` is configured. `db:status` is read-only. Exit code `0` means the migration ledger and required tables are current. Exit code `2` means migrations or tables are missing.
 
 Confirm the production environment contains:
 
@@ -50,7 +48,7 @@ Do not manually delete rows from `soos_schema_migration`. A failed migration mus
 ## Self-hosted VPS Release
 
 1. Deploy the exact commit intended for production to the server.
-2. Run `npm ci`, `npm run audit:dependencies`, and `npm run check` on the release artifact or in CI for that commit.
+2. Run `npm ci` and `npm run check:release` on the release artifact or in CI for that commit.
 3. If `DATABASE_URL` is set, run `npm run db:status`, apply `npm run db:migrate` when needed, and require `db:status` to report ready before restarting the service.
 4. Run `npm run build`.
 5. Restart the Node service with the production `.env`, for example through systemd, PM2, Docker, or another supervisor.

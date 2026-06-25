@@ -9,6 +9,7 @@
 - 已完成：为 Fix Plan 增加本地 issue 决策状态，可将优先事项标记为已解决或已忽略，且不修改原始扫描报告。
 - 已完成：将 Report Coverage 接入扫描摘要页，显示证据强度、已覆盖数据源、URL Inspection 样本边界和不能据此下结论的事项。
 - 已完成：补充 VPS/自托管部署路径与 `.env.example` 模板，明确 Postgres 可使用 Neon、Supabase、RDS 或自建实例，避免首版发布只绑定 Vercel/Neon。
+- 已完成：新增 `npm run check:release`，统一执行依赖审计、完整检查，并在配置 `DATABASE_URL` 时自动执行只读数据库状态检查。
 - 已完成：新增 priority scoring、fix instruction 和 report coverage 纯函数，明确高优先级诊断、修复步骤、验证步骤与报告不能下的结论。
 - 已验收：新增 issue model 与 report coverage 测试，并接入 `npm run check`。
 - 本批取舍：不重构大 UI、不新增 Google 权限、不做 sitemap 写操作、不实现内容生成、自动改站或定时监控；Overview/Fix Plan/Issues/URLs/Google UI 收口进入后续 Phase。

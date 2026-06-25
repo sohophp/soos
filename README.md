@@ -136,6 +136,14 @@ Check API syntax:
 node --check server/api.js
 ```
 
+Run the full release gate:
+
+```bash
+npm run check:release
+```
+
+This runs the high-severity dependency audit and `npm run check`; when `DATABASE_URL` is set it also runs the read-only database status check.
+
 Health responses include a request ID, service version, timestamp, and process uptime. API errors also return a stable error code and request ID; include that request ID when investigating a production failure.
 
 HTTP routing is split under `server/routes/`. `server/api.js` is a compact composition root for request security, session ownership, rate limiting, database initialization, and domain-service injection. Encrypted Search Console storage lives in `server/gsc-config-store.js`; OAuth and Google API calls live in `server/gsc-service.js`.
@@ -361,5 +369,11 @@ When functionality, setup, deployment, or user-facing behavior changes:
 npm run check
 ```
 
-4. Commit changes.
-5. Tag releases with semantic versions such as `v0.1.0`.
+4. Before publishing a release, run:
+
+```bash
+npm run check:release
+```
+
+5. Commit changes.
+6. Tag releases with semantic versions such as `v0.1.0`.
