@@ -109,6 +109,7 @@ const summary = buildSummaryReport(report);
 for (const section of [
   "soos Audit Summary",
   "Overview",
+  "Prioritized Fix Plan",
   "Fix First",
   "Robots Impact",
   "Sitemap Signals",
@@ -118,6 +119,10 @@ for (const section of [
 }
 assert.match(summary, /Health score: 75/);
 assert.match(summary, /Allow URL/);
+assert.match(summary, /Sitemap URLs blocked by robots\.txt/);
+const googleSummary = buildSummaryReport(report, { gscRows, ...exportContext });
+assert.match(googleSummary, /Google reports affected URLs are not indexed/);
+assert.match(googleSummary, /High impressions with low CTR/);
 
 const [mainSource, reportSource, overviewSource] = await Promise.all([
   fs.readFile(new URL("../src/main.jsx", import.meta.url), "utf8"),
@@ -129,6 +134,7 @@ assert.doesNotMatch(mainSource, /function SearchVisibility/);
 assert.doesNotMatch(mainSource, /function GscOpportunities/);
 assert.match(mainSource, /<WorkspaceReport/);
 assert.match(reportSource, /<GoogleOverview report=\{report\}/);
+assert.match(reportSource, /downloadSummaryReport\(report, \{/);
 assert.match(reportSource, /downloadAuditCsv\(report, gsc\.rows, pages, \{/);
 assert.match(reportSource, /downloadHtmlReport\(report, gsc\.rows, language, \{/);
 assert.match(reportSource, /inspectionResults,/);

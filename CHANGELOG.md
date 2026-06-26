@@ -22,6 +22,7 @@ All notable changes to soos will be documented in this file.
 - Fixed Fix Plan URL filtering for Google Inspection and Search Analytics issues so affected URLs are shown even when the finding does not originate from local page issue types.
 - Extended URL CSV exports with the current URL Inspection verdict, coverage state, Google/user canonicals, and Search Analytics opportunity evidence.
 - Extended standalone HTML reports with loaded URL Inspection and Search Analytics evidence so shared reports match the in-app diagnosis.
+- Added the unified prioritized Fix Plan to text summary exports, including Google-confirmed and Search Analytics-derived evidence when loaded.
 
 ### PageSpeed Insights
 

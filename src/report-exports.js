@@ -1,6 +1,7 @@
 import { downloadCsvFile, downloadTextFile } from "./downloads.js";
 import { buildGscRowMap, isTechnicallyIndexablePage, uniqueGscRows } from "./gsc-summary.js";
 import { buildStandaloneHtmlReport } from "./html-report.js";
+import { normalizeReportIssues } from "./issue-model.js";
 import { normalizeReportUrl } from "./url-policy.js";
 
 export function issueCategories(page) {
@@ -181,8 +182,31 @@ export function buildAuditCsvRows(report, gscRows = [], filteredPages = null, co
   return rows;
 }
 
-export function buildSummaryReport(report) {
+function appendPrioritizedFixPlan(lines, issues) {
+  const topIssues = (issues || []).slice(0, 5);
+  if (!topIssues.length) return;
+  lines.push("Prioritized Fix Plan");
+  topIssues.forEach((issue, index) => {
+    lines.push(`${index + 1}. ${issue.title} (${issue.severity}, ${issue.confidence}, score ${issue.priorityScore})`);
+    lines.push(`   Affected URLs: ${issue.affectedUrlCount}`);
+    lines.push(`   Impact: ${issue.impact}`);
+    if (issue.recommendedFix?.steps?.length) lines.push(`   Fix: ${issue.recommendedFix.steps.slice(0, 2).join(" | ")}`);
+    if (issue.evidence?.length) {
+      const evidence = issue.evidence[0];
+      lines.push(`   Evidence: ${[evidence.url, evidence.label, evidence.detail].filter(Boolean).join(" | ")}`);
+    }
+  });
+  lines.push("");
+}
+
+export function buildSummaryReport(report, context = {}) {
+  const exportContext = normalizeExportContext(context);
   const lines = [];
+  const fixPlanIssues = normalizeReportIssues(report, {
+    gscRows: exportContext.gscRows || [],
+    inspectionResults: exportContext.inspectionResults || [],
+    searchInsights: exportContext.searchInsights || [],
+  });
   const topBacklog = (report.backlog || []).slice(0, 5);
   const topRobots = (report.robots?.analysis?.blockedSummaries || []).slice(0, 5);
   const topSitemapSignals = (report.sitemapSignals || []).slice(0, 5);
@@ -202,6 +226,8 @@ export function buildSummaryReport(report) {
   lines.push(`- High-risk Google blockers: ${report.summary?.googleBlockedCount ?? 0}`);
   lines.push(`- Issues: critical ${report.summary?.issueCounts?.critical ?? 0}, warning ${report.summary?.issueCounts?.warning ?? 0}, notice ${report.summary?.issueCounts?.notice ?? 0}`);
   lines.push("");
+
+  appendPrioritizedFixPlan(lines, fixPlanIssues);
 
   if (topBacklog.length) {
     lines.push("Fix First");
@@ -257,6 +283,6 @@ export function downloadHtmlReport(report, gscRows, language, context = {}) {
   );
 }
 
-export function downloadSummaryReport(report) {
-  downloadTextFile(`soos-summary-${exportTimestamp()}.txt`, buildSummaryReport(report));
+export function downloadSummaryReport(report, context = {}) {
+  downloadTextFile(`soos-summary-${exportTimestamp()}.txt`, buildSummaryReport(report, context));
 }
