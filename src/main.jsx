@@ -152,44 +152,52 @@ function App() {
         ref={workspacePanelRef}
       >
       <div className="workspace-view" hidden={activeView !== "scan"}>
-        <ScanLaunchPanel
-          t={t}
-          settings={scanSettings}
-          runner={auditRunner}
-          onSubmit={runAudit}
-          onControl={(action) => auditRunner.control(action).catch((err) => setError(formatApiError(err)))}
-        />
+        <ErrorBoundary panel>
+          <ScanLaunchPanel
+            t={t}
+            settings={scanSettings}
+            runner={auditRunner}
+            onSubmit={runAudit}
+            onControl={(action) => auditRunner.control(action).catch((err) => setError(formatApiError(err)))}
+          />
+        </ErrorBoundary>
       </div>
 
       <div className="workspace-view" hidden={activeView !== "settings"}>
-        <ScanSettingsPanel
-          t={t}
-          language={language}
-          settings={scanSettings}
-          onDeleted={() => {
-            scanSettings.reset();
-            reportHistory.reset();
-            gsc.reset();
-            retainedJobs.reset();
-            setError("");
-            auditRunner.reset();
-          }}
-        />
+        <ErrorBoundary panel>
+          <ScanSettingsPanel
+            t={t}
+            language={language}
+            settings={scanSettings}
+            onDeleted={() => {
+              scanSettings.reset();
+              reportHistory.reset();
+              gsc.reset();
+              retainedJobs.reset();
+              setError("");
+              auditRunner.reset();
+            }}
+          />
+        </ErrorBoundary>
       </div>
 
       <div className="workspace-view" hidden={activeView !== "google"}>
-        <GoogleWorkspace gsc={gsc} report={reportHistory.report} language={language} />
+        <ErrorBoundary panel>
+          <GoogleWorkspace gsc={gsc} report={reportHistory.report} language={language} />
+        </ErrorBoundary>
       </div>
 
       <div className="workspace-view" hidden={activeView !== "history"}>
-        <HistoryWorkspace
-          retainedJobs={retainedJobs}
-          reportHistory={reportHistory}
-          scanSettings={scanSettings}
-          auditRunner={auditRunner}
-          t={t}
-          onError={setError}
-        />
+        <ErrorBoundary panel>
+          <HistoryWorkspace
+            retainedJobs={retainedJobs}
+            reportHistory={reportHistory}
+            scanSettings={scanSettings}
+            auditRunner={auditRunner}
+            t={t}
+            onError={setError}
+          />
+        </ErrorBoundary>
       </div>
 
       {error ? <div className="error" role="alert">{error}</div> : null}

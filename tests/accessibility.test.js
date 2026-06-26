@@ -12,6 +12,7 @@ const [
   importSource,
   paginationSource,
   reportUiSource,
+  errorBoundarySource,
   inspectionDiagnosticsSource,
   styles,
 ] = await Promise.all([
@@ -24,6 +25,7 @@ const [
   fs.readFile(new URL("../src/components/SearchConsoleImport.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/ResultPagination.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/ReportUi.jsx", import.meta.url), "utf8"),
+  fs.readFile(new URL("../src/components/ErrorBoundary.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/UrlInspectionDiagnostics.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
 ]);
@@ -60,6 +62,7 @@ assert.match(findingsSource, /role="group" aria-label=\{t\.urlFindings\}/);
 assert.match(findingsSource, /role="status" aria-live="polite"/);
 assert.match(findingsSource, /<ResultPagination/);
 assert.match(mainSource, /className="error" role="alert"/);
+assert.match(mainSource, /<ErrorBoundary panel>/);
 assert.match(mainSource, /Symbol\.for\("soos\.reactRoot"\)/);
 assert.match(mainSource, /reactRootElement\[reactRootKey\]/);
 assert.match(configSource, /aria-controls="gsc-oauth-help"/);
@@ -76,6 +79,9 @@ assert.match(importSource, /role="alert"/);
 assert.match(paginationSource, /aria-live="polite" aria-atomic="true"/);
 assert.match(paginationSource, /aria-label=\{`\$\{copy\.previousPage\}: \$\{label\}`\}/);
 assert.match(reportUiSource, /aria-hidden="true" focusable="false"/);
+assert.match(errorBoundarySource, /this\.props\.panel/);
+assert.match(errorBoundarySource, /className="panel panel-error" role="alert"/);
+assert.match(errorBoundarySource, /this\.setState\(\{ error: null \}\)/);
 assert.match(inspectionDiagnosticsSource, /role="table"/);
 assert.match(inspectionDiagnosticsSource, /role="columnheader"/);
 assert.match(inspectionDiagnosticsSource, /role="cell"/);
@@ -83,6 +89,7 @@ assert.match(inspectionDiagnosticsSource, /aria-rowindex=/);
 assert.match(styles, /\.skip-link:focus/);
 assert.match(styles, /button:focus-visible/);
 assert.match(styles, /\.workspace-panel:focus-visible/);
+assert.match(styles, /\.panel-error/);
 assert.match(styles, /\.url-alignment-table:focus-visible/);
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 

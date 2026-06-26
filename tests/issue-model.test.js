@@ -72,6 +72,12 @@ const issues = normalizeReportIssues(report, {
       verdict: "FAIL",
       coverageState: "Crawled - currently not indexed",
     },
+    {
+      ok: true,
+      url: "https://example.com/not-indexed-2",
+      verdict: "FAIL",
+      coverageState: "Discovered - currently not indexed",
+    },
   ],
   searchInsights: [
     {
@@ -83,6 +89,15 @@ const issues = normalizeReportIssues(report, {
       impressions: 300,
       clicks: 1,
     },
+    {
+      type: "cannibalization",
+      severity: "warning",
+      title: "Multiple pages compete for one query intent",
+      detail: "seo tools",
+      metrics: "https://example.com/tools (500 impressions) | https://example.com/seo-tools (220 impressions)",
+      impressions: 720,
+      clicks: 18,
+    },
   ],
 });
 
@@ -92,6 +107,7 @@ const titleIssue = issues.find((issue) => issue.type === "title_short");
 const googleCanonicalIssue = issues.find((issue) => issue.type === "google_selected_canonical_differs");
 const googleNotIndexedIssue = issues.find((issue) => issue.type === "google_not_indexed");
 const searchInsightIssue = issues.find((issue) => issue.type === "low_ctr");
+const cannibalizationIssue = issues.find((issue) => issue.type === "cannibalization");
 
 assert.equal(robotsIssue.category, "crawlability");
 assert.equal(robotsIssue.severity, "critical");
@@ -108,10 +124,20 @@ assert.equal(googleCanonicalIssue.confidence, "confirmed");
 assert.equal(googleCanonicalIssue.sourceCapabilities.includes("google"), true);
 assert.equal(googleCanonicalIssue.verification[0].requiresGoogleData, true);
 assert.equal(googleNotIndexedIssue.impact.includes("inspected URLs"), true);
+assert.equal(googleNotIndexedIssue.affectedUrlCount, 2);
+assert.deepEqual(googleNotIndexedIssue.affectedUrls.sort(), [
+  "https://example.com/not-indexed",
+  "https://example.com/not-indexed-2",
+]);
 assert.equal(searchInsightIssue.category, "search_visibility");
 assert.equal(searchInsightIssue.confidence, "confirmed");
 assert.equal(searchInsightIssue.sourceCapabilities.includes("google"), true);
 assert.equal(searchInsightIssue.searchVisibility.impressions, 300);
+assert.equal(cannibalizationIssue.affectedUrlCount, 2);
+assert.deepEqual(cannibalizationIssue.affectedUrls.sort(), [
+  "https://example.com/seo-tools",
+  "https://example.com/tools",
+]);
 
 assert.equal(issues[0].priorityScore >= robotsIssue.priorityScore, true);
 assert.equal(robotsIssue.priorityScore > titleIssue.priorityScore, true);

@@ -20,6 +20,7 @@ function issueBadgeSeverity(severity) {
 }
 
 function FixPlan({ issues, closedIssues, t, onSelectIssue, onStatusChange }) {
+  const [showAll, setShowAll] = useState(false);
   if (!issues?.length && !closedIssues?.length) {
     return (
       <section className="panel backlog">
@@ -28,6 +29,8 @@ function FixPlan({ issues, closedIssues, t, onSelectIssue, onStatusChange }) {
       </section>
     );
   }
+  const visibleIssues = showAll ? issues : issues.slice(0, 8);
+  const hiddenIssueCount = Math.max(0, issues.length - visibleIssues.length);
   function exportFixPlan() {
     downloadCsvFile(
       `soos-fix-plan-${new Date().toISOString().slice(0, 19).replaceAll(":", "-")}.csv`,
@@ -45,7 +48,7 @@ function FixPlan({ issues, closedIssues, t, onSelectIssue, onStatusChange }) {
       </div>
       {issues?.length ? (
         <div className="tasks">
-          {issues.slice(0, 8).map((issue) => (
+          {visibleIssues.map((issue) => (
           <article className={`task task-${issueBadgeSeverity(issue.severity)}`} key={issue.fingerprint}>
             <div className="task-top">
               <Badge severity={issueBadgeSeverity(issue.severity)}>{issue.severity}</Badge>
@@ -62,6 +65,14 @@ function FixPlan({ issues, closedIssues, t, onSelectIssue, onStatusChange }) {
               <strong>{t.impact}</strong>
               <small>{issue.impact}</small>
             </div>
+            {issue.affectedUrls?.length ? (
+              <div className="samples">
+                <strong>{t.sampleUrls}</strong>
+                {issue.affectedUrls.slice(0, 5).map((url, index) => (
+                  <small key={`${issue.fingerprint}-affected-${index}`}>{url}</small>
+                ))}
+              </div>
+            ) : null}
             <div className="fix-plan-block">
               <strong>{t.fixSteps}</strong>
               {issue.recommendedFix.steps.slice(0, 3).map((step, index) => (
@@ -95,6 +106,16 @@ function FixPlan({ issues, closedIssues, t, onSelectIssue, onStatusChange }) {
             </button>
           </article>
           ))}
+          {issues.length > 8 ? (
+            <button
+              className="impact-filter show-more-issues"
+              type="button"
+              aria-expanded={showAll}
+              onClick={() => setShowAll((value) => !value)}
+            >
+              {showAll ? t.showFewerIssues : `${t.showAllIssues} (${hiddenIssueCount})`}
+            </button>
+          ) : null}
         </div>
       ) : <div className="clean"><CheckCircle2 size={20} /><span>{t.noOpenIssues}</span></div>}
       {closedIssues?.length ? (

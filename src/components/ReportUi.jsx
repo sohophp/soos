@@ -32,11 +32,17 @@ export function Stat({ label, value, tone }) {
   );
 }
 
-export function ReportEmptyState({ t }) {
+export function ReportEmptyState({ t, onStartScan }) {
   return (
     <section className="empty">
       <FileSearch size={42} aria-hidden="true" focusable="false" />
-      <p>{t.placeholder}</p>
+      <h2>{t.emptyReportTitle}</h2>
+      <p>{t.emptyReportHelp}</p>
+      {onStartScan ? (
+        <button className="export-button" type="button" onClick={onStartScan}>
+          {t.emptyReportAction}
+        </button>
+      ) : null}
     </section>
   );
 }

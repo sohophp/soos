@@ -82,6 +82,11 @@ const exportContext = {
     coverageState: "Crawled - currently not indexed",
     googleCanonical: "https://example.com/google-canonical",
     userCanonical: "https://example.com/final",
+  }, {
+    ok: true,
+    url: "https://example.com/inspection-only",
+    verdict: "FAIL",
+    coverageState: "Discovered - currently not indexed",
   }],
   searchInsights: [{
     type: "low_ctr",
@@ -118,11 +123,20 @@ for (const section of [
   assert.match(summary, new RegExp(section));
 }
 assert.match(summary, /Health score: 75/);
+assert.match(summary, /Evidence limits/);
+assert.match(summary, /Trust level:/);
+assert.match(summary, /Do not conclude:/);
 assert.match(summary, /Allow URL/);
 assert.match(summary, /Sitemap URLs blocked by robots\.txt/);
 const googleSummary = buildSummaryReport(report, { gscRows, ...exportContext });
 assert.match(googleSummary, /Google reports affected URLs are not indexed/);
 assert.match(googleSummary, /High impressions with low CTR/);
+assert.match(googleSummary, /External evidence URLs/);
+assert.match(googleSummary, /https:\/\/example\.com\/gsc-only \(Search Console:/);
+assert.match(googleSummary, /https:\/\/example\.com\/inspection-only \(URL Inspection:/);
+const connectedNoRowsSummary = buildSummaryReport(report, { gscStatus: { configured: true }, gscRows: [] });
+assert.doesNotMatch(connectedNoRowsSummary, /Google Search Console data was not connected/);
+assert.match(connectedNoRowsSummary, /search_console/);
 
 const [mainSource, reportSource, overviewSource] = await Promise.all([
   fs.readFile(new URL("../src/main.jsx", import.meta.url), "utf8"),
@@ -137,7 +151,9 @@ assert.match(reportSource, /<GoogleOverview report=\{report\}/);
 assert.match(reportSource, /downloadSummaryReport\(report, \{/);
 assert.match(reportSource, /downloadAuditCsv\(report, gsc\.rows, pages, \{/);
 assert.match(reportSource, /downloadHtmlReport\(report, gsc\.rows, language, \{/);
+assert.match(reportSource, /gscStatus: gsc\.status/);
 assert.match(reportSource, /inspectionResults,/);
+assert.match(reportSource, /inspectionCandidateCount: inspectionCandidates\.length/);
 assert.match(reportSource, /searchInsights: gsc\.searchInsights/);
 assert.match(overviewSource, /buildSearchVisibility\(report\)/);
 assert.match(overviewSource, /buildGscOpportunities\(report, rows \|\| \[\], language\)/);

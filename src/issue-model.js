@@ -273,17 +273,26 @@ function toSeoIssue(group, context = {}) {
 export function normalizeReportIssues(report, context = {}) {
   const groups = groupPageIssues(report);
   for (const issue of normalizeGoogleInspectionIssues(report, context.inspectionResults || [])) {
-    groups.set(`${issue.category}:${issue.type}`, {
-      type: issue.type,
-      category: issue.category,
-      rawSeverity: issue.severity,
-      urls: new Set(issue.affectedUrls),
-      evidence: issue.evidence,
-      sourceCapabilities: issue.sourceCapabilities,
-      title: issue.title,
-      summary: issue.summary,
-      impact: issue.impact,
-    });
+    const key = `${issue.category}:${issue.type}`;
+    const existing = groups.get(key);
+    if (existing) {
+      for (const url of issue.affectedUrls || []) existing.urls.add(url);
+      existing.evidence = [...(existing.evidence || []), ...(issue.evidence || [])].slice(0, 50);
+      existing.sourceCapabilities = [...new Set([...(existing.sourceCapabilities || []), ...(issue.sourceCapabilities || [])])];
+      if (issue.severity === "critical") existing.rawSeverity = "critical";
+    } else {
+      groups.set(key, {
+        type: issue.type,
+        category: issue.category,
+        rawSeverity: issue.severity,
+        urls: new Set(issue.affectedUrls),
+        evidence: issue.evidence,
+        sourceCapabilities: issue.sourceCapabilities,
+        title: issue.title,
+        summary: issue.summary,
+        impact: issue.impact,
+      });
+    }
   }
   for (const issue of normalizeSearchInsightIssues(context.searchInsights || [])) {
     groups.set(`${issue.category}:${issue.type}:${stablePart(issue.evidence[0]?.detail)}`, {
@@ -358,9 +367,30 @@ export function normalizeGoogleInspectionIssues(report, inspectionResults = []) 
   return issues;
 }
 
+function extractInsightUrls(insight = {}) {
+  const candidates = [
+    ...(Array.isArray(insight.urls) ? insight.urls : []),
+    insight.page,
+  ];
+  const text = [insight.detail, insight.metrics].filter(Boolean).join(" ");
+  const matches = text.match(/https?:\/\/[^\s),;|]+/g) || [];
+  candidates.push(...matches);
+  const seen = new Set();
+  return candidates
+    .map((url) => String(url || "").trim().replace(/[.,;:]+$/, ""))
+    .filter(Boolean)
+    .filter((url) => {
+      const key = normalizeReportUrl(url) || url;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
 export function normalizeSearchInsightIssues(insights = []) {
   return (insights || []).map((insight) => {
-    const url = insight.page || String(insight.detail || "").match(/https?:\/\/\S+/)?.[0] || "";
+    const urls = extractInsightUrls(insight);
+    const url = urls[0] || "";
     const category = "search_visibility";
     const type = insight.type || "search_visibility";
     return {
@@ -370,7 +400,7 @@ export function normalizeSearchInsightIssues(insights = []) {
       title: insight.title || TITLE_BY_TYPE[type] || "Search visibility opportunity",
       summary: insight.detail || "Search Console data suggests a search visibility opportunity.",
       impact: impactFor(category, type),
-      affectedUrls: url ? [url] : [],
+      affectedUrls: urls,
       sourceCapabilities: ["google"],
       searchVisibility: {
         impressions: Number(insight.impressions || insight.evidence?.minimumImpressions || 0),

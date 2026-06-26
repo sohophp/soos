@@ -95,7 +95,7 @@ export function PageSpeedInsightsPanel({ report, language }) {
   const [apiKey, setApiKey] = useState(readSessionKey);
   const [url, setUrl] = useState(urls[0] || report?.input?.siteRootUrl || "");
   const [strategy, setStrategy] = useState("mobile");
-  const [includeCrux, setIncludeCrux] = useState(true);
+  const [includeCrux, setIncludeCrux] = useState(false);
   const [result, setResult] = useState(null);
   const [cruxResult, setCruxResult] = useState(null);
   const [loading, setLoading] = useState(false);

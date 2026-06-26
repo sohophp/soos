@@ -131,6 +131,7 @@ test("renders actionable PageSpeed and CrUX diagnostics", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "PageSpeed Insights" })).toBeVisible();
   await page.getByLabel("Google API key").fill("browser-session-key");
+  await page.getByRole("checkbox", { name: "Also load dedicated CrUX field data" }).check();
   await page.getByRole("button", { name: "Run PageSpeed", exact: true }).click();
 
   await expect(page.getByText("Core Web Vitals failed", { exact: true })).toBeVisible();
@@ -166,6 +167,7 @@ test("turns a disabled CrUX API response into an enable and retry action", async
 
   await page.goto("/");
   await page.getByLabel("Google API key").fill("browser-session-key");
+  await page.getByRole("checkbox", { name: "Also load dedicated CrUX field data" }).check();
   await page.getByRole("button", { name: "Run PageSpeed", exact: true }).click();
 
   await expect(page.getByText("Chrome UX Report API is not enabled for this Google Cloud project.", { exact: true })).toBeVisible();

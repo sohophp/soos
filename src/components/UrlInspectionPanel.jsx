@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { formatApiError } from "../api-client.js";
 import { inspectGscUrls } from "../gsc-client.js";
 import { gscDataText, inspectionDiagnosisText } from "../i18n.js";
@@ -22,14 +22,17 @@ export function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRo
   const [result, setResult] = useState(null);
   const [resultPageNumber, setResultPageNumber] = useState(1);
   const [error, setError] = useState("");
+  const requestIdRef = useRef(0);
   const candidates = useMemo(
     () => buildUrlInspectionCandidates(report, gscRows, comparisonEntry),
     [comparisonEntry, gscRows, report],
   );
   useEffect(() => {
+    requestIdRef.current += 1;
     setResult(null);
     setResultPageNumber(1);
     setError("");
+    setLoading(false);
   }, [report?.scannedAt, siteUrl]);
   useEffect(() => {
     onResultsChange?.(result?.results || []);
@@ -97,19 +100,23 @@ export function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRo
   })[reason] || reason;
 
   async function runInspection() {
-    if (!siteUrl.trim()) {
+    const requestedSiteUrl = siteUrl.trim();
+    if (!requestedSiteUrl) {
       setError(copy.inspectPropertyFirst);
       return;
     }
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError("");
     try {
-      const body = await inspectGscUrls(nextUrls, siteUrl);
+      const body = await inspectGscUrls(nextUrls, requestedSiteUrl);
+      if (requestId !== requestIdRef.current || siteUrl.trim() !== requestedSiteUrl) return;
       setResult((current) => mergeInspectionBatch(current, body, nextCandidates));
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       setError(formatApiError(err));
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }
 

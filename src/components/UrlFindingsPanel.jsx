@@ -14,6 +14,7 @@ import {
   urlFilterCounts,
 } from "../report-filters.js";
 import { formatText, workspaceText } from "../i18n.js";
+import { normalizeReportUrl } from "../url-policy.js";
 import { ResultPagination } from "./ResultPagination.jsx";
 
 const severityLabels = { critical: "Critical", warning: "Warning", notice: "Notice" };
@@ -178,6 +179,20 @@ export function UrlFindingsPanel({
     sourceSets,
     comparisonEntry,
   })), [changeFilter, comparisonEntry, filter, issueFilter, query, report, sourceFilter, sourceSets]);
+  const externalIssueUrls = useMemo(() => {
+    if (!issueFilter?.affectedUrls?.length) return [];
+    const scannedKeys = new Set((report?.pages || []).flatMap((page) => [
+      normalizeReportUrl(page.url),
+      normalizeReportUrl(page.finalUrl),
+    ]).filter(Boolean));
+    const seen = new Set();
+    return issueFilter.affectedUrls.filter((url) => {
+      const key = normalizeReportUrl(url);
+      if (!key || scannedKeys.has(key) || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [issueFilter, report]);
   const pagination = paginateUrlFindings(pages, pageNumber);
   const { pageCount } = pagination;
   const visiblePages = pagination.items;
@@ -196,6 +211,24 @@ export function UrlFindingsPanel({
     setSourceFilter("all");
     setChangeFilter("all");
     setQuery("");
+  }
+
+  function exportCurrentCsv() {
+    const externalPages = externalIssueUrls.map((url) => ({
+      url,
+      finalUrl: "",
+      status: "",
+      redirectChain: [],
+      canonical: "",
+      googleReasons: [],
+      issues: [{
+        severity: "notice",
+        type: "external_evidence_url",
+        message: t.externalAffectedUrls,
+        detail: t.externalAffectedUrlsHelp,
+      }],
+    }));
+    onExportCsv([...pages, ...externalPages]);
   }
 
   return (
@@ -256,7 +289,7 @@ export function UrlFindingsPanel({
             />
             <button className="export-button" type="button" onClick={onExportSummary}>{t.exportSummary}</button>
             <button className="export-button" type="button" onClick={onExportHtml}>{workspaceCopy.exportHtml}</button>
-            <button className="export-button" type="button" onClick={() => onExportCsv(pages)}>{t.exportCsv}</button>
+            <button className="export-button" type="button" onClick={exportCurrentCsv}>{t.exportCsv}</button>
             {filter !== "all" || issueFilter || sourceFilter !== "all" || changeFilter !== "all" || query ? (
               <button className="export-button" type="button" onClick={clearFilters}>{workspaceCopy.clearFilters}</button>
             ) : null}
@@ -266,6 +299,17 @@ export function UrlFindingsPanel({
       <small className="findings-match-count" role="status" aria-live="polite">
         {pages.length} {workspaceCopy.matchingUrls}
       </small>
+      {externalIssueUrls.length ? (
+        <aside className="external-affected-urls" aria-label={t.externalAffectedUrls}>
+          <strong>{t.externalAffectedUrls}: {externalIssueUrls.length}</strong>
+          <small>{t.externalAffectedUrlsHelp}</small>
+          <div>
+            {externalIssueUrls.slice(0, 12).map((url, index) => (
+              <small key={`${url}-${index}`}>{url}</small>
+            ))}
+          </div>
+        </aside>
+      ) : null}
       <div className="rows">
         {visiblePages.length
           ? visiblePages.map((page, index) => (

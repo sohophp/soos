@@ -107,13 +107,13 @@ function ReportCoveragePanel({ coverage, t }) {
       <div className="coverage-limits">
         <div>
           <strong>{t.coverageLimitations}</strong>
-          {(coverage.limitations.length ? coverage.limitations : [t.coverageNoLimitations]).slice(0, 4).map((item, index) => (
+          {(coverage.limitations.length ? coverage.limitations : [t.coverageNoLimitations]).map((item, index) => (
             <small key={`${item}-${index}`}>{localizeLine(item)}</small>
           ))}
         </div>
         <div>
           <strong>{t.coverageCannotConclude}</strong>
-          {(coverage.cannotConclude.length ? coverage.cannotConclude : [t.coverageNoUnsafeConclusions]).slice(0, 4).map((item, index) => (
+          {(coverage.cannotConclude.length ? coverage.cannotConclude : [t.coverageNoUnsafeConclusions]).map((item, index) => (
             <small key={`${item}-${index}`}>{localizeLine(item)}</small>
           ))}
         </div>

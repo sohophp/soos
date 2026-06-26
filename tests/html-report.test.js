@@ -34,7 +34,10 @@ const html = buildStandaloneHtmlReport({
   }],
 }, {
   language: "zh-CN",
-  gscRows: [{ page: "https://example.com/?x=<script>alert(1)</script>", clicks: 2, impressions: 50, position: 6 }],
+  gscRows: [
+    { page: "https://example.com/?x=<script>alert(1)</script>", clicks: 2, impressions: 50, position: 6 },
+    { page: "https://example.com/gsc-only", clicks: 1, impressions: 20, position: 9 },
+  ],
   inspectionResults: [{
     ok: true,
     url: "https://example.com/?x=<script>alert(1)</script>",
@@ -42,6 +45,11 @@ const html = buildStandaloneHtmlReport({
     coverageState: "Crawled - currently not indexed",
     googleCanonical: "https://example.com/google",
     userCanonical: "https://example.com/",
+  }, {
+    ok: true,
+    url: "https://example.com/inspection-only",
+    verdict: "FAIL",
+    coverageState: "Discovered - currently not indexed",
   }],
   searchInsights: [{
     type: "low_ctr",
@@ -59,6 +67,15 @@ assert.match(html, /Crawled - currently not indexed/);
 assert.match(html, /https:\/\/example\.com\/google/);
 assert.match(html, /搜索机会/);
 assert.match(html, /low_ctr/);
+assert.match(html, /证据边界/);
+assert.match(html, /Trust level:/);
+assert.match(html, /不能据此断言/);
+assert.match(html, /外部证据网址/);
+assert.match(html, /https:\/\/example\.com\/gsc-only/);
+assert.match(html, /Search Console/);
+assert.match(html, /https:\/\/example\.com\/inspection-only/);
+assert.match(html, /URL Inspection/);
+assert.match(html, /不在当前已扫描 URL 列表中/);
 assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
 assert.doesNotMatch(html, /href="javascript:/);
 assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);

@@ -46,13 +46,28 @@ export class ErrorBoundary extends React.Component {
   render() {
     if (!this.state.error) return this.props.children;
     const text = copy[browserLanguage()];
+    if (this.props.panel) {
+      return (
+        <section className="panel panel-error" role="alert">
+          <AlertTriangle size={22} aria-hidden="true" />
+          <div>
+            <h2>{text.title}</h2>
+            <p>{text.detail}</p>
+            <button type="button" onClick={() => this.setState({ error: null })}>
+              <RotateCcw size={16} aria-hidden="true" />
+              {text.reload}
+            </button>
+          </div>
+        </section>
+      );
+    }
     return (
       <main className="fatal-error">
-        <AlertTriangle size={28} />
+        <AlertTriangle size={28} aria-hidden="true" />
         <h1>{text.title}</h1>
         <p>{text.detail}</p>
         <button type="button" onClick={() => window.location.reload()}>
-          <RotateCcw size={16} />
+          <RotateCcw size={16} aria-hidden="true" />
           {text.reload}
         </button>
       </main>

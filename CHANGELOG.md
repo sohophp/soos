@@ -20,12 +20,15 @@ All notable changes to soos will be documented in this file.
 - Restored Search Analytics opportunity handoff into the Issues Fix Plan and made Google overview opportunity keys unique when the same URL appears in multiple findings.
 - Hardened Google Sitemap, property, PageSpeed, and scan-summary list rendering against duplicate real-world values so React does not drop or duplicate diagnostic rows.
 - Fixed Fix Plan URL filtering for Google Inspection and Search Analytics issues so affected URLs are shown even when the finding does not originate from local page issue types.
+- Added expandable Fix Plan task lists and affected-URL samples on each task so large reports do not hide remediation work after the first eight issues.
 - Extended URL CSV exports with the current URL Inspection verdict, coverage state, Google/user canonicals, and Search Analytics opportunity evidence.
 - Extended standalone HTML reports with loaded URL Inspection and Search Analytics evidence so shared reports match the in-app diagnosis.
 - Added the unified prioritized Fix Plan to text summary exports, including Google-confirmed and Search Analytics-derived evidence when loaded.
 - Clarified report coverage for disconnected users by stating that local sitemap, robots, canonical, hreflang, structured-data, and HTML diagnostics still run without Search Console.
 - Reframed the first screen as a technical SEO audit instead of a Google crawl-only tool, with Google data described as optional supporting evidence.
 - Treated CrUX API disabled responses consistently across PageSpeed and dedicated CrUX requests, and stabilized URL Inspection queue keys when duplicate URLs enter the candidate batch.
+- Made dedicated CrUX loading opt-in by default so ordinary PageSpeed runs do not require Chrome UX Report API enablement.
+- Added local panel error boundaries around scan, Google, report, history, and settings views so one failed diagnostic panel does not replace the whole app.
 
 ### PageSpeed Insights
 

@@ -1,4 +1,5 @@
 import { uniqueGscRows } from "./gsc-summary.js";
+import { buildReportCoverage } from "./report-coverage.js";
 import { normalizeReportUrl } from "./url-policy.js";
 
 export function escapeHtml(value) {
@@ -33,7 +34,9 @@ const COPY = {
     generated: "Generated", scanned: "Scanned", input: "Input", sitemap: "Sitemap", robots: "Robots",
     limits: "Limits", findings: "URL evidence", status: "Status", finalUrl: "Final URL", canonical: "Canonical",
     issues: "Issues", google: "Google outcomes", gsc: "Search performance", inspection: "URL Inspection",
-    searchInsights: "Search opportunities", noIssues: "No detected issues",
+    searchInsights: "Search opportunities", noIssues: "No detected issues", evidenceLimits: "Evidence limits",
+    cannotConclude: "Do not conclude", externalEvidence: "External evidence URLs",
+    externalEvidenceHelp: "These URLs came from Google evidence but are not present in the current scanned URL list.",
     evidenceNote: "This report reflects the configured scan scope and the evidence available at scan time.",
   },
   "zh-CN": {
@@ -42,7 +45,9 @@ const COPY = {
     generated: "生成时间", scanned: "扫描时间", input: "输入", sitemap: "Sitemap", robots: "Robots",
     limits: "限制", findings: "网址证据", status: "状态", finalUrl: "最终网址", canonical: "Canonical",
     issues: "问题", google: "Google 结果", gsc: "搜索表现", inspection: "网址检查",
-    searchInsights: "搜索机会", noIssues: "未发现问题",
+    searchInsights: "搜索机会", noIssues: "未发现问题", evidenceLimits: "证据边界",
+    cannotConclude: "不能据此断言", externalEvidence: "外部证据网址",
+    externalEvidenceHelp: "这些网址来自 Google 证据，但不在当前已扫描 URL 列表中。",
     evidenceNote: "本报告仅反映配置的扫描范围和扫描时可获得的证据。",
   },
   "zh-TW": {
@@ -51,7 +56,9 @@ const COPY = {
     generated: "產生時間", scanned: "掃描時間", input: "輸入", sitemap: "Sitemap", robots: "Robots",
     limits: "限制", findings: "網址證據", status: "狀態", finalUrl: "最終網址", canonical: "Canonical",
     issues: "問題", google: "Google 結果", gsc: "搜尋成效", inspection: "網址檢查",
-    searchInsights: "搜尋機會", noIssues: "未發現問題",
+    searchInsights: "搜尋機會", noIssues: "未發現問題", evidenceLimits: "證據邊界",
+    cannotConclude: "不能據此斷言", externalEvidence: "外部證據網址",
+    externalEvidenceHelp: "這些網址來自 Google 證據，但不在目前已掃描 URL 清單中。",
     evidenceNote: "本報告僅反映設定的掃描範圍和掃描時可取得的證據。",
   },
 };
@@ -141,6 +148,29 @@ export function buildStandaloneHtmlReport(report, options = {}) {
       .map((item) => [normalizeReportUrl(item.url), item]),
   );
   const pages = report?.pages || [];
+  const scannedKeys = new Set(pages.flatMap((page) => [
+    normalizeReportUrl(page.url),
+    normalizeReportUrl(page.finalUrl || ""),
+  ]).filter(Boolean));
+  const externalByKey = new Map();
+  for (const row of uniqueGscRows(options.gscRows || [])) {
+    if (!row.key || scannedKeys.has(row.key)) continue;
+    externalByKey.set(row.key, {
+      url: row.page || row.url || row.key,
+      source: "Search Console",
+      detail: `${row.clicks ?? 0} clicks · ${row.impressions ?? 0} impressions · position ${row.position ?? "-"}`,
+    });
+  }
+  for (const item of options.inspectionResults || []) {
+    const key = normalizeReportUrl(item?.url || "");
+    if (!key || scannedKeys.has(key) || externalByKey.has(key)) continue;
+    externalByKey.set(key, {
+      url: item.url,
+      source: "URL Inspection",
+      detail: [item.verdict, item.coverageState || item.error].filter(Boolean).join(" · ") || "-",
+    });
+  }
+  const externalEvidenceRows = [...externalByKey.values()];
   const config = {
     contentChecks: report?.options?.contentChecks,
     performanceChecks: report?.options?.performanceChecks,
@@ -149,6 +179,20 @@ export function buildStandaloneHtmlReport(report, options = {}) {
     urlQueryPolicy: report?.options?.urlQueryPolicy,
     trailingSlashPolicy: report?.options?.trailingSlashPolicy,
   };
+  const coverage = buildReportCoverage(report, {
+    gscConnected: Boolean(options.gscRows?.length || options.gscStatus?.configured),
+    gscStatus: options.gscStatus,
+    inspectionResults: options.inspectionResults || [],
+    inspectionCandidateCount: options.inspectionCandidateCount,
+    pageSpeedUsed: options.pageSpeedUsed,
+    cruxUsed: options.cruxUsed,
+  });
+  const coverageItems = [
+    `Trust level: ${coverage.trustLevel}`,
+    `Evidence sources: ${coverage.trustSignals.join(" | ") || "none"}`,
+    ...coverage.limitations.map((item) => `Limit: ${item}`),
+    ...coverage.cannotConclude.map((item) => `${copy.cannotConclude}: ${item}`),
+  ];
   const pageRows = pages.map((page) =>
     pageEvidence(
       page,
@@ -204,6 +248,15 @@ export function buildStandaloneHtmlReport(report, options = {}) {
       [copy.robots]: report?.input?.robotsUrl,
       [copy.limits]: `${report?.limits?.maxUrls ?? "-"} URLs / ${report?.limits?.maxSitemaps ?? "-"} sitemaps`,
     })}</dl>
+    <h2>${escapeHtml(copy.evidenceLimits)}</h2>
+    <ul>${coverageItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+    ${externalEvidenceRows.length ? `
+      <h2>${escapeHtml(copy.externalEvidence)} (${externalEvidenceRows.length})</h2>
+      <p class="meta">${escapeHtml(copy.externalEvidenceHelp)}</p>
+      <ul>${externalEvidenceRows.slice(0, 50).map((row) => `
+        <li>${escapeHtml(row.url)} · ${escapeHtml(row.source)} · ${escapeHtml(row.detail)}</li>
+      `).join("")}</ul>
+    ` : ""}
     <h2>${escapeHtml(copy.configuration)}</h2>
     <dl>${definitionRows(config)}</dl>
     <h2>${escapeHtml(copy.findings)} (${pages.length})</h2>

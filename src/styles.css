@@ -99,6 +99,37 @@ a:focus-visible,
   gap: 7px;
 }
 
+.panel-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border-color: #e5b9ae;
+  background: #fff8f6;
+  color: #342521;
+}
+
+.panel-error h2,
+.panel-error p {
+  margin: 0;
+}
+
+.panel-error h2 {
+  font-size: 18px;
+}
+
+.panel-error p {
+  margin-top: 4px;
+  color: #6f5650;
+  line-height: 1.55;
+}
+
+.panel-error button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+}
+
 .top {
   display: flex;
   align-items: end;
@@ -1069,6 +1100,11 @@ a:focus-visible,
   margin-right: 8px;
 }
 
+.show-more-issues {
+  justify-self: center;
+  min-width: min(260px, 100%);
+}
+
 .closed-issue-decisions {
   margin-top: 14px;
   border-top: 1px solid #e7ece5;
@@ -1352,6 +1388,33 @@ a:focus-visible,
   display: block;
   padding: 0 0 10px;
   color: #687169;
+}
+
+.external-affected-urls {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid #e0d4a8;
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+.external-affected-urls > small {
+  color: #6d6040;
+  line-height: 1.45;
+}
+
+.external-affected-urls > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.external-affected-urls > div small {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  color: #352d17;
 }
 
 .export-button {

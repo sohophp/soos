@@ -15,9 +15,16 @@ assert.match(source, /aria-controls=\{detailId\}/);
 assert.match(source, /aria-pressed=\{filter === item\}/);
 assert.match(source, /<ResultPagination/);
 assert.match(source, /onIssueFilterChange\(null\)/);
-assert.match(source, /onExportCsv\(pages\)/);
+assert.match(source, /function exportCurrentCsv\(\)/);
+assert.match(source, /external_evidence_url/);
+assert.match(source, /onExportCsv\(\[\.\.\.pages, \.\.\.externalPages\]\)/);
+assert.doesNotMatch(source, /onExportCsv\(pages\)/);
 assert.match(source, /paginateUrlFindings\(pages, pageNumber\)/);
 assert.match(source, /issueUrls: issueFilter\?\.affectedUrls \|\| \[\]/);
+assert.match(source, /normalizeReportUrl/);
+assert.match(source, /externalIssueUrls/);
+assert.match(source, /className="external-affected-urls"/);
+assert.match(source, /t\.externalAffectedUrlsHelp/);
 assert.doesNotMatch(source, /key=\{page\.url\}/);
 assert.match(source, /key=\{`\$\{page\.url\}-\$\{page\.finalUrl/);
 

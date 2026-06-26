@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
 import {
   buildSearchAnalyticsChangeInsights,
   buildSearchAnalyticsComparison,
@@ -156,5 +157,13 @@ assert.equal(
   customIntentInsights.some((item) => item.type === "cannibalization" && item.detail.includes("template")),
   false,
 );
+
+const panelSource = await fs.readFile(new URL("../src/components/SearchAnalyticsPanel.jsx", import.meta.url), "utf8");
+assert.match(panelSource, /function resetLocalResults\(\)/);
+assert.match(panelSource, /function changeDimension\(nextDimension\)/);
+assert.match(panelSource, /changeDimension\(event\.target\.value\)/);
+assert.match(panelSource, /if \(summary\?\.dimension === "page_query"\) onInsights\?\.\(insights\)/);
+assert.match(panelSource, /if \(loadedDimension === "page"\) onRows\(loadedRows\)/);
+assert.match(panelSource, /if \(loadedDimension !== "page_query"\) onInsights\?\.\(\[\]\)/);
 
 console.log("search-analytics-panel-tests-passed");

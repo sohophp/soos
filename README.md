@@ -206,7 +206,7 @@ Visitor flow:
 4. If Google shows an unverified-app warning, open the advanced option and continue to soos after confirming you are using the expected soos domain.
 5. Continue through the soos sign-in screen.
 6. Select the permission to view Search Console data for verified sites, then continue.
-7. Return to soos and click `Test API connection`.
+7. Return to soos. The connection summary refreshes automatically; if it does not, close the popup and click `Connect Google Search Console` again.
 
 After OAuth connects, soos loads the Search Console properties available to that Google account. Select a property from the list to switch between URL-prefix and Domain properties without retyping the exact property identifier.
 
@@ -317,7 +317,7 @@ PageSpeed Insights notes:
 
 - The PageSpeed panel appears in a completed scan report and keeps Google Lighthouse lab data separate from soos lightweight HTML performance checks.
 - The selected URL and user-supplied API key pass through the soos API to Google only when the user starts a test. The key is not written to reports, history, logs, `.env`, or Neon.
-- Enable the PageSpeed Insights API for Lighthouse results and the Chrome UX Report API for optional CrUX data. The same session-only key can be used when both APIs are enabled in its Google Cloud project.
+- Enable the PageSpeed Insights API for Lighthouse results. Dedicated CrUX data is optional and off by default; enable Chrome UX Report API only if you choose to load that field-data source. The same session-only key can be used when both APIs are enabled in its Google Cloud project.
 - Dedicated CrUX results show daily-updated 28-day p75 field data, collection dates, and explicit page-to-origin fallback. PageSpeed's legacy field-data copy remains separate because Google has announced its removal.
 - Google documentation: [Get Started](https://developers.google.com/speed/docs/insights/v5/get-started), [runPagespeed API](https://developers.google.com/speed/docs/insights/rest/v5/pagespeedapi/runpagespeed), and [lab vs field data](https://developers.google.com/speed/docs/insights/v5/about).
 - Chrome documentation: [CrUX API](https://developer.chrome.com/docs/crux/api/).

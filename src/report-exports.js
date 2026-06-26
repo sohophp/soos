@@ -2,6 +2,7 @@ import { downloadCsvFile, downloadTextFile } from "./downloads.js";
 import { buildGscRowMap, isTechnicallyIndexablePage, uniqueGscRows } from "./gsc-summary.js";
 import { buildStandaloneHtmlReport } from "./html-report.js";
 import { normalizeReportIssues } from "./issue-model.js";
+import { buildReportCoverage } from "./report-coverage.js";
 import { normalizeReportUrl } from "./url-policy.js";
 
 export function issueCategories(page) {
@@ -70,6 +71,43 @@ function searchInsightEvidenceForPage(page, insights = []) {
 function normalizeExportContext(context) {
   if (Array.isArray(context)) return { searchInsights: context };
   return context && typeof context === "object" ? context : {};
+}
+
+function exportCoverage(report, context) {
+  return buildReportCoverage(report, {
+    gscConnected: Boolean(context.gscRows?.length || context.gscStatus?.configured),
+    gscStatus: context.gscStatus,
+    inspectionResults: context.inspectionResults || [],
+    inspectionCandidateCount: context.inspectionCandidateCount,
+    pageSpeedUsed: context.pageSpeedUsed,
+    cruxUsed: context.cruxUsed,
+  });
+}
+
+function externalEvidenceRows(report, context) {
+  const scannedKeys = new Set((report?.pages || []).flatMap((page) => [
+    normalizeReportUrl(page.url),
+    normalizeReportUrl(page.finalUrl || ""),
+  ]).filter(Boolean));
+  const byKey = new Map();
+  for (const row of uniqueGscRows(context.gscRows || [])) {
+    if (!row.key || scannedKeys.has(row.key)) continue;
+    byKey.set(row.key, {
+      url: row.page || row.url || row.key,
+      source: "Search Console",
+      detail: `${row.clicks ?? 0} clicks, ${row.impressions ?? 0} impressions, position ${row.position ?? "-"}`,
+    });
+  }
+  for (const item of context.inspectionResults || []) {
+    const key = normalizeReportUrl(item?.url || "");
+    if (!key || scannedKeys.has(key) || byKey.has(key)) continue;
+    byKey.set(key, {
+      url: item.url,
+      source: "URL Inspection",
+      detail: [item.verdict, item.coverageState || item.error].filter(Boolean).join(", ") || "-",
+    });
+  }
+  return [...byKey.values()];
 }
 
 export function buildAuditCsvRows(report, gscRows = [], filteredPages = null, context = {}) {
@@ -202,6 +240,7 @@ function appendPrioritizedFixPlan(lines, issues) {
 export function buildSummaryReport(report, context = {}) {
   const exportContext = normalizeExportContext(context);
   const lines = [];
+  const coverage = exportCoverage(report, exportContext);
   const fixPlanIssues = normalizeReportIssues(report, {
     gscRows: exportContext.gscRows || [],
     inspectionResults: exportContext.inspectionResults || [],
@@ -226,6 +265,24 @@ export function buildSummaryReport(report, context = {}) {
   lines.push(`- High-risk Google blockers: ${report.summary?.googleBlockedCount ?? 0}`);
   lines.push(`- Issues: critical ${report.summary?.issueCounts?.critical ?? 0}, warning ${report.summary?.issueCounts?.warning ?? 0}, notice ${report.summary?.issueCounts?.notice ?? 0}`);
   lines.push("");
+
+  lines.push("Evidence limits");
+  lines.push(`- Trust level: ${coverage.trustLevel}`);
+  lines.push(`- Evidence sources: ${coverage.trustSignals.join(" | ") || "none"}`);
+  for (const item of coverage.limitations) lines.push(`- Limit: ${item}`);
+  for (const item of coverage.cannotConclude) lines.push(`- Do not conclude: ${item}`);
+  lines.push("");
+
+  const externalRows = externalEvidenceRows(report, exportContext);
+  if (externalRows.length) {
+    lines.push("External evidence URLs");
+    lines.push("These URLs came from Google evidence but are not present in the current scanned URL list.");
+    externalRows.slice(0, 10).forEach((row) => {
+      lines.push(`- ${row.url} (${row.source}: ${row.detail})`);
+    });
+    if (externalRows.length > 10) lines.push(`- ...and ${externalRows.length - 10} more`);
+    lines.push("");
+  }
 
   appendPrioritizedFixPlan(lines, fixPlanIssues);
 

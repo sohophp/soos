@@ -17,6 +17,7 @@ assert.match(panelSource, /apiPost\("\/api\/pagespeed\/run"/);
 assert.match(panelSource, /apiPost\("\/api\/crux\/run"/);
 assert.match(panelSource, /Promise\.allSettled/);
 assert.match(panelSource, /type="checkbox"/);
+assert.match(panelSource, /useState\(false\)/);
 assert.match(panelSource, /preferredField\.collectionPeriod/);
 assert.match(panelSource, /name="pagespeed-strategy"/);
 assert.match(panelSource, /result\.lab\.metrics/);

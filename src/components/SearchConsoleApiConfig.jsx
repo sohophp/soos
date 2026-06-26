@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { formatApiError } from "../api-client.js";
 import {
   clearGscConnection,
@@ -60,6 +60,19 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
         : copy.tokenSaved
       : copy.noToken;
   const connectedAccount = status?.googleAccountEmail || status?.googleAccountName || "";
+  const propertyOptions = useMemo(() => {
+    const bySiteUrl = new Map();
+    for (const site of sites || []) {
+      const optionSiteUrl = String(site?.siteUrl || "").trim();
+      if (!optionSiteUrl || bySiteUrl.has(optionSiteUrl)) continue;
+      bySiteUrl.set(optionSiteUrl, { ...site, siteUrl: optionSiteUrl });
+    }
+    const selectedSiteUrl = String(siteUrl || "").trim();
+    if (selectedSiteUrl && !bySiteUrl.has(selectedSiteUrl)) {
+      bySiteUrl.set(selectedSiteUrl, { siteUrl: selectedSiteUrl, permissionLevel: "" });
+    }
+    return [...bySiteUrl.values()];
+  }, [siteUrl, sites]);
 
   async function refreshSites() {
     setSitesLoading(true);
@@ -203,11 +216,12 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
             </strong>
             {status?.configured ? (
               <select aria-label={copy.propertyUrl} value={siteUrl} onChange={selectProperty} disabled={sitesLoading || propertySaving}>
-                {siteUrl && !sites.some((site) => site.siteUrl === siteUrl) ? <option value={siteUrl}>{siteUrl}</option> : null}
                 {!siteUrl ? <option value="">{copy.chooseProperty}</option> : null}
-                {sites.map((site, index) => (
-                  <option value={site.siteUrl} key={`${site.siteUrl}-${site.permissionLevel || ""}-${index}`}>
-                    {site.siteUrl} · {copy[site.permissionLevel] || site.permissionLevel}
+                {propertyOptions.map((site, index) => (
+                  <option value={site.siteUrl} key={`gsc-property-${index}-${site.siteUrl}`}>
+                    {site.permissionLevel
+                      ? `${site.siteUrl} · ${copy[site.permissionLevel] || site.permissionLevel}`
+                      : site.siteUrl}
                   </option>
                 ))}
               </select>
@@ -220,8 +234,8 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
               <small>
                 {sitesLoading
                   ? copy.loadingProperties
-                  : sites.length
-                    ? `${sites.length} ${copy.propertiesAvailable}`
+                  : propertyOptions.length
+                    ? `${propertyOptions.length} ${copy.propertiesAvailable}`
                     : copy.noProperties}
               </small>
             )}

@@ -216,10 +216,6 @@ export function SearchAnalyticsPanel({ status, siteUrl, onRows, onInsights, lang
   const [error, setError] = useState("");
 
   useEffect(() => {
-    onInsights?.(insights);
-  }, [insights, onInsights]);
-
-  useEffect(() => {
     setQueryIntentSettings(readQueryIntentSettings(siteUrl));
     setSummary(null);
     setRows([]);
@@ -230,12 +226,30 @@ export function SearchAnalyticsPanel({ status, siteUrl, onRows, onInsights, lang
     onInsights?.([]);
   }, [siteUrl]);
 
+  useEffect(() => {
+    if (summary?.dimension === "page_query") onInsights?.(insights);
+  }, [insights, onInsights, summary?.dimension]);
+
+  function resetLocalResults() {
+    setSummary(null);
+    setRows([]);
+    setComparison(null);
+    setComparisonRanges(null);
+    setError("");
+    onInsights?.([]);
+  }
+
   function updateQueryIntentSetting(name, value) {
     setQueryIntentSettings((current) => {
       const next = { ...current, [name]: value };
       globalThis.localStorage?.setItem(queryIntentStorageKey(siteUrl), JSON.stringify(next));
       return next;
     });
+  }
+
+  function changeDimension(nextDimension) {
+    setDimension(nextDimension);
+    resetLocalResults();
   }
 
   async function loadAnalytics(event) {
@@ -264,9 +278,12 @@ export function SearchAnalyticsPanel({ status, siteUrl, onRows, onInsights, lang
         dimension,
         comparePrevious,
       });
-      if (body.dimension === "page") onRows(body.rows || []);
-      setRows(body.rows || []);
-      setSummary({ ...summarizeSearchAnalyticsRows(body.rows || []), dimension: body.dimension || dimension });
+      const loadedRows = body.rows || [];
+      const loadedDimension = body.dimension || dimension;
+      if (loadedDimension === "page") onRows(loadedRows);
+      if (loadedDimension !== "page_query") onInsights?.([]);
+      setRows(loadedRows);
+      setSummary({ ...summarizeSearchAnalyticsRows(loadedRows), dimension: loadedDimension });
       if (body.comparison?.current && body.comparison?.previous) {
         setComparison(buildSearchAnalyticsComparison(body.comparison.current.rows, body.comparison.previous.rows));
         setComparisonRanges({
@@ -313,7 +330,7 @@ export function SearchAnalyticsPanel({ status, siteUrl, onRows, onInsights, lang
           </label>
           <label>
             <strong>{copy.dimension}</strong>
-            <select value={dimension} onChange={(event) => setDimension(event.target.value)}>
+            <select value={dimension} onChange={(event) => changeDimension(event.target.value)}>
               <option value="page">{copy.page}</option>
               <option value="query">{copy.query}</option>
               <option value="page_query">{copy.pageQuery}</option>
