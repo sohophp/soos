@@ -197,7 +197,7 @@ export function PageSpeedInsightsPanel({ report, language }) {
         <label>
           <strong>{copy.testUrl}</strong>
           <select value={url} onChange={(event) => setUrl(event.target.value)}>
-            {urls.map((item) => <option value={item} key={item}>{item}</option>)}
+            {urls.map((item, index) => <option value={item} key={`${item}-${index}`}>{item}</option>)}
           </select>
         </label>
         <fieldset className="pagespeed-strategy">
@@ -281,7 +281,7 @@ export function PageSpeedInsightsPanel({ report, language }) {
           {result.lab.warnings?.length ? (
             <div className="pagespeed-callout warning" role="status">
               <strong>{copy.runWarnings}</strong>
-              <ul>{result.lab.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+              <ul>{result.lab.warnings.map((warning, index) => <li key={`${warning}-${index}`}>{warning}</li>)}</ul>
             </div>
           ) : null}
           <section className="pagespeed-section">
@@ -289,7 +289,7 @@ export function PageSpeedInsightsPanel({ report, language }) {
             <small>{copy.labHelp}</small>
             <div className="pagespeed-metrics">
               {Object.entries(result.lab.metrics || {}).map(([name, metric]) => (
-                <div key={name}>
+                <div key={`lab-${name}`}>
                   <span>{copy[name] || name.toUpperCase()}</span>
                   <strong>{metricValue(metric, name)}</strong>
                   <Badge severity={scoreSeverity(metric.score == null ? null : Math.round(metric.score * 100))}>
@@ -324,7 +324,7 @@ export function PageSpeedInsightsPanel({ report, language }) {
                     : ""}
                 </small>
                 {Object.entries(preferredField.metrics || {}).map(([name, metric]) => (
-                  <div key={name}>
+                  <div key={`field-${name}`}>
                     <Badge severity={fieldSeverity(metric.category)}>{copy[metric.category] || copy.unknown}</Badge>
                     <strong>{copy[name] || name.toUpperCase()}</strong>
                     <span>{fieldValue(metric, name)}</span>
@@ -338,8 +338,8 @@ export function PageSpeedInsightsPanel({ report, language }) {
             <section className="pagespeed-section">
               <strong>{copy.opportunities}</strong>
               <div className="pagespeed-opportunities">
-                {result.lab.opportunities.map((item) => (
-                  <div key={item.id}>
+                {result.lab.opportunities.map((item, index) => (
+                  <div key={`${item.id}-${index}`}>
                     <Badge severity={scoreSeverity(Math.round(item.score * 100))}>{Math.round(item.score * 100)}</Badge>
                     <strong>{item.title}</strong>
                     <span>
@@ -357,8 +357,8 @@ export function PageSpeedInsightsPanel({ report, language }) {
             <section className="pagespeed-section">
               <strong>{copy.performanceDiagnostics}</strong>
               <div className="pagespeed-audits">
-                {result.lab.diagnostics.map((item) => (
-                  <article key={item.id}>
+                {result.lab.diagnostics.map((item, index) => (
+                  <article key={`${item.id}-${index}`}>
                     <Badge severity={scoreSeverity(item.score == null ? null : Math.round(item.score * 100))}>
                       {item.score == null ? copy.review : Math.round(item.score * 100)}
                     </Badge>
@@ -377,8 +377,8 @@ export function PageSpeedInsightsPanel({ report, language }) {
             <small>{copy.seoAuditsHelp}</small>
             {result.seo?.audits?.length ? (
               <div className="pagespeed-audits">
-                {result.seo.audits.map((item) => (
-                  <article key={item.id}>
+                {result.seo.audits.map((item, index) => (
+                  <article key={`${item.id}-${index}`}>
                     <Badge severity={item.scoreDisplayMode === "manual" ? "notice" : "critical"}>
                       {item.scoreDisplayMode === "manual" ? copy.review : copy.failedAudit}
                     </Badge>

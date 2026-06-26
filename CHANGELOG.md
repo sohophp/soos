@@ -18,6 +18,7 @@ All notable changes to soos will be documented in this file.
 - Added report coverage summaries that make scan limits, GSC connection, URL Inspection sampling, PageSpeed/CrUX usage, and unsafe conclusions explicit.
 - Added regression coverage for issue normalization, confidence classification, priority scoring, fix instructions, and report limitations.
 - Restored Search Analytics opportunity handoff into the Issues Fix Plan and made Google overview opportunity keys unique when the same URL appears in multiple findings.
+- Hardened Google Sitemap, property, PageSpeed, and scan-summary list rendering against duplicate real-world values so React does not drop or duplicate diagnostic rows.
 
 ### PageSpeed Insights
 

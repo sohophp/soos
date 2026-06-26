@@ -29,7 +29,7 @@ function ExecutiveSummary({ summary, t }) {
         {summary.topActions?.length ? (
           <div className="executive-actions">
             <strong>{t.priorityActions}</strong>
-            {summary.topActions.map((action) => <small key={action}>{action}</small>)}
+            {summary.topActions.map((action, index) => <small key={`${action}-${index}`}>{action}</small>)}
           </div>
         ) : null}
       </div>

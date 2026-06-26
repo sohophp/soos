@@ -13,6 +13,7 @@
 - 已完成：将 Vite 生产构建 chunk warning baseline 固定为 600 kB 并加入回归测试，避免首版发布时出现已知体积提示噪音。
 - 已完成：新增 priority scoring、fix instruction 和 report coverage 纯函数，明确高优先级诊断、修复步骤、验证步骤与报告不能下的结论。
 - 已完成：恢复 Search Analytics 机会洞察到 Issues Fix Plan 的状态传递，Page + Query 的低 CTR、排名机会和关键词竞争诊断会进入统一修复清单；同时修复 Google 概览机会卡片重复 key 风险。
+- 已完成：补强 Google Sitemap、Property、PageSpeed 和扫描摘要列表的稳定 key，避免真实数据存在重复 URL、重复 warning 或重复审计项时出现行丢失/重复渲染警告。
 - 已验收：新增 issue model 与 report coverage 测试，并接入 `npm run check`。
 - 本批取舍：不重构大 UI、不新增 Google 权限、不做 sitemap 写操作、不实现内容生成、自动改站或定时监控；Overview/Fix Plan/Issues/URLs/Google UI 收口进入后续 Phase。
 

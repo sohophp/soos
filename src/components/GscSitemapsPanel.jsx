@@ -89,8 +89,8 @@ export function GscSitemapsPanel({ status, siteUrl, currentSitemapUrls = [], lan
           ) : null}
           {(result.sitemaps || []).length ? (
             <div className="gsc-sitemap-list">
-              {result.sitemaps.map((item) => (
-                <article className="gsc-sitemap-row" key={item.path}>
+              {result.sitemaps.map((item, index) => (
+                <article className="gsc-sitemap-row" key={`${item.path}-${item.type || ""}-${index}`}>
                   <div>
                     <strong title={item.path}>{item.path}</strong>
                     <small>{item.sitemapIndex ? copy.sitemapsIndex : copy.sitemapsFile}{item.type ? ` / ${item.type}` : ""}</small>

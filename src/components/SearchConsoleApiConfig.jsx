@@ -205,8 +205,8 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
               <select aria-label={copy.propertyUrl} value={siteUrl} onChange={selectProperty} disabled={sitesLoading || propertySaving}>
                 {siteUrl && !sites.some((site) => site.siteUrl === siteUrl) ? <option value={siteUrl}>{siteUrl}</option> : null}
                 {!siteUrl ? <option value="">{copy.chooseProperty}</option> : null}
-                {sites.map((site) => (
-                  <option value={site.siteUrl} key={site.siteUrl}>
+                {sites.map((site, index) => (
+                  <option value={site.siteUrl} key={`${site.siteUrl}-${site.permissionLevel || ""}-${index}`}>
                     {site.siteUrl} · {copy[site.permissionLevel] || site.permissionLevel}
                   </option>
                 ))}
@@ -239,8 +239,8 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
           <div className="gsc-oauth-help" id="gsc-oauth-help">
             <strong>{copy.oauthHelpTitle}</strong>
             <ol>
-              {copy.oauthHelpSteps.map((step) => (
-                <li key={step}>{step}</li>
+              {copy.oauthHelpSteps.map((step, index) => (
+                <li key={`${step}-${index}`}>{step}</li>
               ))}
             </ol>
             <a href="https://support.google.com/webmasters/answer/7687615" target="_blank" rel="noreferrer">
