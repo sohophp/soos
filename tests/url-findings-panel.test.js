@@ -17,6 +17,7 @@ assert.match(source, /<ResultPagination/);
 assert.match(source, /onIssueFilterChange\(null\)/);
 assert.match(source, /onExportCsv\(pages\)/);
 assert.match(source, /paginateUrlFindings\(pages, pageNumber\)/);
+assert.match(source, /issueUrls: issueFilter\?\.affectedUrls \|\| \[\]/);
 assert.doesNotMatch(source, /key=\{page\.url\}/);
 assert.match(source, /key=\{`\$\{page\.url\}-\$\{page\.finalUrl/);
 
@@ -51,5 +52,17 @@ const matching = pages.filter((page) => pageMatchesUrlFilters(page, {
 }));
 assert.equal(matching.length, 1);
 assert.equal(matching[0].url, pages[0].url);
+
+const googleIssueMatching = pages.filter((page) => pageMatchesUrlFilters(page, {
+  severity: "all",
+  issueType: "google_not_indexed",
+  issueUrls: [pages[1].url],
+  source: "all",
+  change: "all",
+  sourceSets,
+  comparisonEntry: null,
+}));
+assert.equal(googleIssueMatching.length, 1);
+assert.equal(googleIssueMatching[0].url, pages[1].url);
 
 console.log("url findings panel tests passed");

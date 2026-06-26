@@ -84,7 +84,7 @@ function FixPlan({ issues, closedIssues, t, onSelectIssue, onStatusChange }) {
                 ))}
               </div>
             ) : null}
-            <button className="impact-filter" type="button" onClick={() => onSelectIssue?.({ type: issue.type })}>
+            <button className="impact-filter" type="button" onClick={() => onSelectIssue?.(issue)}>
               {t.showMatchingUrls}
             </button>
             <button className="impact-filter" type="button" onClick={() => onStatusChange?.(issue, "resolved")}>

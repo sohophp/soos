@@ -59,6 +59,7 @@ export function pageMatchesUrlFilters(page, options) {
   const {
     severity = "all",
     issueType = "",
+    issueUrls = [],
     query = "",
     source = "all",
     change = "all",
@@ -68,7 +69,12 @@ export function pageMatchesUrlFilters(page, options) {
 
   if (severity === "ok" && (page.issues || []).length) return false;
   if (!["all", "ok"].includes(severity) && !(page.issues || []).some((issue) => issue.severity === severity)) return false;
-  if (issueType && !(page.issues || []).some((issue) => issue.type === issueType)) return false;
+  if (issueType) {
+    const issueUrlKeys = new Set((issueUrls || []).map(normalizedUrl).filter(Boolean));
+    const issueTypeMatches = (page.issues || []).some((issue) => issue.type === issueType);
+    const issueUrlMatches = issueUrlKeys.has(normalizedUrl(page.url)) || issueUrlKeys.has(normalizedUrl(page.finalUrl));
+    if (!issueTypeMatches && !issueUrlMatches) return false;
+  }
 
   const urlKey = normalizedUrl(page.url);
   if (source !== "all" && !sourceSets?.[source]?.has(urlKey)) return false;

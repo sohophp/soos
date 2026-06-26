@@ -74,6 +74,24 @@ assert.equal(pageMatchesUrlFilters(pages[2], {
   sourceSets,
   comparisonEntry,
 }), true);
+assert.equal(pageMatchesUrlFilters(pages[2], {
+  severity: "all",
+  issueType: "google_not_indexed",
+  issueUrls: ["https://example.com/c/"],
+  source: "all",
+  change: "all",
+  sourceSets,
+  comparisonEntry,
+}), true);
+assert.equal(pageMatchesUrlFilters(pages[1], {
+  severity: "all",
+  issueType: "google_not_indexed",
+  issueUrls: ["https://example.com/c/"],
+  source: "all",
+  change: "all",
+  sourceSets,
+  comparisonEntry,
+}), false);
 
 const counts = urlFilterCounts(pages, sourceSets, comparisonEntry);
 assert.equal(counts.sources.gsc, 1);

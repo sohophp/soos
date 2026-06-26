@@ -171,6 +171,7 @@ export function UrlFindingsPanel({
   const pages = useMemo(() => (report?.pages || []).filter((page) => pageMatchesUrlFilters(page, {
     severity: filter,
     issueType: issueFilter?.type || "",
+    issueUrls: issueFilter?.affectedUrls || [],
     query,
     source: sourceFilter,
     change: changeFilter,

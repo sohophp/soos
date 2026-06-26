@@ -50,6 +50,7 @@ assert.match(issuesSource, /priorityScore/);
 assert.match(issuesSource, /issue\.recommendedFix\.steps/);
 assert.match(issuesSource, /issue\.verification\[0\]\?\.steps/);
 assert.match(issuesSource, /navigator\.clipboard\.writeText/);
+assert.match(issuesSource, /onSelectIssue\?\.\(issue\)/);
 assert.match(issuesSource, /onSelectIssue\?\.\(\{ type: issueType \}\)/);
 assert.match(issuesSource, /report\.internationalSignals/);
 
