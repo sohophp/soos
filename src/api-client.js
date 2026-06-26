@@ -37,6 +37,9 @@ async function parseResponseBody(response) {
 
   const text = await response.text();
   if (!text) return null;
+  if (contentType.includes("text/html") || /^\s*<!doctype html/i.test(text) || /^\s*<html[\s>]/i.test(text)) {
+    return null;
+  }
   try {
     return JSON.parse(text);
   } catch {

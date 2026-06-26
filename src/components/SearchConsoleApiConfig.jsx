@@ -260,6 +260,15 @@ export function SearchConsoleApiConfig({ status, onStatus, siteUrl, onSiteUrlCha
             <a href="https://support.google.com/webmasters/answer/7687615" target="_blank" rel="noreferrer">
               {copy.docsLabel}
             </a>
+            <a href="https://developers.google.com/webmaster-tools/v1/how-tos/authorizing" target="_blank" rel="noreferrer">
+              {copy.oauthDocsLabel}
+            </a>
+            <a href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com" target="_blank" rel="noreferrer">
+              {copy.enableApiDocsLabel}
+            </a>
+            <a href="https://developers.google.com/search/docs/monitor-debug/search-console-start" target="_blank" rel="noreferrer">
+              {copy.gscStartDocsLabel}
+            </a>
           </div>
         ) : null}
         <div className="gsc-api-actions">

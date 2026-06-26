@@ -4,7 +4,10 @@ import { dictionaries } from "../src/i18n.js";
 
 const [
   mainSource,
+  appHeaderSource,
+  workspaceNavigationSource,
   scanSetupSource,
+  scanCommandSource,
   runtimeSource,
   findingsSource,
   configSource,
@@ -17,7 +20,10 @@ const [
   styles,
 ] = await Promise.all([
   fs.readFile(new URL("../src/main.jsx", import.meta.url), "utf8"),
+  fs.readFile(new URL("../src/components/AppHeader.jsx", import.meta.url), "utf8"),
+  fs.readFile(new URL("../src/components/WorkspaceNavigation.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/ScanSetupPanels.jsx", import.meta.url), "utf8"),
+  fs.readFile(new URL("../src/components/ScanCommandBar.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/ScanRuntimePanel.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/UrlFindingsPanel.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/SearchConsoleApiConfig.jsx", import.meta.url), "utf8"),
@@ -38,18 +44,18 @@ for (const language of ["en", "zh-CN", "zh-TW"]) {
 
 assert.match(mainSource, /className="skip-link" href="#workspace-content"/);
 assert.match(mainSource, /id="workspace-content" tabIndex="-1"/);
-assert.match(mainSource, /htmlFor="language-select"/);
-assert.match(mainSource, /role="tablist"/);
-assert.match(mainSource, /role="tab"/);
-assert.match(mainSource, /aria-selected=\{activeView === view\}/);
-assert.match(mainSource, /aria-controls="workspace-panel"/);
+assert.match(appHeaderSource, /htmlFor="language-select"/);
+assert.match(workspaceNavigationSource, /role="tablist"/);
+assert.match(workspaceNavigationSource, /role="tab"/);
+assert.match(workspaceNavigationSource, /aria-selected=\{activeView === view\}/);
+assert.match(workspaceNavigationSource, /aria-controls="workspace-panel"/);
 assert.match(mainSource, /role="tabpanel"/);
 assert.match(mainSource, /aria-labelledby=\{`workspace-tab-\$\{activeView\}`\}/);
 assert.match(mainSource, /event\.key === "ArrowRight"/);
 assert.match(mainSource, /event\.key === "ArrowLeft"/);
 assert.match(mainSource, /event\.key === "Home"/);
 assert.match(mainSource, /event\.key === "End"/);
-assert.match(scanSetupSource, /htmlFor="audit-url"/);
+assert.match(scanCommandSource, /htmlFor="audit-url"/);
 assert.match(scanSetupSource, /className="scan-boundary-note" aria-label=\{t\.rawHtmlBoundaryTitle\}/);
 assert.match(runtimeSource, /role="progressbar"/);
 assert.match(runtimeSource, /aria-valuenow=/);

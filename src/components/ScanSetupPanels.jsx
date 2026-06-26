@@ -1,35 +1,41 @@
 import React from "react";
-import { FileSearch, Info, Loader2, Search } from "lucide-react";
+import { Info } from "lucide-react";
 import { pageSpeedText } from "../i18n.js";
-import { readPageSpeedSessionKey, writePageSpeedSessionKey } from "../pagespeed-key.js";
+import {
+  readGoogleApiSessionKey,
+  readPageSpeedSessionKey,
+  writeGoogleApiSessionKey,
+  writePageSpeedSessionKey,
+} from "../pagespeed-key.js";
 import { PrivacyDataPanel } from "./PrivacyDataPanel.jsx";
 import {
   ProgressBar,
   ProgressControls,
   RuntimePanel,
 } from "./ScanRuntimePanel.jsx";
+import { ScanCommandBar } from "./ScanCommandBar.jsx";
 
 export function ScanLaunchPanel({ t, settings, runner, onSubmit, onControl }) {
   return (
     <>
-      <form className="searchbar" onSubmit={onSubmit}>
-        <Search size={20} aria-hidden="true" />
-        <label className="visually-hidden" htmlFor="audit-url">{t.auditUrlLabel}</label>
-        <input
-          id="audit-url"
-          type="url"
-          required
-          placeholder={t.placeholder}
-          value={settings.sitemapUrl}
-          onChange={(event) => settings.setValue("sitemapUrl", event.target.value)}
-        />
-        <button type="submit" disabled={runner.loading}>
-          {runner.loading
-            ? <Loader2 className="spin" size={18} aria-hidden="true" />
-            : <FileSearch size={18} aria-hidden="true" />}
-          {t.audit}
-        </button>
-      </form>
+      <section className="scan-start-guide" aria-label={t.scanStepsTitle}>
+        <div>
+          <span>1</span>
+          <strong>{t.scanStepSettings}</strong>
+          <small>{t.scanStepSettingsHelp}</small>
+        </div>
+        <div>
+          <span>2</span>
+          <strong>{t.scanStepRun}</strong>
+          <small>{t.scanStepRunHelp}</small>
+        </div>
+        <div>
+          <span>3</span>
+          <strong>{t.scanStepEvidence}</strong>
+          <small>{t.scanStepEvidenceHelp}</small>
+        </div>
+      </section>
+      <ScanCommandBar t={t} settings={settings} runner={runner} onSubmit={onSubmit} />
 
       <ProgressBar progress={runner.progress} />
       <RuntimePanel
@@ -53,12 +59,23 @@ export function ScanLaunchPanel({ t, settings, runner, onSubmit, onControl }) {
 
 export function ScanSettingsPanel({ t, language, settings, onDeleted }) {
   const pageSpeedCopy = pageSpeedText[language] || pageSpeedText.en;
+  const [googleApiKey, setGoogleApiKey] = React.useState(readGoogleApiSessionKey);
   const [pageSpeedKey, setPageSpeedKey] = React.useState(readPageSpeedSessionKey);
+
+  function notifyApiKeyChange() {
+    globalThis.dispatchEvent?.(new Event("soos:pagespeed-key"));
+  }
+
+  function updateGoogleApiKey(value) {
+    setGoogleApiKey(value);
+    writeGoogleApiSessionKey(value);
+    notifyApiKeyChange();
+  }
 
   function updatePageSpeedKey(value) {
     setPageSpeedKey(value);
     writePageSpeedSessionKey(value);
-    globalThis.dispatchEvent?.(new Event("soos:pagespeed-key"));
+    notifyApiKeyChange();
   }
 
   return (
@@ -137,18 +154,31 @@ export function ScanSettingsPanel({ t, language, settings, onDeleted }) {
           <small>{pageSpeedCopy.settingsHelp}</small>
         </div>
         <label>
-          <strong>{pageSpeedCopy.apiKey}</strong>
+          <strong>{pageSpeedCopy.sharedApiKey}</strong>
+          <input
+            type="password"
+            autoComplete="off"
+            value={googleApiKey}
+            onChange={(event) => updateGoogleApiKey(event.target.value)}
+            placeholder={pageSpeedCopy.sharedApiKeyPlaceholder}
+          />
+        </label>
+        <label>
+          <strong>{pageSpeedCopy.pageSpeedApiKey}</strong>
           <input
             type="password"
             autoComplete="off"
             value={pageSpeedKey}
             onChange={(event) => updatePageSpeedKey(event.target.value)}
-            placeholder={pageSpeedCopy.apiKeyPlaceholder}
+            placeholder={pageSpeedCopy.pageSpeedApiKeyPlaceholder}
           />
         </label>
         <div className="pagespeed-settings-actions">
-          {pageSpeedKey ? (
-            <button className="export-button" type="button" onClick={() => updatePageSpeedKey("")}>
+          {googleApiKey || pageSpeedKey ? (
+            <button className="export-button" type="button" onClick={() => {
+              updateGoogleApiKey("");
+              updatePageSpeedKey("");
+            }}>
               {pageSpeedCopy.clearKey}
             </button>
           ) : null}
@@ -157,6 +187,12 @@ export function ScanSettingsPanel({ t, language, settings, onDeleted }) {
           </a>
           <a className="export-button" href="https://console.cloud.google.com/apis/library/pagespeedonline.googleapis.com" target="_blank" rel="noreferrer">
             {pageSpeedCopy.enablePageSpeedApi}
+          </a>
+          <a className="export-button" href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com" target="_blank" rel="noreferrer">
+            {pageSpeedCopy.enableSearchConsoleApi}
+          </a>
+          <a className="export-button" href="https://developers.google.com/webmaster-tools/v1/how-tos/authorizing" target="_blank" rel="noreferrer">
+            {pageSpeedCopy.gscAuthGuide}
           </a>
           <a className="export-button" href="https://developers.google.com/search/docs/monitor-debug/search-console-start" target="_blank" rel="noreferrer">
             {pageSpeedCopy.enableGscGuide}

@@ -65,6 +65,21 @@ await assert.rejects(
     && error.retryable,
 );
 
+globalThis.fetch = async () => new Response(`<!doctype html>
+<html><body><h1>Error response</h1><p>Error code: 404</p>
+<p>Error code explanation: 404 - Nothing matches the given URI.</p></body></html>`, {
+  status: 404,
+  headers: { "content-type": "text/html" },
+});
+
+await assert.rejects(
+  () => apiGet("/api/session-data", { fallbackMessage: "Could not load session data summary" }),
+  (error) => error instanceof ApiError
+    && error.message === "Could not load session data summary"
+    && error.status === 404
+    && error.code === "HTTP_404",
+);
+
 globalThis.fetch = async () => {
   throw new TypeError("fetch failed");
 };

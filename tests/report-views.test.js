@@ -24,6 +24,11 @@ const [mainSource, reportSource, summarySource, issuesSource, uiSource, styles] 
   fs.readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
 ]);
 assert.match(mainSource, /<WorkspaceReport/);
+assert.match(mainSource, /<AppHeader/);
+assert.match(mainSource, /<WorkspaceNavigation/);
+assert.match(mainSource, /\["issues", ListChecks\]/);
+assert.match(mainSource, /\["urls", Link\]/);
+assert.match(mainSource, /\["history", History\]/);
 assert.match(reportSource, /\["issues", "urls"\]\.includes\(activeView\)/);
 assert.doesNotMatch(reportSource, /\["scan", "issues", "urls"\]\.includes\(activeView\)/);
 assert.match(reportSource, /<ReportEmptyState t=\{t\} onStartScan=\{\(\) => onViewChange\?\.\("scan"\)\} \/>/);

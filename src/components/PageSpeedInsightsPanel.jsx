@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { apiGet, apiPost, formatApiError } from "../api-client.js";
 import { pageSpeedText } from "../i18n.js";
-import { readPageSpeedSessionKey } from "../pagespeed-key.js";
+import { readActivePageSpeedSessionKey, readGoogleApiSessionKey, readPageSpeedSessionKey } from "../pagespeed-key.js";
 import { Badge, Stat } from "./ReportUi.jsx";
 
 function scoreSeverity(score) {
@@ -83,7 +83,7 @@ export function PageSpeedInsightsPanel({ report, language }) {
       .flatMap((page) => [page.finalUrl || page.url, page.url])
       .filter(Boolean),
   )].slice(0, 500), [report]);
-  const [apiKey, setApiKey] = useState(readPageSpeedSessionKey);
+  const [apiKey, setApiKey] = useState(readActivePageSpeedSessionKey);
   const [status, setStatus] = useState({
     defaultApiKeyConfigured: false,
     defaultCruxApiKeyConfigured: false,
@@ -114,7 +114,7 @@ export function PageSpeedInsightsPanel({ report, language }) {
       .catch(() => setStatus({ defaultApiKeyConfigured: false, defaultCruxApiKeyConfigured: false }));
 
     function refreshSessionKey() {
-      setApiKey(readPageSpeedSessionKey());
+      setApiKey(readActivePageSpeedSessionKey());
     }
     globalThis.addEventListener?.("storage", refreshSessionKey);
     globalThis.addEventListener?.("soos:pagespeed-key", refreshSessionKey);
@@ -185,6 +185,8 @@ export function PageSpeedInsightsPanel({ report, language }) {
   const preferredField = cruxField || field;
   const preferredFieldSource = cruxField ? "crux" : field ? "pagespeed" : "";
   const webVitalsStatus = coreWebVitalsStatus(preferredField);
+  const customPageSpeedKey = Boolean(readPageSpeedSessionKey());
+  const sharedGoogleKey = Boolean(readGoogleApiSessionKey());
   const hasRunnableKey = Boolean(apiKey || status.defaultApiKeyConfigured);
   const hasCruxKey = Boolean(apiKey || status.defaultCruxApiKeyConfigured);
 
@@ -200,7 +202,15 @@ export function PageSpeedInsightsPanel({ report, language }) {
       <form className="pagespeed-form" onSubmit={run}>
         <div className="pagespeed-key-status">
           <strong>{copy.apiKey}</strong>
-          <span>{apiKey ? copy.usingCustomKey : status.defaultApiKeyConfigured ? copy.usingDefaultKey : copy.noApiKey}</span>
+          <span>
+            {customPageSpeedKey
+              ? copy.usingCustomKey
+              : sharedGoogleKey
+                ? copy.usingSharedKey
+                : status.defaultApiKeyConfigured
+                  ? copy.usingDefaultKey
+                  : copy.noApiKey}
+          </span>
           <small>{copy.apiKeyHelp}</small>
         </div>
         <label>

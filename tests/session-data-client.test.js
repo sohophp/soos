@@ -8,10 +8,11 @@ import {
 } from "../src/session-data.js";
 import { privacyDataText } from "../src/i18n.js";
 
-const [mainSource, gscHookSource, googleWorkspaceSource] = await Promise.all([
+const [mainSource, gscHookSource, googleWorkspaceSource, privacyPanelSource] = await Promise.all([
   fs.readFile(new URL("../src/main.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/hooks/useGscWorkspace.js", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/GoogleWorkspace.jsx", import.meta.url), "utf8"),
+  fs.readFile(new URL("../src/components/PrivacyDataPanel.jsx", import.meta.url), "utf8"),
 ]);
 
 function createStorage(initial) {
@@ -68,6 +69,9 @@ assert.match(mainSource, /retainedJobs\.reset\(\)/);
 assert.match(mainSource, /auditRunner\.reset\(\)/);
 assert.match(gscHookSource, /const \[resetKey, setResetKey\] = useState\(0\)/);
 assert.match(gscHookSource, /setResetKey\(\(value\) => value \+ 1\)/);
+assert.match(privacyPanelSource, /friendlyError/);
+assert.match(privacyPanelSource, /copy\.apiUnavailable/);
+assert.match(privacyPanelSource, /Error code explanation/);
 for (const keyPrefix of ["gsc-config", "gsc-import"]) {
   assert.ok(googleWorkspaceSource.includes(`key={\`${keyPrefix}-\${gsc.resetKey}\`}`), keyPrefix);
 }

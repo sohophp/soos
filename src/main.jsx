@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ChartNoAxesCombined,
@@ -17,12 +17,14 @@ import { useRetainedJobs } from "./hooks/useRetainedJobs.js";
 import { useReportHistory } from "./hooks/useReportHistory.js";
 import { useScanSettings } from "./hooks/useScanSettings.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
+import { AppHeader } from "./components/AppHeader.jsx";
 import { GoogleWorkspace } from "./components/GoogleWorkspace.jsx";
 import { HistoryWorkspace } from "./components/HistoryWorkspace.jsx";
 import {
   ScanLaunchPanel,
   ScanSettingsPanel,
 } from "./components/ScanSetupPanels.jsx";
+import { WorkspaceNavigation } from "./components/WorkspaceNavigation.jsx";
 import { WorkspaceReport } from "./components/WorkspaceReport.jsx";
 import {
   detectLanguage,
@@ -54,14 +56,19 @@ function App() {
     onRefreshJobs: () => retainedJobs.load().catch(() => {}),
     onError: (err) => setError(formatApiError(err)),
   });
-  const workspaceViews = [
+  const workspaceViews = useMemo(() => [
     ["scan", ScanSearch],
     ["google", ChartNoAxesCombined],
     ["issues", ListChecks],
     ["urls", Link],
     ["history", History],
     ["settings", Settings],
-  ];
+  ], []);
+
+  useEffect(() => {
+    if (workspaceViews.some(([view]) => view === activeView)) return;
+    setActiveView(saveWorkspaceView("scan"));
+  }, [activeView, workspaceViews]);
 
   function changeView(view, options = {}) {
     setActiveView(saveWorkspaceView(view));
@@ -104,44 +111,22 @@ function App() {
     <>
       <a className="skip-link" href="#workspace-content">{t.skipToContent}</a>
       <main id="workspace-content" tabIndex="-1" ref={mainContentRef}>
-      <header className="top">
-        <div>
-          <span className="mark">soos</span>
-          <h1>{t.heading}</h1>
-        </div>
-        <div className="top-actions">
-          <p>{t.subheading}</p>
-          <label className="visually-hidden" htmlFor="language-select">{t.languageLabel}</label>
-          <select id="language-select" value={language} onChange={(event) => setLanguage(event.target.value)}>
-            <option value="en">English</option>
-            <option value="zh-CN">{"\u7b80\u4f53\u4e2d\u6587"}</option>
-            <option value="zh-TW">{"\u7e41\u9ad4\u4e2d\u6587"}</option>
-          </select>
-        </div>
-      </header>
+      <AppHeader
+        language={language}
+        onLanguageChange={setLanguage}
+        report={reportHistory.report}
+        t={t}
+      />
 
-      <nav className="workspace-nav" aria-label={workspaceCopy.navigation} role="tablist">
-        {workspaceViews.map(([view, Icon], index) => (
-          <button
-            className={activeView === view ? "active" : ""}
-            type="button"
-            key={view}
-            id={`workspace-tab-${view}`}
-            role="tab"
-            aria-selected={activeView === view}
-            aria-controls="workspace-panel"
-            tabIndex={activeView === view ? 0 : -1}
-            ref={(element) => {
-              workspaceTabRefs.current[index] = element;
-            }}
-            onClick={() => changeView(view, { focus: false })}
-            onKeyDown={(event) => handleWorkspaceKeyDown(event, index)}
-          >
-            <Icon size={17} aria-hidden="true" />
-            <span>{workspaceCopy[view]}</span>
-          </button>
-        ))}
-      </nav>
+      <WorkspaceNavigation
+        activeView={activeView}
+        ariaLabel={workspaceCopy.navigation}
+        labels={workspaceCopy}
+        onChange={changeView}
+        onKeyDown={handleWorkspaceKeyDown}
+        tabRefs={workspaceTabRefs}
+        views={workspaceViews}
+      />
 
       <div
         id="workspace-panel"

@@ -17,13 +17,28 @@ export function PrivacyDataPanel({ language, onDeleted }) {
   const [error, setError] = useState("");
   const localCount = browserSoosDataSummary().count;
 
+  function friendlyError(requestError) {
+    const rawMessage = String(requestError?.message || "");
+    if (
+      requestError?.status === 404
+      || requestError?.code === "NOT_FOUND"
+      || requestError?.code === "HTTP_404"
+      || rawMessage.includes("Error code explanation")
+      || rawMessage.includes("Nothing matches the given URI")
+      || rawMessage.includes("Noting matche the given URI")
+    ) {
+      return copy.apiUnavailable;
+    }
+    return formatApiError(requestError);
+  }
+
   async function refresh() {
     setLoading(true);
     setError("");
     try {
       setSummary(await getSessionDataSummary());
     } catch (requestError) {
-      setError(formatApiError(requestError));
+      setError(friendlyError(requestError));
     } finally {
       setLoading(false);
     }
@@ -45,7 +60,7 @@ export function PrivacyDataPanel({ language, onDeleted }) {
       setMessage(copy.deleted.replace("{local}", String(localDeleted)));
       onDeleted?.(result);
     } catch (requestError) {
-      setError(formatApiError(requestError));
+      setError(friendlyError(requestError));
     } finally {
       setDeleting(false);
     }

@@ -43,10 +43,11 @@ assert.deepEqual(buildAuditRequest({
   },
 });
 
-const [mainSource, hookSource, panelSource] = await Promise.all([
+const [mainSource, hookSource, panelSource, commandBarSource] = await Promise.all([
   fs.readFile(new URL("../src/main.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/hooks/useScanSettings.js", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/ScanSetupPanels.jsx", import.meta.url), "utf8"),
+  fs.readFile(new URL("../src/components/ScanCommandBar.jsx", import.meta.url), "utf8"),
 ]);
 
 assert.match(mainSource, /const scanSettings = useScanSettings\(\)/);
@@ -55,7 +56,12 @@ assert.match(mainSource, /<ScanSettingsPanel/);
 assert.doesNotMatch(mainSource, /className="searchbar"/);
 assert.doesNotMatch(mainSource, /className="option-toggle"/);
 assert.match(hookSource, /buildAuditRequest\(settings\)/);
-assert.match(panelSource, /htmlFor="audit-url"/);
+assert.match(panelSource, /<ScanCommandBar/);
+assert.match(commandBarSource, /htmlFor="audit-url"/);
+assert.match(panelSource, /scan-start-guide/);
+assert.match(panelSource, /t\.scanStepSettings/);
+assert.match(panelSource, /t\.scanStepRun/);
+assert.match(panelSource, /t\.scanStepEvidence/);
 assert.match(panelSource, /<PrivacyDataPanel/);
 assert.match(panelSource, /onPause=\{\(\) => onControl\("pause"\)\}/);
 

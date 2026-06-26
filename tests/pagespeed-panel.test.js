@@ -12,11 +12,16 @@ const [panelSource, settingsSource, summarySource, workspaceSource, routeSource,
 ]);
 
 assert.match(settingsSource, /writePageSpeedSessionKey/);
+assert.match(settingsSource, /writeGoogleApiSessionKey/);
 assert.match(settingsSource, /type="password"/);
 assert.match(settingsSource, /autoComplete="off"/);
 assert.match(settingsSource, /console\.cloud\.google\.com\/apis\/credentials/);
 assert.match(settingsSource, /console\.cloud\.google\.com\/apis\/library\/pagespeedonline/);
+assert.match(settingsSource, /console\.cloud\.google\.com\/apis\/library\/searchconsole/);
+assert.match(settingsSource, /developers\.google\.com\/webmaster-tools\/v1\/how-tos\/authorizing/);
 assert.match(settingsSource, /developers\.google\.com\/search\/docs\/monitor-debug\/search-console-start/);
+assert.match(panelSource, /readActivePageSpeedSessionKey/);
+assert.match(panelSource, /copy\.usingSharedKey/);
 assert.match(panelSource, /apiGet\("\/api\/pagespeed\/status"/);
 assert.match(panelSource, /defaultApiKeyConfigured/);
 assert.match(panelSource, /apiPost\("\/api\/pagespeed\/run"/);
