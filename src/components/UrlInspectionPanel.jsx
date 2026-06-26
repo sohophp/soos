@@ -151,8 +151,11 @@ export function UrlInspectionPanel({ report, gscStatus, siteUrl, language, gscRo
         {nextCandidates.length ? (
           <div className="inspection-queue-list">
             <strong>{copy.inspectionNextBatch}: {nextCandidates.length}</strong>
-            {nextCandidates.slice(0, 6).map((candidate) => (
-              <div className="inspection-queue-row" key={candidate.key}>
+            {nextCandidates.slice(0, 6).map((candidate, index) => (
+              <div
+                className="inspection-queue-row"
+                key={`${candidate.key || candidate.url}-${candidate.sources.join(",")}-${candidate.reasons.join(",")}-${index}`}
+              >
                 <span title={candidate.url}>{candidate.url}</span>
                 <small>{candidate.reasons.map(reasonLabel).join(" / ")}</small>
                 <small>{copy.inspectionSources}: {candidate.sources.map(sourceLabel).join(", ")}</small>

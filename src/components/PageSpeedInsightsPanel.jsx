@@ -58,8 +58,14 @@ function formatBytes(value) {
   return `${Math.round(value / 1024)} KB`;
 }
 
+function isCruxApiNotEnabled(error) {
+  return error?.code === "CRUX_API_NOT_ENABLED"
+    || String(error?.message || "").includes("chromeuxreport.googleapis.com")
+    || String(error?.message || "").includes("Chrome UX Report API has not been used");
+}
+
 function cruxErrorState(error, copy) {
-  if (error?.code !== "CRUX_API_NOT_ENABLED") {
+  if (!isCruxApiNotEnabled(error)) {
     return {
       message: formatApiError(error),
       code: error?.code || "",
@@ -152,7 +158,11 @@ export function PageSpeedInsightsPanel({ report, language }) {
         setCruxError(cruxErrorState(cruxOutcome.reason, copy));
       }
     } catch (requestError) {
-      setError(formatApiError(requestError));
+      if (isCruxApiNotEnabled(requestError)) {
+        setCruxError(cruxErrorState(requestError, copy));
+      } else {
+        setError(formatApiError(requestError));
+      }
     } finally {
       setLoading(false);
     }

@@ -26,6 +26,7 @@ assert.match(panelSource, /result\.seo\?\.audits/);
 assert.match(panelSource, /coreWebVitalsStatus/);
 assert.match(panelSource, /preferredField = cruxField \|\| field/);
 assert.match(panelSource, /CRUX_API_NOT_ENABLED/);
+assert.match(panelSource, /isCruxApiNotEnabled\(requestError\)/);
 assert.match(panelSource, /console\.cloud\.google\.com\/apis\/library\/chromeuxreport/);
 assert.match(panelSource, /copy\.enableCruxApi/);
 assert.match(panelSource, /copy\.retryCrux/);

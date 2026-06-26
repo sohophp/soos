@@ -20,6 +20,7 @@
 - 已完成：Summary 文本导出接入统一 Fix Plan，包含扫描、Google Inspection 与 Search Analytics 证据合并后的优先级、影响、修复步骤和证据摘要。
 - 已完成：未连接 Search Console 时，Report Coverage 明确提示本地 sitemap、robots、canonical、hreflang、结构化数据和 HTML 诊断仍可独立使用，只是不能断言 Google 真实收录。
 - 已完成：首屏三语言标题改为技术 SEO 检查/审计，避免用户误以为必须连接 Google 后才能使用本地诊断。
+- 已完成：PageSpeed 主请求与独立 CrUX 请求都能把 CrUX API 未启用错误转为可操作提示；URL Inspection 候选队列在重复 URL 时不再产生 React key 冲突。
 - 已验收：新增 issue model 与 report coverage 测试，并接入 `npm run check`。
 - 本批取舍：不重构大 UI、不新增 Google 权限、不做 sitemap 写操作、不实现内容生成、自动改站或定时监控；Overview/Fix Plan/Issues/URLs/Google UI 收口进入后续 Phase。
 

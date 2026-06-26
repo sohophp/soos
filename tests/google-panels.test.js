@@ -188,6 +188,8 @@ assert.match(mainSource, /<WorkspaceReport/);
 assert.match(reportSource, /<UrlInspectionPanel/);
 assert.match(reportSource, /<GooglebotLogAnalysis/);
 assert.match(inspectionSource, /mergeInspectionBatch\(current, body, nextCandidates\)/);
+assert.doesNotMatch(inspectionSource, /key=\{candidate\.key\}/);
+assert.match(inspectionSource, /candidate\.sources\.join\(","\)/);
 assert.match(logSource, /buildGooglebotLogDiagnosis\(analysis, report, gscRows, copy\)/);
 assert.match(logSource, /role="status"/);
 assert.match(logSource, /role="alert"/);

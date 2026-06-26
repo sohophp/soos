@@ -25,6 +25,7 @@ All notable changes to soos will be documented in this file.
 - Added the unified prioritized Fix Plan to text summary exports, including Google-confirmed and Search Analytics-derived evidence when loaded.
 - Clarified report coverage for disconnected users by stating that local sitemap, robots, canonical, hreflang, structured-data, and HTML diagnostics still run without Search Console.
 - Reframed the first screen as a technical SEO audit instead of a Google crawl-only tool, with Google data described as optional supporting evidence.
+- Treated CrUX API disabled responses consistently across PageSpeed and dedicated CrUX requests, and stabilized URL Inspection queue keys when duplicate URLs enter the candidate batch.
 
 ### PageSpeed Insights
 
