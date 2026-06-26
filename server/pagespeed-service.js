@@ -48,6 +48,13 @@ export function validatePageSpeedRequest(input = {}) {
   return { apiKey, url: url.href, strategy, locale };
 }
 
+function withDefaultApiKey(input = {}, options = {}) {
+  return {
+    ...input,
+    apiKey: String(input.apiKey || "").trim() || String(options.defaultApiKey || "").trim(),
+  };
+}
+
 function score(category) {
   const value = category?.score;
   return typeof value === "number" ? Math.round(value * 100) : null;
@@ -205,7 +212,7 @@ export function normalizePageSpeedResponse(body, request) {
 }
 
 export async function runPageSpeed(input, options = {}) {
-  const request = validatePageSpeedRequest(input);
+  const request = validatePageSpeedRequest(withDefaultApiKey(input, options));
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   const endpoint = new URL(PAGESPEED_ENDPOINT);
   endpoint.searchParams.set("url", request.url);

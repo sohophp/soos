@@ -3,7 +3,9 @@ import { readJsonBody, sendJson } from "../http.js";
 export function handleCruxRoute(req, res, requestPath, options = {}) {
   if (req.method !== "POST" || requestPath !== "/api/crux/run") return false;
   readJsonBody(req, 10000)
-    .then((body) => options.runCrux(body))
+    .then((body) => options.runCrux(body, {
+      defaultApiKey: options.defaultApiKey?.() || "",
+    }))
     .then((result) => sendJson(res, 200, result))
     .catch((error) => {
       const status = error?.status === 429

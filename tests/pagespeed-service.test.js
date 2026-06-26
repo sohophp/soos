@@ -154,6 +154,21 @@ assert.equal(request.searchParams.get("key"), "secret-key");
 assert.equal(request.searchParams.get("strategy"), "mobile");
 assert.deepEqual(request.searchParams.getAll("category"), ["performance", "seo"]);
 
+let defaultKeyUrl = "";
+await runPageSpeed({
+  url: "https://example.com/page",
+}, {
+  defaultApiKey: "default-secret",
+  fetchImpl: async (url) => {
+    defaultKeyUrl = String(url);
+    return new Response(JSON.stringify(fixture), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  },
+});
+assert.equal(new URL(defaultKeyUrl).searchParams.get("key"), "default-secret");
+
 await assert.rejects(
   runPageSpeed({
     apiKey: "quota-key",

@@ -91,6 +91,21 @@ assert.equal(requests[1].body.origin, "https://example.com");
 assert.equal(requests[0].body.formFactor, "PHONE");
 assert.ok(requests[0].body.metrics.includes("interaction_to_next_paint"));
 
+const defaultKeyRequests = [];
+await runCrux({
+  url: "https://example.com/page",
+}, {
+  defaultApiKey: "default-crux-secret",
+  fetchImpl: async (url, options) => {
+    defaultKeyRequests.push({ url: String(url), body: JSON.parse(options.body) });
+    return new Response(JSON.stringify(pageFixture), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  },
+});
+assert.equal(new URL(defaultKeyRequests[0].url).searchParams.get("key"), "default-crux-secret");
+
 const noData = await runCrux({
   apiKey: "secret-key",
   url: "https://example.com/new",

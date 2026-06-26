@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 
-const [panelSource, summarySource, workspaceSource, routeSource, cruxRouteSource, securitySource] = await Promise.all([
+const [panelSource, settingsSource, summarySource, workspaceSource, routeSource, cruxRouteSource, securitySource] = await Promise.all([
   fs.readFile(new URL("../src/components/PageSpeedInsightsPanel.jsx", import.meta.url), "utf8"),
+  fs.readFile(new URL("../src/components/ScanSetupPanels.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/ScanSummaryView.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../src/components/WorkspaceReport.jsx", import.meta.url), "utf8"),
   fs.readFile(new URL("../server/routes/pagespeed-routes.js", import.meta.url), "utf8"),
@@ -10,9 +11,14 @@ const [panelSource, summarySource, workspaceSource, routeSource, cruxRouteSource
   fs.readFile(new URL("../server/security.js", import.meta.url), "utf8"),
 ]);
 
-assert.match(panelSource, /sessionStorage\?\.setItem\(SESSION_KEY/);
-assert.match(panelSource, /type="password"/);
-assert.match(panelSource, /autoComplete="off"/);
+assert.match(settingsSource, /writePageSpeedSessionKey/);
+assert.match(settingsSource, /type="password"/);
+assert.match(settingsSource, /autoComplete="off"/);
+assert.match(settingsSource, /console\.cloud\.google\.com\/apis\/credentials/);
+assert.match(settingsSource, /console\.cloud\.google\.com\/apis\/library\/pagespeedonline/);
+assert.match(settingsSource, /developers\.google\.com\/search\/docs\/monitor-debug\/search-console-start/);
+assert.match(panelSource, /apiGet\("\/api\/pagespeed\/status"/);
+assert.match(panelSource, /defaultApiKeyConfigured/);
 assert.match(panelSource, /apiPost\("\/api\/pagespeed\/run"/);
 assert.match(panelSource, /apiPost\("\/api\/crux\/run"/);
 assert.match(panelSource, /Promise\.allSettled/);
@@ -43,8 +49,11 @@ assert.match(workspaceSource, /language=\{language\}/);
 assert.match(workspaceSource, /gscStatus=\{gsc\.status\}/);
 assert.match(workspaceSource, /inspectionResults=\{inspectionResults\}/);
 assert.match(routeSource, /requestPath !== "\/api\/pagespeed\/run"/);
+assert.match(routeSource, /requestPath === "\/api\/pagespeed\/status"/);
+assert.match(routeSource, /defaultApiKey/);
 assert.match(routeSource, /readJsonBody\(req, 10000\)/);
 assert.match(cruxRouteSource, /requestPath !== "\/api\/crux\/run"/);
+assert.match(cruxRouteSource, /defaultApiKey/);
 assert.match(cruxRouteSource, /readJsonBody\(req, 10000\)/);
 assert.match(securitySource, /group: "pagespeed", limit: 6/);
 assert.match(securitySource, /group: "crux", limit: 6/);

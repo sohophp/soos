@@ -405,6 +405,43 @@ a:focus-visible,
   background: #ffffff;
 }
 
+.pagespeed-settings {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.1fr) minmax(220px, 1fr);
+  gap: 14px;
+  align-items: end;
+  width: min(900px, 100%);
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #dfe6dd;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.pagespeed-settings label strong {
+  display: block;
+  font-size: 14px;
+}
+
+.pagespeed-settings input[type="password"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  margin-top: 6px;
+  border: 1px solid #d9e1d7;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172018;
+  padding: 0 10px;
+}
+
+.pagespeed-settings-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .url-policy-copy strong,
 .url-policy-copy small,
 .url-policy-settings label strong {
@@ -1777,7 +1814,8 @@ a:focus-visible,
     align-items: flex-start;
   }
 
-  .url-policy-settings {
+  .url-policy-settings,
+  .pagespeed-settings {
     grid-template-columns: 1fr;
   }
 
@@ -2898,9 +2936,22 @@ a:focus-visible,
   gap: 12px;
 }
 
-.pagespeed-form > label {
+.pagespeed-form > label,
+.pagespeed-key-status {
   display: grid;
   gap: 5px;
+}
+
+.pagespeed-key-status {
+  padding: 10px 12px;
+  border: 1px solid #d9e1d7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.pagespeed-key-status span {
+  color: #246b45;
+  font-weight: 800;
 }
 
 .pagespeed-form > .pagespeed-crux-option {

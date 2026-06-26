@@ -79,6 +79,21 @@ const clearAuditJobBatches = auditJobStore.clearBatches;
 const fetchText = createScanFetcher();
 const { audit } = createScanRunner({ fetchText, jobStore: auditJobStore });
 
+function pageSpeedApiKeyFromEnv() {
+  return process.env.SOOS_PAGESPEED_API_KEY
+    || process.env.SOOS_GOOGLE_API_KEY
+    || process.env.GOOGLE_API_KEY
+    || "";
+}
+
+function cruxApiKeyFromEnv() {
+  return process.env.SOOS_CRUX_API_KEY
+    || process.env.SOOS_PAGESPEED_API_KEY
+    || process.env.SOOS_GOOGLE_API_KEY
+    || process.env.GOOGLE_API_KEY
+    || "";
+}
+
 function oauthRedirectUri() {
   const publicBaseUrl = process.env.SOOS_PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
   if (publicBaseUrl) return `${publicBaseUrl.replace(/\/$/, "")}/api/gsc/oauth/callback`;
@@ -423,10 +438,14 @@ export function handleRequest(req, res) {
   })) return;
   if (handlePageSpeedRoute(req, res, requestPath, {
     runPageSpeed,
+    defaultApiKey: pageSpeedApiKeyFromEnv,
+    defaultApiKeyConfigured: () => Boolean(pageSpeedApiKeyFromEnv()),
+    defaultCruxApiKeyConfigured: () => Boolean(cruxApiKeyFromEnv()),
     sendRouteError,
   })) return;
   if (handleCruxRoute(req, res, requestPath, {
     runCrux,
+    defaultApiKey: cruxApiKeyFromEnv,
     sendRouteError,
   })) return;
   if (handleAuditJobRoute(req, res, requestPath, {

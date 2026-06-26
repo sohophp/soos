@@ -1,17 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { apiPost, formatApiError } from "../api-client.js";
+import { apiGet, apiPost, formatApiError } from "../api-client.js";
 import { pageSpeedText } from "../i18n.js";
+import { readPageSpeedSessionKey } from "../pagespeed-key.js";
 import { Badge, Stat } from "./ReportUi.jsx";
-
-const SESSION_KEY = "soos.pagespeed.api-key";
-
-function readSessionKey() {
-  try {
-    return globalThis.sessionStorage?.getItem(SESSION_KEY) || "";
-  } catch {
-    return "";
-  }
-}
 
 function scoreSeverity(score) {
   if (score == null) return "notice";
@@ -92,7 +83,11 @@ export function PageSpeedInsightsPanel({ report, language }) {
       .flatMap((page) => [page.finalUrl || page.url, page.url])
       .filter(Boolean),
   )].slice(0, 500), [report]);
-  const [apiKey, setApiKey] = useState(readSessionKey);
+  const [apiKey, setApiKey] = useState(readPageSpeedSessionKey);
+  const [status, setStatus] = useState({
+    defaultApiKeyConfigured: false,
+    defaultCruxApiKeyConfigured: false,
+  });
   const [url, setUrl] = useState(urls[0] || report?.input?.siteRootUrl || "");
   const [strategy, setStrategy] = useState("mobile");
   const [includeCrux, setIncludeCrux] = useState(false);
@@ -110,15 +105,24 @@ export function PageSpeedInsightsPanel({ report, language }) {
     setCruxError("");
   }, [report?.scannedAt, report?.input?.siteRootUrl, url, urls]);
 
-  function updateKey(value) {
-    setApiKey(value);
-    try {
-      if (value) globalThis.sessionStorage?.setItem(SESSION_KEY, value);
-      else globalThis.sessionStorage?.removeItem(SESSION_KEY);
-    } catch {
-      // Session-only storage may be unavailable in strict privacy modes.
+  useEffect(() => {
+    apiGet("/api/pagespeed/status")
+      .then((value) => setStatus({
+        defaultApiKeyConfigured: Boolean(value?.defaultApiKeyConfigured),
+        defaultCruxApiKeyConfigured: Boolean(value?.defaultCruxApiKeyConfigured),
+      }))
+      .catch(() => setStatus({ defaultApiKeyConfigured: false, defaultCruxApiKeyConfigured: false }));
+
+    function refreshSessionKey() {
+      setApiKey(readPageSpeedSessionKey());
     }
-  }
+    globalThis.addEventListener?.("storage", refreshSessionKey);
+    globalThis.addEventListener?.("soos:pagespeed-key", refreshSessionKey);
+    return () => {
+      globalThis.removeEventListener?.("storage", refreshSessionKey);
+      globalThis.removeEventListener?.("soos:pagespeed-key", refreshSessionKey);
+    };
+  }, []);
 
   async function run(event) {
     event?.preventDefault();
@@ -181,6 +185,8 @@ export function PageSpeedInsightsPanel({ report, language }) {
   const preferredField = cruxField || field;
   const preferredFieldSource = cruxField ? "crux" : field ? "pagespeed" : "";
   const webVitalsStatus = coreWebVitalsStatus(preferredField);
+  const hasRunnableKey = Boolean(apiKey || status.defaultApiKeyConfigured);
+  const hasCruxKey = Boolean(apiKey || status.defaultCruxApiKeyConfigured);
 
   return (
     <section className="panel pagespeed-panel">
@@ -192,18 +198,11 @@ export function PageSpeedInsightsPanel({ report, language }) {
         <span>{copy.onDemand}</span>
       </div>
       <form className="pagespeed-form" onSubmit={run}>
-        <label>
+        <div className="pagespeed-key-status">
           <strong>{copy.apiKey}</strong>
-          <input
-            type="password"
-            autoComplete="off"
-            value={apiKey}
-            onChange={(event) => updateKey(event.target.value)}
-            placeholder={copy.apiKeyPlaceholder}
-            required
-          />
+          <span>{apiKey ? copy.usingCustomKey : status.defaultApiKeyConfigured ? copy.usingDefaultKey : copy.noApiKey}</span>
           <small>{copy.apiKeyHelp}</small>
-        </label>
+        </div>
         <label>
           <strong>{copy.testUrl}</strong>
           <select value={url} onChange={(event) => setUrl(event.target.value)}>
@@ -229,19 +228,15 @@ export function PageSpeedInsightsPanel({ report, language }) {
           <input
             type="checkbox"
             checked={includeCrux}
+            disabled={!hasCruxKey}
             onChange={(event) => setIncludeCrux(event.target.checked)}
           />
           <span>{copy.includeCrux}</span>
         </label>
         <div className="pagespeed-actions">
-          <button className="export-button" type="submit" disabled={loading || !apiKey || !url}>
+          <button className="export-button" type="submit" disabled={loading || !hasRunnableKey || !url}>
             {loading ? copy.running : copy.run}
           </button>
-          {apiKey ? (
-            <button className="export-button" type="button" onClick={() => updateKey("")}>
-              {copy.clearKey}
-            </button>
-          ) : null}
         </div>
         <small className="pagespeed-privacy">{copy.privacy}</small>
       </form>

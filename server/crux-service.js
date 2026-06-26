@@ -50,6 +50,13 @@ export function validateCruxRequest(input = {}) {
   return { apiKey, url: url.href, origin: url.origin, formFactor };
 }
 
+function withDefaultApiKey(input = {}, options = {}) {
+  return {
+    ...input,
+    apiKey: String(input.apiKey || "").trim() || String(options.defaultApiKey || "").trim(),
+  };
+}
+
 function categoryFor(name, value) {
   const thresholds = THRESHOLDS[name];
   if (!thresholds || value == null || Number.isNaN(Number(value))) return "unknown";
@@ -145,7 +152,7 @@ async function queryRecord(request, scope, options) {
 }
 
 export async function runCrux(input, options = {}) {
-  const request = validateCruxRequest(input);
+  const request = validateCruxRequest(withDefaultApiKey(input, options));
   const queryOptions = {
     fetchImpl: options.fetchImpl || globalThis.fetch,
     timeoutMs: options.timeoutMs,

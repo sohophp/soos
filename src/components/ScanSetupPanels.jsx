@@ -1,5 +1,7 @@
 import React from "react";
 import { FileSearch, Info, Loader2, Search } from "lucide-react";
+import { pageSpeedText } from "../i18n.js";
+import { readPageSpeedSessionKey, writePageSpeedSessionKey } from "../pagespeed-key.js";
 import { PrivacyDataPanel } from "./PrivacyDataPanel.jsx";
 import {
   ProgressBar,
@@ -50,6 +52,15 @@ export function ScanLaunchPanel({ t, settings, runner, onSubmit, onControl }) {
 }
 
 export function ScanSettingsPanel({ t, language, settings, onDeleted }) {
+  const pageSpeedCopy = pageSpeedText[language] || pageSpeedText.en;
+  const [pageSpeedKey, setPageSpeedKey] = React.useState(readPageSpeedSessionKey);
+
+  function updatePageSpeedKey(value) {
+    setPageSpeedKey(value);
+    writePageSpeedSessionKey(value);
+    globalThis.dispatchEvent?.(new Event("soos:pagespeed-key"));
+  }
+
   return (
     <>
       <SettingToggle
@@ -119,6 +130,39 @@ export function ScanSettingsPanel({ t, language, settings, onDeleted }) {
         help={t.directoryRobotsHelp}
         onChange={(value) => settings.setValue("directoryRobots", value)}
       />
+
+      <section className="pagespeed-settings">
+        <div className="url-policy-copy">
+          <strong>{pageSpeedCopy.settingsTitle}</strong>
+          <small>{pageSpeedCopy.settingsHelp}</small>
+        </div>
+        <label>
+          <strong>{pageSpeedCopy.apiKey}</strong>
+          <input
+            type="password"
+            autoComplete="off"
+            value={pageSpeedKey}
+            onChange={(event) => updatePageSpeedKey(event.target.value)}
+            placeholder={pageSpeedCopy.apiKeyPlaceholder}
+          />
+        </label>
+        <div className="pagespeed-settings-actions">
+          {pageSpeedKey ? (
+            <button className="export-button" type="button" onClick={() => updatePageSpeedKey("")}>
+              {pageSpeedCopy.clearKey}
+            </button>
+          ) : null}
+          <a className="export-button" href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer">
+            {pageSpeedCopy.applyApiKey}
+          </a>
+          <a className="export-button" href="https://console.cloud.google.com/apis/library/pagespeedonline.googleapis.com" target="_blank" rel="noreferrer">
+            {pageSpeedCopy.enablePageSpeedApi}
+          </a>
+          <a className="export-button" href="https://developers.google.com/search/docs/monitor-debug/search-console-start" target="_blank" rel="noreferrer">
+            {pageSpeedCopy.enableGscGuide}
+          </a>
+        </div>
+      </section>
 
       <PrivacyDataPanel language={language} onDeleted={onDeleted} />
     </>

@@ -1,9 +1,18 @@
 import { readJsonBody, sendJson } from "../http.js";
 
 export function handlePageSpeedRoute(req, res, requestPath, options = {}) {
+  if (req.method === "GET" && requestPath === "/api/pagespeed/status") {
+    sendJson(res, 200, {
+      defaultApiKeyConfigured: Boolean(options.defaultApiKeyConfigured?.()),
+      defaultCruxApiKeyConfigured: Boolean(options.defaultCruxApiKeyConfigured?.()),
+    });
+    return true;
+  }
   if (req.method !== "POST" || requestPath !== "/api/pagespeed/run") return false;
   readJsonBody(req, 10000)
-    .then((body) => options.runPageSpeed(body))
+    .then((body) => options.runPageSpeed(body, {
+      defaultApiKey: options.defaultApiKey?.() || "",
+    }))
     .then((result) => sendJson(res, 200, result))
     .catch((error) => {
       const status = error?.status === 429
