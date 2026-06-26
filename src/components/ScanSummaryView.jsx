@@ -98,6 +98,12 @@ function ReportCoveragePanel({ coverage, t }) {
           ))}
         </div>
       ) : null}
+      {!coverage.gscConnected ? (
+        <p className="coverage-local-note">
+          <strong>{t.coverageLocalOnlyTitle}</strong>
+          <span>{t.coverageLocalOnlyHelp}</span>
+        </p>
+      ) : null}
       <div className="coverage-limits">
         <div>
           <strong>{t.coverageLimitations}</strong>

@@ -67,6 +67,7 @@ Stored data, retention periods, Google disconnection, and complete current-sessi
 - Structured data validation and scan-level diagnosis/report scoring live in dedicated domain modules.
 - A unified issue model normalizes scan, Google, and search-visibility findings into Issue -> Evidence -> Fix -> Verify objects with confidence and explainable priority scoring.
 - Report coverage summaries state scan limits, Google connection state, URL Inspection sampling, PageSpeed/CrUX usage, and conclusions the report cannot safely make.
+- Search Console is optional for the core technical audit; local sitemap, robots, canonical, hreflang, structured-data, and HTML diagnostics run before any Google connection.
 - Persistent Scan, Google, Issues, URLs, History, and Settings views, with paginated URL findings and state-preserving Google diagnostics.
 - Workspace views expose ARIA tab semantics and support Left/Right/Home/End keyboard navigation.
 - URL findings can be filtered by severity, issue type, text, Sitemap/internal/GSC/Inspection source, and historical change state; CSV, summary, and standalone HTML exports include loaded URL Inspection plus Search Analytics evidence.

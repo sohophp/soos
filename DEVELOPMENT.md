@@ -18,6 +18,7 @@
 - 已完成：URL CSV 导出补充当前已加载的 URL Inspection verdict、coverage state、Google/user canonical 与 Search Analytics 机会证据，方便离线执行修复。
 - 已完成：独立 HTML 报告同步展示已加载的 URL Inspection 与 Search Analytics 证据，分享报告时与应用内诊断保持一致。
 - 已完成：Summary 文本导出接入统一 Fix Plan，包含扫描、Google Inspection 与 Search Analytics 证据合并后的优先级、影响、修复步骤和证据摘要。
+- 已完成：未连接 Search Console 时，Report Coverage 明确提示本地 sitemap、robots、canonical、hreflang、结构化数据和 HTML 诊断仍可独立使用，只是不能断言 Google 真实收录。
 - 已验收：新增 issue model 与 report coverage 测试，并接入 `npm run check`。
 - 本批取舍：不重构大 UI、不新增 Google 权限、不做 sitemap 写操作、不实现内容生成、自动改站或定时监控；Overview/Fix Plan/Issues/URLs/Google UI 收口进入后续 Phase。
 

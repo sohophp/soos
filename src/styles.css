@@ -1404,6 +1404,26 @@ a:focus-visible,
   font-weight: 700;
 }
 
+.coverage-local-note {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid #55745e;
+  background: #f7faf6;
+}
+
+.coverage-local-note strong {
+  color: #172018;
+  font-size: 13px;
+}
+
+.coverage-local-note span {
+  color: #526058;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .coverage-limits {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
