@@ -16,6 +16,7 @@
 - 已完成：补强 Google Sitemap、Property、PageSpeed 和扫描摘要列表的稳定 key，避免真实数据存在重复 URL、重复 warning 或重复审计项时出现行丢失/重复渲染警告。
 - 已完成：修复 Fix Plan 到 URL 列表的筛选链路，Google Inspection 与 Search Analytics 生成的证据型 issue 可按 affected URLs 显示对应页面，不再依赖本地扫描 issue type。
 - 已完成：URL CSV 导出补充当前已加载的 URL Inspection verdict、coverage state、Google/user canonical 与 Search Analytics 机会证据，方便离线执行修复。
+- 已完成：独立 HTML 报告同步展示已加载的 URL Inspection 与 Search Analytics 证据，分享报告时与应用内诊断保持一致。
 - 已验收：新增 issue model 与 report coverage 测试，并接入 `npm run check`。
 - 本批取舍：不重构大 UI、不新增 Google 权限、不做 sitemap 写操作、不实现内容生成、自动改站或定时监控；Overview/Fix Plan/Issues/URLs/Google UI 收口进入后续 Phase。
 

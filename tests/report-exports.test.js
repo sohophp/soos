@@ -130,6 +130,7 @@ assert.doesNotMatch(mainSource, /function GscOpportunities/);
 assert.match(mainSource, /<WorkspaceReport/);
 assert.match(reportSource, /<GoogleOverview report=\{report\}/);
 assert.match(reportSource, /downloadAuditCsv\(report, gsc\.rows, pages, \{/);
+assert.match(reportSource, /downloadHtmlReport\(report, gsc\.rows, language, \{/);
 assert.match(reportSource, /inspectionResults,/);
 assert.match(reportSource, /searchInsights: gsc\.searchInsights/);
 assert.match(overviewSource, /buildSearchVisibility\(report\)/);

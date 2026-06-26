@@ -35,11 +35,30 @@ const html = buildStandaloneHtmlReport({
 }, {
   language: "zh-CN",
   gscRows: [{ page: "https://example.com/?x=<script>alert(1)</script>", clicks: 2, impressions: 50, position: 6 }],
+  inspectionResults: [{
+    ok: true,
+    url: "https://example.com/?x=<script>alert(1)</script>",
+    verdict: "FAIL",
+    coverageState: "Crawled - currently not indexed",
+    googleCanonical: "https://example.com/google",
+    userCanonical: "https://example.com/",
+  }],
+  searchInsights: [{
+    type: "low_ctr",
+    title: "High impressions with low CTR",
+    page: "https://example.com/?x=<script>alert(1)</script>",
+    metrics: "2 clicks / 50 impressions",
+  }],
 });
 
 assert.match(html, /^<!doctype html>/);
 assert.match(html, /SEO 检查报告/);
 assert.match(html, /2 clicks · 50 impressions · position 6/);
+assert.match(html, /网址检查/);
+assert.match(html, /Crawled - currently not indexed/);
+assert.match(html, /https:\/\/example\.com\/google/);
+assert.match(html, /搜索机会/);
+assert.match(html, /low_ctr/);
 assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
 assert.doesNotMatch(html, /href="javascript:/);
 assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);

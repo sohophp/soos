@@ -32,7 +32,8 @@ const COPY = {
     urls: "URLs", affected: "Affected URLs", score: "Health score", critical: "Critical", warnings: "Warnings",
     generated: "Generated", scanned: "Scanned", input: "Input", sitemap: "Sitemap", robots: "Robots",
     limits: "Limits", findings: "URL evidence", status: "Status", finalUrl: "Final URL", canonical: "Canonical",
-    issues: "Issues", google: "Google outcomes", gsc: "Search performance", noIssues: "No detected issues",
+    issues: "Issues", google: "Google outcomes", gsc: "Search performance", inspection: "URL Inspection",
+    searchInsights: "Search opportunities", noIssues: "No detected issues",
     evidenceNote: "This report reflects the configured scan scope and the evidence available at scan time.",
   },
   "zh-CN": {
@@ -40,7 +41,8 @@ const COPY = {
     urls: "网址", affected: "受影响网址", score: "健康评分", critical: "严重", warnings: "警告",
     generated: "生成时间", scanned: "扫描时间", input: "输入", sitemap: "Sitemap", robots: "Robots",
     limits: "限制", findings: "网址证据", status: "状态", finalUrl: "最终网址", canonical: "Canonical",
-    issues: "问题", google: "Google 结果", gsc: "搜索表现", noIssues: "未发现问题",
+    issues: "问题", google: "Google 结果", gsc: "搜索表现", inspection: "网址检查",
+    searchInsights: "搜索机会", noIssues: "未发现问题",
     evidenceNote: "本报告仅反映配置的扫描范围和扫描时可获得的证据。",
   },
   "zh-TW": {
@@ -48,7 +50,8 @@ const COPY = {
     urls: "網址", affected: "受影響網址", score: "健康評分", critical: "嚴重", warnings: "警告",
     generated: "產生時間", scanned: "掃描時間", input: "輸入", sitemap: "Sitemap", robots: "Robots",
     limits: "限制", findings: "網址證據", status: "狀態", finalUrl: "最終網址", canonical: "Canonical",
-    issues: "問題", google: "Google 結果", gsc: "搜尋成效", noIssues: "未發現問題",
+    issues: "問題", google: "Google 結果", gsc: "搜尋成效", inspection: "網址檢查",
+    searchInsights: "搜尋機會", noIssues: "未發現問題",
     evidenceNote: "本報告僅反映設定的掃描範圍和掃描時可取得的證據。",
   },
 };
@@ -59,7 +62,22 @@ function definitionRows(values) {
     .join("");
 }
 
-function pageEvidence(page, gsc, copy) {
+function inspectionForPage(page, inspectionByUrl) {
+  return inspectionByUrl.get(normalizeReportUrl(page.url))
+    || inspectionByUrl.get(normalizeReportUrl(page.finalUrl || ""))
+    || null;
+}
+
+function searchInsightsForPage(page, insights = []) {
+  const pageKeys = new Set([normalizeReportUrl(page.url), normalizeReportUrl(page.finalUrl || "")].filter(Boolean));
+  return (insights || []).filter((insight) => {
+    const directUrl = normalizeReportUrl(insight.page || "");
+    const detailUrl = normalizeReportUrl(String(insight.detail || "").match(/https?:\/\/\S+/)?.[0] || "");
+    return (directUrl && pageKeys.has(directUrl)) || (detailUrl && pageKeys.has(detailUrl));
+  });
+}
+
+function pageEvidence(page, gsc, inspection, searchInsights, copy) {
   const url = escapeHtml(page.url);
   const href = safeHref(page.url);
   const issues = (page.issues || []).length
@@ -76,6 +94,18 @@ function pageEvidence(page, gsc, copy) {
   const gscText = gsc
     ? `${gsc.clicks ?? 0} clicks · ${gsc.impressions ?? 0} impressions · position ${gsc.position ?? "-"}`
     : "-";
+  const inspectionRows = inspection?.ok ? definitionRows({
+    Verdict: inspection.verdict || "-",
+    "Coverage state": inspection.coverageState || "-",
+    "Google canonical": inspection.googleCanonical || "-",
+    "User canonical": inspection.userCanonical || "-",
+  }) : "";
+  const insightRows = (searchInsights || []).map((insight) => `
+    <li>
+      <strong>${escapeHtml(insight.type || "search_opportunity")}</strong>
+      <span>${escapeHtml(insight.title || insight.detail || "")}</span>
+      ${insight.metrics ? `<small>${escapeHtml(insight.metrics)}</small>` : ""}
+    </li>`).join("");
   return `
     <article class="url-row">
       <header>
@@ -91,6 +121,8 @@ function pageEvidence(page, gsc, copy) {
       </dl>
       <section><h4>${escapeHtml(copy.issues)}</h4><ul>${issues}</ul></section>
       ${googleReasons ? `<section><h4>${escapeHtml(copy.google)}</h4><ul>${googleReasons}</ul></section>` : ""}
+      ${inspectionRows ? `<section><h4>${escapeHtml(copy.inspection)}</h4><dl>${inspectionRows}</dl></section>` : ""}
+      ${insightRows ? `<section><h4>${escapeHtml(copy.searchInsights)}</h4><ul>${insightRows}</ul></section>` : ""}
     </article>`;
 }
 
@@ -103,6 +135,11 @@ export function buildStandaloneHtmlReport(report, options = {}) {
       row,
     ]),
   );
+  const inspectionByUrl = new Map(
+    (options.inspectionResults || [])
+      .filter((item) => item?.url)
+      .map((item) => [normalizeReportUrl(item.url), item]),
+  );
   const pages = report?.pages || [];
   const config = {
     contentChecks: report?.options?.contentChecks,
@@ -113,7 +150,13 @@ export function buildStandaloneHtmlReport(report, options = {}) {
     trailingSlashPolicy: report?.options?.trailingSlashPolicy,
   };
   const pageRows = pages.map((page) =>
-    pageEvidence(page, gscByUrl.get(normalizeReportUrl(page.url)), copy),
+    pageEvidence(
+      page,
+      gscByUrl.get(normalizeReportUrl(page.url)),
+      inspectionForPage(page, inspectionByUrl),
+      searchInsightsForPage(page, options.searchInsights),
+      copy,
+    ),
   ).join("");
   const generatedAt = new Date().toISOString();
   const reportTitle = options.title || copy.title;

@@ -46,6 +46,6 @@ assert.match(historySource, /<ComparisonPanel/);
 assert.match(historySource, /auditRunner\.continueJob\(job\)/);
 assert.match(reportSource, /<UrlInspectionPanel/);
 assert.match(reportSource, /searchInsights=\{gsc\.searchInsights\}/);
-assert.match(reportSource, /downloadHtmlReport\(report, gsc\.rows, language\)/);
+assert.match(reportSource, /downloadHtmlReport\(report, gsc\.rows, language, \{/);
 
 console.log("workspace state tests passed");

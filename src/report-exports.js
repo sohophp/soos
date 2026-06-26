@@ -249,10 +249,10 @@ export function downloadAuditCsv(report, gscRows, filteredPages, context) {
   downloadCsvFile(`soos-audit-${exportTimestamp()}.csv`, buildAuditCsvRows(report, gscRows, filteredPages, context));
 }
 
-export function downloadHtmlReport(report, gscRows, language) {
+export function downloadHtmlReport(report, gscRows, language, context = {}) {
   downloadTextFile(
     `soos-report-${exportTimestamp()}.html`,
-    buildStandaloneHtmlReport(report, { language, gscRows }),
+    buildStandaloneHtmlReport(report, { language, gscRows, ...normalizeExportContext(context) }),
     "text/html;charset=utf-8;",
   );
 }
