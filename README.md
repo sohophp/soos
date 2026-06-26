@@ -69,7 +69,7 @@ Stored data, retention periods, Google disconnection, and complete current-sessi
 - Report coverage summaries state scan limits, Google connection state, URL Inspection sampling, PageSpeed/CrUX usage, and conclusions the report cannot safely make.
 - Persistent Scan, Google, Issues, URLs, History, and Settings views, with paginated URL findings and state-preserving Google diagnostics.
 - Workspace views expose ARIA tab semantics and support Left/Right/Home/End keyboard navigation.
-- URL findings can be filtered by severity, issue type, text, Sitemap/internal/GSC/Inspection source, and historical change state; CSV export follows the active filters.
+- URL findings can be filtered by severity, issue type, text, Sitemap/internal/GSC/Inspection source, and historical change state; CSV export follows the active filters and includes loaded URL Inspection plus Search Analytics evidence.
 - URL finding rows, filters, source/change counts, pagination, and filtered exports are isolated in `src/components/UrlFindingsPanel.jsx`.
 - Scan summary, issue diagnosis, and shared report badges/statistics are separated into focused report view components.
 - Sitemap inventory, recursive discoveries, internal-link graph filters, and graph CSV export are isolated in `src/components/UrlStructureView.jsx`.

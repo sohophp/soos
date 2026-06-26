@@ -74,10 +74,32 @@ const gscRows = [
   { page: "https://example.com/page/", clicks: 2, impressions: 100, position: 7 },
   { page: "https://example.com/gsc-only", clicks: 1, impressions: 20, position: 9 },
 ];
-const csvRows = buildAuditCsvRows(report, gscRows);
+const exportContext = {
+  inspectionResults: [{
+    ok: true,
+    url: "https://example.com/page/",
+    verdict: "FAIL",
+    coverageState: "Crawled - currently not indexed",
+    googleCanonical: "https://example.com/google-canonical",
+    userCanonical: "https://example.com/final",
+  }],
+  searchInsights: [{
+    type: "low_ctr",
+    title: "High impressions with low CTR",
+    page: "https://example.com/page/",
+    metrics: "2 clicks / 100 impressions",
+  }],
+};
+const csvRows = buildAuditCsvRows(report, gscRows, null, exportContext);
 assert.equal(csvRows[0][0], "url");
+assert.equal(csvRows[0].includes("inspection_verdict"), true);
+assert.equal(csvRows[0].includes("search_insights"), true);
 assert.equal(csvRows.filter((row) => row[0] === page.url).length, 2);
 assert.equal(csvRows.find((row) => row[0] === page.url)?.[13], 2);
+assert.equal(csvRows.find((row) => row[0] === page.url)?.[17], "FAIL");
+assert.equal(csvRows.find((row) => row[0] === page.url)?.[18], "Crawled - currently not indexed");
+assert.equal(csvRows.find((row) => row[0] === page.url)?.[19], "https://example.com/google-canonical");
+assert.match(csvRows.find((row) => row[0] === page.url)?.[21], /low_ctr/);
 assert.ok(csvRows.some((row) => row[7] === "gsc_not_in_sitemap"));
 
 const filteredRows = buildAuditCsvRows(report, gscRows, [page]);
@@ -107,7 +129,9 @@ assert.doesNotMatch(mainSource, /function SearchVisibility/);
 assert.doesNotMatch(mainSource, /function GscOpportunities/);
 assert.match(mainSource, /<WorkspaceReport/);
 assert.match(reportSource, /<GoogleOverview report=\{report\}/);
-assert.match(reportSource, /downloadAuditCsv\(report, gsc\.rows, pages\)/);
+assert.match(reportSource, /downloadAuditCsv\(report, gsc\.rows, pages, \{/);
+assert.match(reportSource, /inspectionResults,/);
+assert.match(reportSource, /searchInsights: gsc\.searchInsights/);
 assert.match(overviewSource, /buildSearchVisibility\(report\)/);
 assert.match(overviewSource, /buildGscOpportunities\(report, rows \|\| \[\], language\)/);
 assert.match(overviewSource, /key=\{`\$\{item\.key\}-\$\{item\.severity\}-\$\{index\}`\}/);

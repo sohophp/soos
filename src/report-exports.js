@@ -51,9 +51,33 @@ export function classifyGscForPage(page, gsc) {
   return "has_visibility";
 }
 
-export function buildAuditCsvRows(report, gscRows = [], filteredPages = null) {
+function inspectionEvidenceForPage(page, inspectionByUrl) {
+  const inspection = inspectionByUrl.get(normalizeReportUrl(page.url)) || inspectionByUrl.get(normalizeReportUrl(page.finalUrl || ""));
+  if (!inspection?.ok) return null;
+  return inspection;
+}
+
+function searchInsightEvidenceForPage(page, insights = []) {
+  const pageKeys = new Set([normalizeReportUrl(page.url), normalizeReportUrl(page.finalUrl || "")].filter(Boolean));
+  return (insights || []).filter((insight) => {
+    const directUrl = normalizeReportUrl(insight.page || "");
+    const detailUrl = normalizeReportUrl(String(insight.detail || "").match(/https?:\/\/\S+/)?.[0] || "");
+    return (directUrl && pageKeys.has(directUrl)) || (detailUrl && pageKeys.has(detailUrl));
+  });
+}
+
+function normalizeExportContext(context) {
+  if (Array.isArray(context)) return { searchInsights: context };
+  return context && typeof context === "object" ? context : {};
+}
+
+export function buildAuditCsvRows(report, gscRows = [], filteredPages = null, context = {}) {
+  const exportContext = normalizeExportContext(context);
   const normalizedGscRows = uniqueGscRows(gscRows);
   const gscByUrl = buildGscRowMap(normalizedGscRows);
+  const inspectionByUrl = new Map((exportContext.inspectionResults || [])
+    .filter((item) => item?.url)
+    .map((item) => [normalizeReportUrl(item.url), item]));
   const exportPages = filteredPages ?? report.pages ?? [];
   const rows = [[
     "url",
@@ -73,10 +97,17 @@ export function buildAuditCsvRows(report, gscRows = [], filteredPages = null) {
     "gsc_impressions",
     "gsc_position",
     "gsc_classification",
+    "inspection_verdict",
+    "inspection_coverage_state",
+    "inspection_google_canonical",
+    "inspection_user_canonical",
+    "search_insights",
   ]];
 
   for (const page of exportPages) {
     const gsc = gscByUrl.get(normalizeReportUrl(page.url));
+    const inspection = inspectionEvidenceForPage(page, inspectionByUrl);
+    const searchInsights = searchInsightEvidenceForPage(page, exportContext.searchInsights);
     const baseRow = [
       page.url,
       page.finalUrl || "",
@@ -93,6 +124,11 @@ export function buildAuditCsvRows(report, gscRows = [], filteredPages = null) {
       gsc?.impressions ?? "",
       gsc?.position ?? "",
       classifyGscForPage(page, gsc),
+      inspection?.verdict || "",
+      inspection?.coverageState || "",
+      inspection?.googleCanonical || "",
+      inspection?.userCanonical || "",
+      searchInsights.map((insight) => [insight.type, insight.title || insight.detail, insight.metrics].filter(Boolean).join(": ")).join(" | "),
     ];
     if (!(page.issues || []).length && !page.googleReasons?.length) {
       rows.push([...baseRow, "ok", "", "", "", ...tailRow]);
@@ -134,6 +170,11 @@ export function buildAuditCsvRows(report, gscRows = [], filteredPages = null) {
         row.impressions ?? "",
         row.position ?? "",
         "gsc_not_in_sitemap",
+        "",
+        "",
+        "",
+        "",
+        "",
       ]);
     }
   }
@@ -204,8 +245,8 @@ function exportTimestamp(now = new Date()) {
   return now.toISOString().slice(0, 19).replaceAll(":", "-");
 }
 
-export function downloadAuditCsv(report, gscRows, filteredPages) {
-  downloadCsvFile(`soos-audit-${exportTimestamp()}.csv`, buildAuditCsvRows(report, gscRows, filteredPages));
+export function downloadAuditCsv(report, gscRows, filteredPages, context) {
+  downloadCsvFile(`soos-audit-${exportTimestamp()}.csv`, buildAuditCsvRows(report, gscRows, filteredPages, context));
 }
 
 export function downloadHtmlReport(report, gscRows, language) {

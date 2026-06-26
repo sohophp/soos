@@ -92,7 +92,10 @@ export function WorkspaceReport({
           onIssueFilterChange={setIssueFilter}
           onExportSummary={() => downloadSummaryReport(report)}
           onExportHtml={() => downloadHtmlReport(report, gsc.rows, language)}
-          onExportCsv={(pages) => downloadAuditCsv(report, gsc.rows, pages)}
+          onExportCsv={(pages) => downloadAuditCsv(report, gsc.rows, pages, {
+            inspectionResults,
+            searchInsights: gsc.searchInsights,
+          })}
         />
       </div>
     </>
