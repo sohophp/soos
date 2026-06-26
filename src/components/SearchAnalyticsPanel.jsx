@@ -177,7 +177,7 @@ function downloadComparisonCsv(comparison, ranges) {
   downloadCsvFile(`soos-search-analytics-comparison-${new Date().toISOString().slice(0, 19).replaceAll(":", "-")}.csv`, csvRows);
 }
 
-export function SearchAnalyticsPanel({ status, siteUrl, onRows, language }) {
+export function SearchAnalyticsPanel({ status, siteUrl, onRows, onInsights, language }) {
   const copy = gscDataText[language] || gscDataText.en;
   const defaults = useMemo(() => defaultGscDateRange(), []);
   const [startDate, setStartDate] = useState(defaults.startDate);
@@ -216,12 +216,18 @@ export function SearchAnalyticsPanel({ status, siteUrl, onRows, language }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    onInsights?.(insights);
+  }, [insights, onInsights]);
+
+  useEffect(() => {
     setQueryIntentSettings(readQueryIntentSettings(siteUrl));
     setSummary(null);
     setRows([]);
     setComparison(null);
     setComparisonRanges(null);
     setError("");
+    onRows?.([]);
+    onInsights?.([]);
   }, [siteUrl]);
 
   function updateQueryIntentSetting(name, value) {
@@ -249,6 +255,7 @@ export function SearchAnalyticsPanel({ status, siteUrl, onRows, language }) {
     setComparison(null);
     setComparisonRanges(null);
     onRows([]);
+    onInsights?.([]);
     try {
       const body = await loadGscSearchAnalytics({
         startDate,

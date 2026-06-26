@@ -305,6 +305,7 @@ Search Analytics notes:
 - Page dimension rows feed GSC opportunities, Search Visibility, and CSV export.
 - Query, Page + Query, Country, and Device dimensions are displayed in the Search Analytics panel for exploration.
 - Page + Query rows also generate lightweight opportunities for high impressions with low CTR, top rankings with almost no clicks, rankings in positions 4-10, page-two rankings, and pages spread across many queries.
+- These Page + Query opportunities also feed the Issues Fix Plan, so keyword opportunities can be prioritized beside crawl, indexability, canonical, and structured-data findings.
 - Page + Query analysis flags likely keyword cannibalization when multiple pages receive a meaningful share of visibility for the same query.
 - Similar Page + Query terms are clustered by normalized intent; branded, local, navigation, informational, and topic queries are distinguished to reduce cannibalization false positives.
 - Brand, location, and clustering-exclusion terms can be customized per Search Console property and are stored only in the current browser.

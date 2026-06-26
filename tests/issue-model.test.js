@@ -73,6 +73,17 @@ const issues = normalizeReportIssues(report, {
       coverageState: "Crawled - currently not indexed",
     },
   ],
+  searchInsights: [
+    {
+      type: "low_ctr",
+      severity: "warning",
+      title: "High impressions with low CTR",
+      detail: "seo audit on https://example.com/title",
+      metrics: "1 clicks / 300 impressions",
+      impressions: 300,
+      clicks: 1,
+    },
+  ],
 });
 
 const robotsIssue = issues.find((issue) => issue.type === "robots_disallow");
@@ -80,6 +91,7 @@ const canonicalIssue = issues.find((issue) => issue.type === "canonical_mismatch
 const titleIssue = issues.find((issue) => issue.type === "title_short");
 const googleCanonicalIssue = issues.find((issue) => issue.type === "google_selected_canonical_differs");
 const googleNotIndexedIssue = issues.find((issue) => issue.type === "google_not_indexed");
+const searchInsightIssue = issues.find((issue) => issue.type === "low_ctr");
 
 assert.equal(robotsIssue.category, "crawlability");
 assert.equal(robotsIssue.severity, "critical");
@@ -96,6 +108,10 @@ assert.equal(googleCanonicalIssue.confidence, "confirmed");
 assert.equal(googleCanonicalIssue.sourceCapabilities.includes("google"), true);
 assert.equal(googleCanonicalIssue.verification[0].requiresGoogleData, true);
 assert.equal(googleNotIndexedIssue.impact.includes("inspected URLs"), true);
+assert.equal(searchInsightIssue.category, "search_visibility");
+assert.equal(searchInsightIssue.confidence, "confirmed");
+assert.equal(searchInsightIssue.sourceCapabilities.includes("google"), true);
+assert.equal(searchInsightIssue.searchVisibility.impressions, 300);
 
 assert.equal(issues[0].priorityScore >= robotsIssue.priorityScore, true);
 assert.equal(robotsIssue.priorityScore > titleIssue.priorityScore, true);

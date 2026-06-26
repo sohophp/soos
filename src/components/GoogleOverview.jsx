@@ -14,8 +14,8 @@ function GscOpportunities({ report, rows, language }) {
         <span>{opportunities.length}</span>
       </div>
       <div className="impact-list">
-        {opportunities.map((item) => (
-          <article className="impact-card" key={item.key}>
+        {opportunities.map((item, index) => (
+          <article className="impact-card" key={`${item.key}-${item.severity}-${index}`}>
             <div className="impact-top">
               <Badge severity={item.severity}>{item.key}</Badge>
               <strong>{item.title}</strong>

@@ -25,6 +25,7 @@ const [mainSource, reportSource, summarySource, issuesSource, uiSource] = await 
 assert.match(mainSource, /<WorkspaceReport/);
 assert.match(reportSource, /<ReportEmptyState t=\{t\} \/>/);
 assert.match(reportSource, /gscRows=\{gsc\.rows\}/);
+assert.match(reportSource, /searchInsights=\{gsc\.searchInsights\}/);
 assert.match(reportSource, /inspectionResults=\{inspectionResults\}/);
 assert.match(reportSource, /buildUrlInspectionCandidates\(report, gsc\.rows, comparisonEntry\)/);
 assert.match(reportSource, /inspectionCandidateCount=\{inspectionCandidates\.length\}/);
@@ -36,7 +37,7 @@ assert.match(summarySource, /coverageCannotConclude/);
 assert.match(summarySource, /report\.summary\.healthScore/);
 assert.match(summarySource, /report\.truncation\?\.truncated/);
 assert.match(issuesSource, /robotsImpactIssueType\(item\.scope\)/);
-assert.match(issuesSource, /normalizeReportIssues\(report, \{ gscRows, inspectionResults \}\)/);
+assert.match(issuesSource, /normalizeReportIssues\(report, \{ gscRows, searchInsights, inspectionResults \}\)/);
 assert.match(issuesSource, /applyIssueStatuses/);
 assert.match(issuesSource, /saveIssueStatuses\(report, next\)/);
 assert.match(issuesSource, /function FixPlan/);

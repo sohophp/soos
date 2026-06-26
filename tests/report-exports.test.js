@@ -110,5 +110,6 @@ assert.match(reportSource, /<GoogleOverview report=\{report\}/);
 assert.match(reportSource, /downloadAuditCsv\(report, gsc\.rows, pages\)/);
 assert.match(overviewSource, /buildSearchVisibility\(report\)/);
 assert.match(overviewSource, /buildGscOpportunities\(report, rows \|\| \[\], language\)/);
+assert.match(overviewSource, /key=\{`\$\{item\.key\}-\$\{item\.severity\}-\$\{index\}`\}/);
 
 console.log("report exports tests passed");

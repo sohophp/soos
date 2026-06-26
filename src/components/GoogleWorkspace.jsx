@@ -30,6 +30,7 @@ export function GoogleWorkspace({ gsc, report, language }) {
             status={gsc.status}
             siteUrl={gsc.siteUrl}
             onRows={(rows) => gsc.setRows(rows, { source: "api", siteUrl: gsc.siteUrl })}
+            onInsights={gsc.setSearchInsights}
             language={language}
           />
         </>

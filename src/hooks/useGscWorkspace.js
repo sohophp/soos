@@ -8,6 +8,7 @@ const UNAVAILABLE_STATUS = Object.freeze({
 
 export function useGscWorkspace() {
   const [rows, setRows] = useState([]);
+  const [searchInsights, setSearchInsights] = useState([]);
   const [rowsSource, setRowsSource] = useState("");
   const [rowsSiteUrl, setRowsSiteUrl] = useState("");
   const [status, setStatus] = useState(null);
@@ -16,6 +17,7 @@ export function useGscWorkspace() {
 
   function clearRows() {
     setRows([]);
+    setSearchInsights([]);
     setRowsSource("");
     setRowsSiteUrl("");
   }
@@ -50,6 +52,10 @@ export function useGscWorkspace() {
     setRowsSiteUrl(context.siteUrl || "");
   }
 
+  function applySearchInsights(nextInsights) {
+    setSearchInsights(Array.isArray(nextInsights) ? nextInsights : []);
+  }
+
   async function refreshStatus() {
     try {
       const nextStatus = await getGscStatus();
@@ -74,6 +80,7 @@ export function useGscWorkspace() {
 
   return {
     rows,
+    searchInsights,
     rowsSource,
     rowsSiteUrl,
     status,
@@ -81,6 +88,7 @@ export function useGscWorkspace() {
     resetKey,
     clearRows,
     setRows: applyRows,
+    setSearchInsights: applySearchInsights,
     setStatus: applyStatus,
     setSiteUrl: changeSiteUrl,
     refreshStatus,

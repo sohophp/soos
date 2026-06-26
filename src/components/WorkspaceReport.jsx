@@ -74,6 +74,7 @@ export function WorkspaceReport({
           report={report}
           t={t}
           gscRows={gsc.rows}
+          searchInsights={gsc.searchInsights}
           inspectionResults={inspectionResults}
           onSelectIssue={selectIssue}
         />

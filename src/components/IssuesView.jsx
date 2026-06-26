@@ -257,13 +257,13 @@ function SignalList({ title, signals, labels, t, badgeLabel, severityFor, onSele
   );
 }
 
-export function IssuesView({ report, t, onSelectIssue, gscRows = [], inspectionResults = [] }) {
+export function IssuesView({ report, t, onSelectIssue, gscRows = [], searchInsights = [], inspectionResults = [] }) {
   const [issueStatuses, setIssueStatuses] = useState({});
   useEffect(() => {
     setIssueStatuses(loadIssueStatuses(report));
   }, [report?.input?.siteRootUrl, report?.input?.originalUrl]);
   const normalizedIssues = applyIssueStatuses(
-    normalizeReportIssues(report, { gscRows, inspectionResults }),
+    normalizeReportIssues(report, { gscRows, searchInsights, inspectionResults }),
     issueStatuses,
   );
   const openIssues = normalizedIssues.filter((issue) => issue.status === "open");

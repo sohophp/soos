@@ -17,6 +17,7 @@ All notable changes to soos will be documented in this file.
 - Pinned the production chunk-size warning baseline at 600 kB and added a regression test so build warnings remain meaningful.
 - Added report coverage summaries that make scan limits, GSC connection, URL Inspection sampling, PageSpeed/CrUX usage, and unsafe conclusions explicit.
 - Added regression coverage for issue normalization, confidence classification, priority scoring, fix instructions, and report limitations.
+- Restored Search Analytics opportunity handoff into the Issues Fix Plan and made Google overview opportunity keys unique when the same URL appears in multiple findings.
 
 ### PageSpeed Insights
 

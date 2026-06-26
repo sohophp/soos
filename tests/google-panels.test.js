@@ -215,8 +215,10 @@ assert.match(sitemapSource, /currentMatchCount/);
 assert.doesNotMatch(configSource, />\{copy\.refresh\}</);
 assert.doesNotMatch(configSource, />\{testing \? copy\.testing : copy\.test\}</);
 assert.match(analyticsSource, /if \(body\.dimension === "page"\) onRows/);
+assert.match(analyticsSource, /onInsights\?\.\(insights\)/);
 assert.match(analyticsSource, /setComparisonRanges\(null\)/);
 assert.ok((analyticsSource.match(/onRows\(\[\]\)/g) || []).length >= 2);
+assert.ok((analyticsSource.match(/onInsights\?\.\(\[\]\)/g) || []).length >= 2);
 assert.match(inspectionSource, /if \(!gscStatus\?\.configured\)/);
 
 console.log("google panels tests passed");
