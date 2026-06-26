@@ -2,8 +2,8 @@
 
 export const dictionaries = {
   en: {
-    heading: "Google crawl diagnostics",
-    subheading: "sitemap, robots.txt, canonical, and hreflang checks",
+    heading: "Technical SEO audit",
+    subheading: "Audit sitemap, robots.txt, indexability, canonical, hreflang, structured data, and optional Google evidence.",
     placeholder: "https://example.com, /sitemap.xml, or /robots.txt",
     skipToContent: "Skip to main content",
     languageLabel: "Interface language",
@@ -267,8 +267,8 @@ export const dictionaries = {
     invalidHreflangValues: "Invalid hreflang values",
   },
   "zh-CN": {
-    heading: "\u0047\u006f\u006f\u0067\u006c\u0065 \u6293\u53d6\u8bca\u65ad",
-    subheading: "\u68c0\u67e5 sitemap\u3001robots.txt\u3001canonical \u548c hreflang",
+    heading: "\u6280\u672f SEO \u68c0\u67e5",
+    subheading: "\u68c0\u67e5 sitemap\u3001robots.txt\u3001\u53ef\u7d22\u5f15\u6027\u3001canonical\u3001hreflang\u3001\u7ed3\u6784\u5316\u6570\u636e\uff0c\u5e76\u53ef\u9009\u63a5\u5165 Google \u8bc1\u636e\u3002",
     placeholder: "https://example.com\u3001/sitemap.xml \u6216 /robots.txt",
     skipToContent: "\u8df3\u5230\u4e3b\u8981\u5185\u5bb9",
     languageLabel: "\u754c\u9762\u8bed\u8a00",
@@ -532,8 +532,8 @@ export const dictionaries = {
     invalidHreflangValues: "\u65e0\u6548\u7684 hreflang \u503c",
   },
   "zh-TW": {
-    heading: "\u0047\u006f\u006f\u0067\u006c\u0065 \u6293\u53d6\u8a3a\u65b7",
-    subheading: "\u6aa2\u67e5 sitemap\u3001robots.txt\u3001canonical \u548c hreflang",
+    heading: "\u6280\u8853 SEO \u6aa2\u67e5",
+    subheading: "\u6aa2\u67e5 sitemap\u3001robots.txt\u3001\u53ef\u7d22\u5f15\u6027\u3001canonical\u3001hreflang\u3001\u7d50\u69cb\u5316\u8cc7\u6599\uff0c\u4e26\u53ef\u9078\u63a5\u5165 Google \u8b49\u64da\u3002",
     placeholder: "https://example.com\u3001/sitemap.xml \u6216 /robots.txt",
     skipToContent: "\u8df3\u5230\u4e3b\u8981\u5167\u5bb9",
     languageLabel: "\u4ecb\u9762\u8a9e\u8a00",
