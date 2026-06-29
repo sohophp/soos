@@ -7,6 +7,7 @@ import {
   ListChecks,
   ScanSearch,
   Settings,
+  Images,
 } from "lucide-react";
 import { formatApiError } from "./api-client.js";
 import {
@@ -26,6 +27,7 @@ import {
 } from "./components/ScanSetupPanels.jsx";
 import { WorkspaceNavigation } from "./components/WorkspaceNavigation.jsx";
 import { WorkspaceReport } from "./components/WorkspaceReport.jsx";
+import { ImageSeoAudit } from "./components/ImageSeoAudit.jsx";
 import {
   detectLanguage,
   dictionaries,
@@ -58,6 +60,7 @@ function App() {
   });
   const workspaceViews = useMemo(() => [
     ["scan", ScanSearch],
+    ["images", Images],
     ["google", ChartNoAxesCombined],
     ["issues", ListChecks],
     ["urls", Link],
@@ -164,6 +167,10 @@ function App() {
             }}
           />
         </ErrorBoundary>
+      </div>
+
+      <div className="workspace-view" hidden={activeView !== "images"}>
+        <ErrorBoundary panel><ImageSeoAudit /></ErrorBoundary>
       </div>
 
       <div className="workspace-view" hidden={activeView !== "google"}>

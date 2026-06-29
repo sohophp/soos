@@ -858,6 +858,7 @@ export const dictionaries = {
 export const workspaceText = {
   en: {
     scan: "Scan",
+    images: "Images",
     google: "Google",
     issues: "Issues",
     urls: "URLs",
@@ -887,6 +888,7 @@ export const workspaceText = {
   },
   "zh-CN": {
     scan: "扫描",
+    images: "图片",
     google: "Google",
     issues: "问题",
     urls: "网址",
@@ -916,6 +918,7 @@ export const workspaceText = {
   },
   "zh-TW": {
     scan: "掃描",
+    images: "圖片",
     google: "Google",
     issues: "問題",
     urls: "網址",
@@ -1757,8 +1760,5 @@ export function formatText(template, values) {
 }
 
 export function detectLanguage() {
-  const lang = (navigator.language || navigator.userLanguage || "en").toLowerCase();
-  if (lang.includes("tw") || lang.includes("hk") || lang.includes("hant")) return "zh-TW";
-  if (lang.startsWith("zh")) return "zh-CN";
   return "en";
 }

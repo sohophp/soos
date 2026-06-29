@@ -1,4 +1,4 @@
-export const WORKSPACE_VIEW_KEYS = ["scan", "google", "issues", "urls", "history", "settings"];
+export const WORKSPACE_VIEW_KEYS = ["scan", "images", "google", "issues", "urls", "history", "settings"];
 
 const STORAGE_KEY = "soos.workspaceView.v1";
 

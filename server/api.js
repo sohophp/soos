@@ -37,6 +37,8 @@ import { handleGscRoute } from "./routes/gsc-routes.js";
 import { handlePageSpeedRoute } from "./routes/pagespeed-routes.js";
 import { handleSessionDataRoute } from "./routes/session-data-routes.js";
 import { handleSystemRoute } from "./routes/system-routes.js";
+import { handleImageSeoAuditRoute } from "./routes/image-seo-audit-routes.js";
+import { imageSeoAudit } from "./image-seo-audit.js";
 
 export { isPublicIp, trustedGoogleHostname } from "./googlebot-verifier.js";
 export { inspectJsonLd } from "./structured-data.js";
@@ -446,6 +448,10 @@ export function handleRequest(req, res) {
   if (handleCruxRoute(req, res, requestPath, {
     runCrux,
     defaultApiKey: cruxApiKeyFromEnv,
+    sendRouteError,
+  })) return;
+  if (handleImageSeoAuditRoute(req, res, requestPath, {
+    auditPage: (url, options) => imageSeoAudit.auditPage(url, options),
     sendRouteError,
   })) return;
   if (handleAuditJobRoute(req, res, requestPath, {

@@ -7,7 +7,7 @@ import {
 } from "../src/workspace-views.js";
 import { workspaceText } from "../src/i18n.js";
 
-assert.deepEqual(WORKSPACE_VIEW_KEYS, ["scan", "google", "issues", "urls", "history", "settings"]);
+assert.deepEqual(WORKSPACE_VIEW_KEYS, ["scan", "images", "google", "issues", "urls", "history", "settings"]);
 assert.equal(normalizeWorkspaceView("google"), "google");
 assert.equal(normalizeWorkspaceView("unknown"), "scan");
 
