@@ -130,7 +130,9 @@ test("renders actionable PageSpeed and CrUX diagnostics", async ({ page }) => {
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "PageSpeed Insights" })).toBeVisible();
+  await page.getByRole("tab", { name: "Settings", exact: true }).click();
   await page.getByLabel("Google API key").fill("browser-session-key");
+  await page.getByRole("tab", { name: "Scan", exact: true }).click();
   await page.getByRole("checkbox", { name: "Also load dedicated CrUX field data" }).check();
   await page.getByRole("button", { name: "Run PageSpeed", exact: true }).click();
 
@@ -166,7 +168,9 @@ test("turns a disabled CrUX API response into an enable and retry action", async
   });
 
   await page.goto("/");
+  await page.getByRole("tab", { name: "Settings", exact: true }).click();
   await page.getByLabel("Google API key").fill("browser-session-key");
+  await page.getByRole("tab", { name: "Scan", exact: true }).click();
   await page.getByRole("checkbox", { name: "Also load dedicated CrUX field data" }).check();
   await page.getByRole("button", { name: "Run PageSpeed", exact: true }).click();
 

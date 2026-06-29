@@ -114,7 +114,7 @@ test("localizes a restored large report and keeps tab navigation accessible", as
   const languages = [
     {
       value: "en",
-      title: "Technical SEO audit",
+      title: "SEO Command Center",
       scan: "Scan",
       urls: "URLs",
       matchCount: "125 matching URLs",
@@ -122,7 +122,7 @@ test("localizes a restored large report and keeps tab navigation accessible", as
     },
     {
       value: "zh-CN",
-      title: "技术 SEO 检查",
+      title: "SEO 智能诊断台",
       scan: "扫描",
       urls: "网址",
       matchCount: "125 个匹配网址",
@@ -130,7 +130,7 @@ test("localizes a restored large report and keeps tab navigation accessible", as
     },
     {
       value: "zh-TW",
-      title: "技術 SEO 檢查",
+      title: "SEO 智能診斷台",
       scan: "掃描",
       urls: "網址",
       matchCount: "125 個符合網址",
